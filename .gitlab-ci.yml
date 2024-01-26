@@ -1,19 +1,27 @@
 image: docker.io/gumjoe/wacc-ci-scala:slim
 
-stages:          # List of stages for jobs, and their order of execution
+stages:         
   - build
   - test
   - deploy
 
-build-job:       # This job runs in the build stage, which runs first.
+build-job:       
   stage: build
   script:
-    - echo "Compiling the code..."
+    - echo "Building..."
     - scala-cli .
-    - echo "Compile complete."
+    - echo "Build complete."
 
-unit-test-job:   # This job runs in the test stage.
-  stage: test    # It only starts when the job in the build stage completes successfully.
+unit-test-job:  
+  stage: test   
   script:
-    - echo "Running unit tests... This will take about 60 seconds."
+    - echo "Running unit tests..."
     - scala-cli test .
+    - echo "Tests complete."
+
+lint-test-job:
+  stage: test
+  script: 
+    - echo "Linting..."
+    - scalafix .
+    - echo "Linting complete."
