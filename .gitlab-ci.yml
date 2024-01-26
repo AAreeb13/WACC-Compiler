@@ -1,3 +1,5 @@
+image: gumjoe/wacc-ci-scala:x86
+
 stages:          # List of stages for jobs, and their order of execution
   - build
   - test
