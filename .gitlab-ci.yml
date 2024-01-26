@@ -1,4 +1,4 @@
-image: gumjoe/wacc-ci-scala:x86
+image: docker.io/gumjoe/wacc-ci-scala:slim
 
 stages:          # List of stages for jobs, and their order of execution
   - build
