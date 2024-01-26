@@ -25,5 +25,3 @@ lint-test-job:
     - echo "Linting..."
     - scalafix .
     - echo "Linting complete."
-
-#Dummy commit to test pipeline
