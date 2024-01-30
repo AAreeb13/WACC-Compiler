@@ -21,11 +21,14 @@ object parser {
     
     private lazy val expr: Parsley[Expr] = 
         precedence[Expr](atom)(
+            Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
             Ops(InfixL)(Add from "+", Sub from "-"),
-            Ops(InfixL)(Mul from "*", Mod from "%"), 
-            Ops(InfixL)(Div from "/")
         )
 
-    private lazy val atom = Var(ident) | IntVal(intLiter) | CharVal(charLiter) | StrVal(strLiter)
+    private lazy val atom 
+        = Var(ident) 
+        | IntVal(intLiter) 
+        | CharVal(charLiter) 
+        | StrVal(strLiter)
         
 }
