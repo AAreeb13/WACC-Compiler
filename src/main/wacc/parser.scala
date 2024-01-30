@@ -21,8 +21,12 @@ object parser {
     
     lazy val expr: Parsley[Expr] = 
         precedence[Expr](atom)(
+            Ops(Prefix)(Not from "!", Neg from "-", Len from "len", Ord from "ord", Chr from "chr"),
             Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
-            Ops(InfixL)(Add from "+", Sub from "-")
+            Ops(InfixL)(Add from "+", Sub from "-"),
+            Ops(InfixN)(Grt from ">", GrtEql from ">=", Less from "<", LessEql from "<="),
+            Ops(InfixR)(And from "&&"),
+            Ops(InfixR)(Or from "||")
         )
 
     lazy val atom 
@@ -33,5 +37,6 @@ object parser {
         BoolVal(boolLiter) |
         (PairVal from pairLiter) | 
         ArrayVal(ident, some("[" ~> expr <~ "]")) |
-        "(" ~> expr <~ ")"       
+        "(" ~> expr <~ ")"    
+   
 }

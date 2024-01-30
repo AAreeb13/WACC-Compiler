@@ -7,7 +7,7 @@ object Prog extends generic.ParserBridge1[List[Expr], Prog]
 
 sealed trait Expr
 
-/*------------------------------Binary Operators------------------------------*/
+/*------------------------------ Binary Operators ------------------------------*/
 
 case class Add(x: Expr, y: Expr) extends Expr
 object Add extends generic.ParserBridge2[Expr, Expr, Expr]
@@ -24,7 +24,31 @@ object Div extends generic.ParserBridge2[Expr, Expr, Expr]
 case class Mod(x: Expr, y: Expr) extends Expr
 object Mod extends generic.ParserBridge2[Expr, Expr, Expr]
 
-/*------------------------------Atoms------------------------------*/
+case class Grt(x: Expr, y: Expr) extends Expr
+object Grt extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class GrtEql(x: Expr, y: Expr) extends Expr
+object GrtEql extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class Less(x: Expr, y: Expr) extends Expr
+object Less extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class LessEql(x: Expr, y: Expr) extends Expr
+object LessEql extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class Eql(x: Expr, y: Expr) extends Expr
+object Eql extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class NotEql(x: Expr, y: Expr) extends Expr
+object NotEql extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class And(x: Expr, y: Expr) extends Expr
+object And extends generic.ParserBridge2[Expr, Expr, Expr]
+
+case class Or(x: Expr, y: Expr) extends Expr
+object Or extends generic.ParserBridge2[Expr, Expr, Expr]
+
+/*------------------------------ Atoms ------------------------------*/
 
 /* For <ident> */
 case class Var(v: String) extends Expr
@@ -44,5 +68,22 @@ object BoolVal extends generic.ParserBridge1[Boolean, Expr]
 
 case object PairVal extends Expr with generic.ParserBridge0[Expr]
 
-case class ArrayVal(i: String, exprs: List[Expr]) extends Expr
+case class ArrayVal(id: String, exprs: List[Expr]) extends Expr
 object ArrayVal extends generic.ParserBridge2[String, List[Expr], Expr]
+
+/*------------------------------ Unary Operators ------------------------------*/
+
+case class Not(x: Expr) extends Expr
+object Not extends generic.ParserBridge1[Expr, Expr]
+
+case class Neg(x: Expr) extends Expr
+object Neg extends generic.ParserBridge1[Expr, Expr]
+
+case class Len(x: Expr) extends Expr
+object Len extends generic.ParserBridge1[Expr, Expr]
+
+case class Ord(x: Expr) extends Expr
+object Ord extends generic.ParserBridge1[Expr, Expr]
+
+case class Chr(x: Expr) extends Expr
+object Chr extends generic.ParserBridge1[Expr, Expr]
