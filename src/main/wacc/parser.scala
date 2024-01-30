@@ -14,21 +14,24 @@ object parser {
     def parse[Err: ErrorBuilder](input: String): Result[Err, Prog] = parser.parse(input)
     
 
-    private lazy val parser = fully(prog)
-    private lazy val prog = Prog(exprs)
+    lazy val parser = fully(prog)
+    lazy val prog = Prog(exprs)
 
-    private lazy val exprs = many(expr)
+    lazy val exprs = many(expr)
     
-    private lazy val expr: Parsley[Expr] = 
+    lazy val expr: Parsley[Expr] = 
         precedence[Expr](atom)(
             Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
-            Ops(InfixL)(Add from "+", Sub from "-"),
+            Ops(InfixL)(Add from "+", Sub from "-")
         )
 
-    private lazy val atom 
-        = Var(ident) 
-        | IntVal(intLiter) 
-        | CharVal(charLiter) 
-        | StrVal(strLiter)
-        
+    lazy val atom 
+        = Var(ident) | 
+        IntVal(intLiter) | 
+        CharVal(charLiter) | 
+        StrVal(strLiter)| 
+        BoolVal(boolLiter) |
+        (PairVal from pairLiter) | 
+        ArrayVal(ident, some("[" ~> expr <~ "]")) |
+        "(" ~> expr <~ ")"       
 }

@@ -6,6 +6,9 @@ case class Prog(exprs: List[Expr])
 object Prog extends generic.ParserBridge1[List[Expr], Prog]
 
 sealed trait Expr
+
+/*------------------------------Binary Operators------------------------------*/
+
 case class Add(x: Expr, y: Expr) extends Expr
 object Add extends generic.ParserBridge2[Expr, Expr, Expr]
 
@@ -21,6 +24,9 @@ object Div extends generic.ParserBridge2[Expr, Expr, Expr]
 case class Mod(x: Expr, y: Expr) extends Expr
 object Mod extends generic.ParserBridge2[Expr, Expr, Expr]
 
+/*------------------------------Atoms------------------------------*/
+
+/* For <ident> */
 case class Var(v: String) extends Expr
 object Var extends generic.ParserBridge1[String, Expr]
 
@@ -32,3 +38,11 @@ object CharVal extends generic.ParserBridge1[Char, Expr]
 
 case class StrVal(s: String) extends Expr
 object StrVal extends generic.ParserBridge1[String, Expr]
+
+case class BoolVal(b: Boolean) extends Expr
+object BoolVal extends generic.ParserBridge1[Boolean, Expr]
+
+case object PairVal extends Expr with generic.ParserBridge0[Expr]
+
+case class ArrayVal(i: String, exprs: List[Expr]) extends Expr
+object ArrayVal extends generic.ParserBridge2[String, List[Expr], Expr]
