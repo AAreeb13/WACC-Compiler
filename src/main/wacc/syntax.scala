@@ -23,3 +23,12 @@ object Mod extends generic.ParserBridge2[Expr, Expr, Expr]
 
 case class Var(v: String) extends Expr
 object Var extends generic.ParserBridge1[String, Expr]
+
+case class IntVal(i: BigInt) extends Expr
+object IntVal extends generic.ParserBridge1[BigInt, Expr]
+
+case class CharVal(c: Char) extends Expr
+object CharVal extends generic.ParserBridge1[Char, Expr]
+
+case class StrVal(s: String) extends Expr
+object StrVal extends generic.ParserBridge1[String, Expr]

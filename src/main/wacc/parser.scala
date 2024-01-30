@@ -26,6 +26,6 @@ object parser {
             Ops(InfixL)(Div from "/")
         )
 
-    private lazy val atom = Var(ident)
+    private lazy val atom = Var(ident) | IntVal(intLiter) | CharVal(charLiter) | StrVal(strLiter)
         
 }

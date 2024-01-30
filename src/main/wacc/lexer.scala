@@ -11,12 +11,14 @@ object lexer {
             identifierStart = predicate.Basic(c => c.isLetter || c == '_'),
             identifierLetter = predicate.Basic(c => c.isLetterOrDigit || c == '_')
         ),
-        spaceDesc = SpaceDesc.plain
+        spaceDesc = SpaceDesc.plain 
     )
     private val lexer = new Lexer(desc)
 
-    val integer = lexer.lexeme.integer.decimal32
+    val intLiter: Parsley[BigInt] = lexer.lexeme.integer.decimal32[BigInt]
     val ident: Parsley[String] = lexer.lexeme.names.identifier
+    val charLiter = lexer.lexeme.character.ascii
+    val strLiter = lexer.lexeme.string.ascii
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
 }
