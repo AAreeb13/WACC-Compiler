@@ -13,7 +13,7 @@ import lexer._
 object parser {
     def parse[Err: ErrorBuilder](input: String): Result[Err, Prog] = parser.parse(input)
     
-    lazy val flip
+
     lazy val parser = fully(prog)
     lazy val prog = Prog(exprs)
 
@@ -31,11 +31,12 @@ object parser {
 
     lazy val atom 
         = atomic(ArrayVal(ident, some("[" ~> expr <~ "]"))) |
+        atomic((PairVal from pairLiter)) |
+        atomic(BoolVal(boolLiter)) |
         Var(ident) | 
         IntVal(intLiter) | 
         CharVal(charLiter) | 
         StrVal(strLiter)| 
-        BoolVal(boolLiter) |
-        (PairVal from pairLiter) | 
-        "(" ~> expr <~ ")"
+        "(" ~> expr <~ ")"    
+   
 }
