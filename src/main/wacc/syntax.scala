@@ -154,5 +154,5 @@ object Scope extends generic.ParserBridge1[List[Stmt], Stmt]
 case class Fst(_lvalue: LValue) extends PairElem
 object Fst extends generic.ParserBridge1[LValue, PairElem]
 
-case class Snd(_rvalue: RValue) extends PairElem
-object Snd extends generic.ParserBridge1[RValue, PairElem]
+case class Snd(_rvalue: LValue) extends PairElem
+object Snd extends generic.ParserBridge1[LValue, PairElem]
