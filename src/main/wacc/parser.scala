@@ -24,7 +24,7 @@ object parser {
             Ops(Prefix)(Not from "!", Neg from "-", Len from "len", Ord from "ord", Chr from "chr"),
             Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
             Ops(InfixL)(Add from "+", Sub from "-"),
-            Ops(InfixN)(Grt from ">", GrtEql from ">=", Less from "<", LessEql from "<="),
+            Ops(InfixN)(atomic(GrtEql from ">="), Grt from ">", atomic(LessEql from "<="), Less from "<"),
             Ops(InfixN)(Eql from "==", NotEql from "!="),
             Ops(InfixR)(And from "&&"),
             Ops(InfixR)(Or from "||")
@@ -39,5 +39,24 @@ object parser {
         CharVal(charLiter) | 
         StrVal(strLiter)| 
         "(" ~> expr <~ ")"    
-   
+
+    lazy val baseType 
+        = (IntType from "int") |
+        (CharType from "char") |
+        (StrType from "string") |
+        (BoolType from "bool")
+
+    lazy val arrType: Parsley[Type]
+        = precedence[Type](baseType, pairType)(
+            Ops(Postfix)(ArrType from "[" <~> "]")
+        )
+
+    lazy val pairType
+        = PairType(("pair" ~> "(") ~>  pairElemType, "," ~> pairElemType <~ ")")
+
+    lazy val pairElemType: Parsley[Type] 
+        = baseType |
+        arrType |
+        (ErasedPair from "pair")
+
 }

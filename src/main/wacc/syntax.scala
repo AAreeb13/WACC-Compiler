@@ -6,6 +6,7 @@ case class Prog(exprs: List[Expr])
 object Prog extends generic.ParserBridge1[List[Expr], Prog]
 
 sealed trait Expr
+sealed trait Type
 
 /*------------------------------ Binary Operators ------------------------------*/
 
@@ -87,3 +88,18 @@ object Ord extends generic.ParserBridge1[Expr, Expr]
 
 case class Chr(x: Expr) extends Expr
 object Chr extends generic.ParserBridge1[Expr, Expr]
+
+/*------------------------------ Types ------------------------------*/
+
+case object IntType extends Type with generic.ParserBridge0[Type]
+case object CharType extends Type with generic.ParserBridge0[Type]
+case object StrType extends Type with generic.ParserBridge0[Type]
+case object BoolType extends Type with generic.ParserBridge0[Type]
+
+case class ArrType(t: Type) extends Type
+object ArrType extends generic.ParserBridge1[Type, Type]
+
+case class PairType(t1: Type, t2: Type) extends Type
+object PairType extends generic.ParserBridge2[Type, Type, Type]
+
+case object ErasedPair extends Type with generic.ParserBridge0[Type]
