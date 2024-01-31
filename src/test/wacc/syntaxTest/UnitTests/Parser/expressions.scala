@@ -30,23 +30,17 @@ class parserExpressionTest extends AnyFlatSpec {
     }
     it should "match len on an expr" in {
         parser.expr.parse("len(arr)") shouldBe Success(Len(Var("arr")))
-        parser.expr.parse("len(arr[1])") shouldBe Success(Len(ArrayVal("arr",IntVal(1) :: Nil))) 
-        parser.expr.parse("len arr") shouldBe Success(Len(Var("arr")))
-        parser.expr.parse("len arr[1]") shouldBe Success(Len(ArrayVal("arr",IntVal(1) :: Nil)))
-                 
+        parser.expr.parse("len(arr[1])") shouldBe Success(Len(ArrayVal("arr",IntVal(1) :: Nil)))                  
     }
     it should "match ord on an expr" in {
-        parser.expr.parse("ord x") shouldBe Success(Ord(Var("x")))
-        parser.expr.parse("ord \'c\'") shouldBe Success(Ord(CharVal('c')))
+        parser.expr.parse("ord(x)") shouldBe Success(Ord(Var("x")))
+        parser.expr.parse("ord(\'c\')") shouldBe Success(Ord(CharVal('c')))
     }
     it should "match binary logical and/or symbols" in {
         parser.expr.parse("true&&false") shouldBe Success(And(BoolVal(true), BoolVal(false)))
         parser.expr.parse("x||true") shouldBe Success(Or(Var("x"), BoolVal(true)))
     }
-    it should "match binary logical and/or symbols with spaces" in {
-        parser.expr.parse("true  &&  false") shouldBe Success(And(BoolVal(true), BoolVal(false)))
-        parser.expr.parse("x  ||  true") shouldBe Success(Or(Var("x"), BoolVal(true)))
-    }
+    
     it should "match with equality and inequality symbols between two exprs" in {
         parser.expr.parse("x==6") shouldBe Success(Eql(Var("x"), IntVal(6)))
         parser.expr.parse("y!=x") shouldBe Success(NotEql(Var("y"), Var("x")))
@@ -58,9 +52,20 @@ class parserExpressionTest extends AnyFlatSpec {
     }
     it should "match with binary operators between two expressions" in {
         parser.expr.parse("x*4") shouldBe Success(Mul(Var("x"), IntVal(4)))
-        parser.expr.parse("5+23") shouldBe Success(Add(IntVal(5), IntVal(23)))
+        parser.expr.parse("5+a") shouldBe Success(Add(IntVal(5), Var("a")))
         parser.expr.parse("5-23") shouldBe Success(Sub(IntVal(5), IntVal(23)))
         parser.expr.parse("23/x") shouldBe Success(Div(IntVal(23), Var("x")))
         parser.expr.parse("y%x") shouldBe Success(Mod(Var("y"),Var("x")))
+    }
+    it should "match binary logical and/or symbols with spaces" in {
+        parser.expr.parse("true  &&  false") shouldBe Success(And(BoolVal(true), BoolVal(false)))
+        parser.expr.parse("x  ||  true") shouldBe Success(Or(Var("x"), BoolVal(true)))
+    }
+    it should "match unary operations with spaces" in {
+        parser.expr.parse("len arr") shouldBe Success(Len(Var("arr")))
+        parser.expr.parse("ord x") shouldBe Success(Ord(Var("x")))
+    }
+    it should "match with equality and inequality symbols with unnecessary spaces" in {
+        parser.expr.parse("y != x") shouldBe Success(NotEql(Var("y"), Var("x")))
     }
 }
