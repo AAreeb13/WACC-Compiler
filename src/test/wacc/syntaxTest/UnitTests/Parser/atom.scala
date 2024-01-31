@@ -8,6 +8,7 @@ import parsley.token.{Lexer, predicate}
 import parsley.token.Lexer
 import parsley.token.descriptions._
 import parsley.{Result, Success, Failure}
+import org.scalactic.Bool
 
 class parserAtomTest extends AnyFlatSpec {
     "An atom" should "match an integer value" in {
@@ -38,25 +39,3 @@ class parserAtomTest extends AnyFlatSpec {
     }    
 }
 
-class parserExpressionTest extends AnyFlatSpec {
-    "An expr" should "match an atom" in {
-        parser.expr.parse("1") shouldBe Success(IntVal(1))
-        parser.expr.parse("\'c\'") shouldBe Success(CharVal('c'))
-        parser.expr.parse("\"Hello Mahdi Ahmed\"") shouldBe Success(StrVal("Hello Mahdi Ahmed"))
-        parser.expr.parse("variable") shouldBe Success(Var("variable"))
-        parser.expr.parse("arr[3]") shouldBe Success(ArrayVal("arr", IntVal(3) :: Nil))
-        parser.expr.parse("((((\"hello\"))))") shouldBe Success(StrVal("hello"))
-        parser.expr.parse("null") shouldBe Success(PairVal)
-        parser.expr.parse("true") shouldBe Success(BoolVal(true))
-        parser.expr.parse("false") shouldBe Success(BoolVal(false))
-    }
-    it should "match not, '!', operated expressions" in {
-        parser.expr.parse("!true") shouldBe Success(Not(BoolVal(true)))
-    }
-    it should "match negation, '-', on an expression" in {
-        parser.expr.parse("-4") shouldBe Success(Neg(IntVal(4)))
-    }
-    it should "match len on an expression" in {
-        
-    }
-}
