@@ -11,7 +11,41 @@ object lexer {
             identifierStart = predicate.Basic(c => c.isLetter || c == '_'),
             identifierLetter = predicate.Basic(c => c.isLetterOrDigit || c == '_')
         ),
-        spaceDesc = SpaceDesc.plain 
+        spaceDesc = SpaceDesc.plain, 
+        symbolDesc = SymbolDesc.plain.copy (
+            hardKeywords = Set (
+                "int",
+                "bool",
+                "char",
+                "string",
+                "pair",
+                "len",
+                "ord",
+                "chr",
+                "true",
+                "false",
+                "null"
+            ),
+            hardOperators = Set (
+                // binary operators
+                "*",
+                "/",
+                "%",
+                "+",
+                "-",
+                ">",
+                ">=",
+                "<",
+                "<=",
+                "==",
+                "!=",
+                "&&",
+                "||",
+                // unary operators
+                "!",
+                "-"
+            )
+        )
     )
     private val lexer = new Lexer(desc)
 

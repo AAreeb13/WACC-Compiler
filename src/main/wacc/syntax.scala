@@ -2,11 +2,13 @@ package wacc
 
 import parsley.generic
 
-case class Prog(exprs: List[Expr])
-object Prog extends generic.ParserBridge1[List[Expr], Prog]
+case class Prog(funcs: List[Func], stmt: Stmt)
+object Prog extends generic.ParserBridge2[List[Func], Stmt, Prog]
 
 sealed trait Expr
 sealed trait Type
+sealed trait Func
+sealed trait Stmt
 
 /*------------------------------ Binary Operators ------------------------------*/
 

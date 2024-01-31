@@ -15,7 +15,7 @@ object parser {
     
 
     lazy val parser = fully(prog)
-    lazy val prog = Prog(exprs)
+    lazy val prog = Prog("begin" ~> many(func), stmt <~ "end")
 
     lazy val exprs = many(expr)
     
@@ -63,5 +63,8 @@ object parser {
         = baseType |
         arrType |
         (ErasedPair from "pair")
+
+    lazy val func: Parsley[Func] = ???
+    lazy val stmt: Parsley[Stmt] = ???
 
 }
