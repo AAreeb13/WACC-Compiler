@@ -2,13 +2,14 @@ package wacc
 
 import parsley.generic
 
-case class Prog(funcs: List[Func], stmt: Stmt)
-object Prog extends generic.ParserBridge2[List[Func], Stmt, Prog]
+case class Prog(funcs: List[Func], stmts: List[Stmt])
+object Prog extends generic.ParserBridge2[List[Func], List[Stmt], Prog]
 
 sealed trait Expr
 sealed trait Type
-sealed trait Func
 sealed trait Stmt
+sealed trait LValue
+sealed trait RValue
 
 /*------------------------------ Binary Operators ------------------------------*/
 
@@ -105,3 +106,46 @@ case class PairType(t1: Type, t2: Type) extends Type
 object PairType extends generic.ParserBridge2[Type, Type, Type]
 
 case object ErasedPair extends Type with generic.ParserBridge0[Type]
+
+/*------------------------------ Program ------------------------------*/
+
+case class Func(retType: Type, name: String, params: List[Param], stats: List[Stmt])
+object Func extends generic.ParserBridge4[Type, String, List[Param], List[Stmt], Func]
+
+case class Param(_type: Type, name: String)
+object Param extends generic.ParserBridge2[Type, String, Param]
+
+case object Skip extends Stmt with generic.ParserBridge0[Stmt]
+
+case class AssignNew(t: Type, name: String, rvalue: RValue) extends Stmt
+object AssignNew extends generic.ParserBridge3[Type, String, RValue, Stmt]
+
+case class Assign(lvalue: LValue, rvalue: RValue) extends Stmt
+object Assign extends generic.ParserBridge2[LValue, RValue, Stmt]
+
+case class Read(lvalue: LValue) extends Stmt
+object Read extends generic.ParserBridge1[LValue, Stmt]
+
+case class Free(_expr: Expr) extends Stmt
+object Free extends generic.ParserBridge1[Expr, Stmt]
+
+case class Return(_expr: Expr) extends Stmt
+object Return extends generic.ParserBridge1[Expr, Stmt]
+
+case class Exit(_expr: Expr) extends Stmt
+object Exit extends generic.ParserBridge1[Expr, Stmt]
+
+case class Print(expr: Expr) extends Stmt
+object Print extends generic.ParserBridge1[Expr, Stmt]
+
+case class Println(expr: Expr) extends Stmt
+object Println extends generic.ParserBridge1[Expr, Stmt]
+
+case class If(cond: Expr, ifStat: List[Stmt], elseStat: List[Stmt]) extends Stmt
+object If extends generic.ParserBridge3[Expr, List[Stmt], List[Stmt], Stmt]
+
+case class While(cond: Expr, stats: List[Stmt]) extends Stmt
+object While extends generic.ParserBridge2[Expr, List[Stmt], Stmt]
+
+case class Scope(stats: List[Stmt]) extends Stmt
+object Scope extends generic.ParserBridge1[List[Stmt], Stmt]

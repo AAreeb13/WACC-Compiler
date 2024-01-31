@@ -15,7 +15,7 @@ object parser {
     
 
     lazy val parser = fully(prog)
-    lazy val prog = Prog("begin" ~> many(func), stmt <~ "end")
+    lazy val prog = "begin" ~> Prog(many(func), stmtList) <~ "end"
 
     lazy val exprs = many(expr)
     
@@ -64,7 +64,26 @@ object parser {
         arrType |
         (ErasedPair from "pair")
 
-    lazy val func: Parsley[Func] = ???
-    lazy val stmt: Parsley[Stmt] = ???
+    lazy val func: Parsley[Func] = Func(types, ident, "(" ~> many(paramList) <~ ")", "is" ~> stmtList <~ "end") 
 
+    lazy val stmtList = sepBy1(stmt, ";")
+
+    lazy val stmt: Parsley[Stmt] 
+        = Skip from "skip" |
+        AssignNew(types, ident <~ "=", rvalue) |
+        Assign(lvalue, "=" ~> rvalue) |
+        Read("read" ~> lvalue) |
+        Free("free" ~> expr) |
+        Return("return" ~> expr) |
+        Exit("exit" ~> expr) |
+        Print("print" ~> expr) |
+        Println("println" ~> expr) |
+        If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")
+        While("while" ~> expr, "do" ~> stmtList <~ "done") |
+        Scope("begin" ~> stmtList <~ "end") 
+
+
+    lazy val paramList = ???
+    lazy val rvalue = ???
+    lazy val lvalue = ???
 }
