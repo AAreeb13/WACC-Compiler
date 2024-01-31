@@ -40,6 +40,11 @@ object parser {
         StrVal(strLiter)| 
         "(" ~> expr <~ ")"    
 
+    lazy val types 
+        = baseType |
+        arrType |
+        pairType
+    
     lazy val baseType 
         = (IntType from "int") |
         (CharType from "char") |
