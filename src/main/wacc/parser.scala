@@ -25,6 +25,7 @@ object parser {
             Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
             Ops(InfixL)(Add from "+", Sub from "-"),
             Ops(InfixN)(Grt from ">", GrtEql from ">=", Less from "<", LessEql from "<="),
+            Ops(InfixN)(Eql from "==", NotEql from "!="),
             Ops(InfixR)(And from "&&"),
             Ops(InfixR)(Or from "||")
         )
