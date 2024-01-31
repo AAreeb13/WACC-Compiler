@@ -64,7 +64,7 @@ object parser {
         arrType |
         (ErasedPair from "pair")
 
-    lazy val func: Parsley[Func] = Func(types, ident, "(" ~> many(paramList) <~ ")", "is" ~> stmtList <~ "end") 
+    lazy val func: Parsley[Func] = Func(types, ident, "(" ~> paramList <~ ")", "is" ~> stmtList <~ "end") 
 
     lazy val stmtList = sepBy1(stmt, ";")
 
@@ -82,8 +82,12 @@ object parser {
         While("while" ~> expr, "do" ~> stmtList <~ "done") |
         Scope("begin" ~> stmtList <~ "end") 
 
-
-    lazy val paramList = ???
+    lazy val param = Param(types, ident)
+    lazy val paramList = sepBy1(param, ",")
     lazy val rvalue = ???
     lazy val lvalue = ???
+
+    lazy val pairElem 
+        = Fst("fst" ~> lvalue) | 
+        Snd("snd" ~> lvalue)
 }

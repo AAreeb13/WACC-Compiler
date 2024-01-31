@@ -10,6 +10,7 @@ sealed trait Type
 sealed trait Stmt
 sealed trait LValue
 sealed trait RValue
+sealed trait PairElem extends LValue with RValue
 
 /*------------------------------ Binary Operators ------------------------------*/
 
@@ -107,7 +108,7 @@ object PairType extends generic.ParserBridge2[Type, Type, Type]
 
 case object ErasedPair extends Type with generic.ParserBridge0[Type]
 
-/*------------------------------ Program ------------------------------*/
+/*------------------------------ Statements ------------------------------*/
 
 case class Func(retType: Type, name: String, params: List[Param], stats: List[Stmt])
 object Func extends generic.ParserBridge4[Type, String, List[Param], List[Stmt], Func]
@@ -117,13 +118,13 @@ object Param extends generic.ParserBridge2[Type, String, Param]
 
 case object Skip extends Stmt with generic.ParserBridge0[Stmt]
 
-case class AssignNew(t: Type, name: String, rvalue: RValue) extends Stmt
+case class AssignNew(t: Type, name: String, _rvalue: RValue) extends Stmt
 object AssignNew extends generic.ParserBridge3[Type, String, RValue, Stmt]
 
-case class Assign(lvalue: LValue, rvalue: RValue) extends Stmt
+case class Assign(_lvalue: LValue, _rvalue: RValue) extends Stmt
 object Assign extends generic.ParserBridge2[LValue, RValue, Stmt]
 
-case class Read(lvalue: LValue) extends Stmt
+case class Read(_lvalue: LValue) extends Stmt
 object Read extends generic.ParserBridge1[LValue, Stmt]
 
 case class Free(_expr: Expr) extends Stmt
@@ -149,3 +150,9 @@ object While extends generic.ParserBridge2[Expr, List[Stmt], Stmt]
 
 case class Scope(stats: List[Stmt]) extends Stmt
 object Scope extends generic.ParserBridge1[List[Stmt], Stmt]
+
+case class Fst(_lvalue: LValue) extends PairElem
+object Fst extends generic.ParserBridge1[LValue, PairElem]
+
+case class Snd(_rvalue: RValue) extends PairElem
+object Snd extends generic.ParserBridge1[RValue, PairElem]

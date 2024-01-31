@@ -41,7 +41,9 @@ object lexer {
                 "done",
                 "begin",
                 "end",
-                "is"
+                "is",
+                "fst",
+                "snd"
             ),
             hardOperators = Set (
                 // binary operators
