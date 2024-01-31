@@ -24,7 +24,24 @@ object lexer {
                 "chr",
                 "true",
                 "false",
-                "null"
+                "null",
+                "skip",
+                "read",
+                "free",
+                "return",
+                "exit",
+                "print",
+                "println",
+                "if",
+                "then",
+                "else",
+                "fi",
+                "while",
+                "do",
+                "done",
+                "begin",
+                "end",
+                "is"
             ),
             hardOperators = Set (
                 // binary operators
