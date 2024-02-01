@@ -76,7 +76,7 @@ object parser {
     lazy val arrLiter = ArrLiter(sepBy(expr, ","))
 
     lazy val stmt: Parsley[Stmt] 
-        = (Skip from "skip").debug("SKIP!!") |
+        = (Skip from "skip") |
         atomic(AssignNew(types, ident <~ "=", rvalue)) |
         atomic(Assign(lvalue, "=" ~> rvalue)) |
         atomic(Read("read" ~> lvalue)) |
