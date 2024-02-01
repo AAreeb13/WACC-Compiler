@@ -14,4 +14,9 @@ class parserStatementTest extends AnyFlatSpec {
     "\'skip\'" should "match stmt" in {
         parser.stmt.parse("skip") shouldBe Success(Skip)
     }
+    "\'free\'" should "match stmt" in {
+        parser.stmt.parse("free(array)") shouldBe Success(Free(Var("array")))
+    }
+    
+    
 }
