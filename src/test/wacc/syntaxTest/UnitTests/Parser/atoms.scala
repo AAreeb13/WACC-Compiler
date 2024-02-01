@@ -27,14 +27,14 @@ class parserAtomTest extends AnyFlatSpec {
     it should "match an expression in nested in brackets" in {
         parser.atom.parse("((((\"hello\"))))") shouldBe Success(StrVal("hello"))
     }
-    it should "match with a pair literal" in {
+    it should "match a pair literal" in {
         parser.atom.parse("null") shouldBe Success(PairVal)
     }
-    it should "match with a boolean" in {
+    it should "match a boolean" in {
         parser.atom.parse("true") shouldBe Success(BoolVal(true))
         parser.atom.parse("false") shouldBe Success(BoolVal(false))        
     }
-    it should "match with an array element" in {
+    it should "match an array element" in {
         parser.expr.parse("arr[3]") shouldBe Success(ArrayVal("arr", IntVal(3) :: Nil))
     }    
 }
