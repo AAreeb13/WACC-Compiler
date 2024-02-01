@@ -17,6 +17,9 @@ class parserStatementTest extends AnyFlatSpec {
     "\'free\'" should "match stmt" in {
         parser.stmt.parse("free(array)") shouldBe Success(Free(Var("array")))
     }
+    "assignments" should "match stmt" in {
+        parser.stmt.parse("int i=0") shouldBe Success(AssignNew(IntType, "i", IntVal(0)))
+    }
     
     
 }
