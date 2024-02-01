@@ -13,14 +13,13 @@ import lexer._
 object parser {
     def parse[Err: ErrorBuilder](input: String): Result[Err, Prog] = parser.parse(input)
     
-
     lazy val parser = fully(prog)
     lazy val prog = "begin" ~> Prog(many(func), stmtList) <~ "end"
 
     lazy val exprs = many(expr)
     
     lazy val expr: Parsley[Expr] = 
-        precedence[Expr](atom)(
+        precedence(atom)(
             Ops(Prefix)(Not from "!", Neg from "-", Len from "len", Ord from "ord", Chr from "chr"),
             Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
             Ops(InfixL)(Add from "+", Sub from "-"),
@@ -30,8 +29,10 @@ object parser {
             Ops(InfixR)(Or from "||")
         )
 
+    lazy val arrElem = atomic(ArrayVal(ident, some("[" ~> expr <~ "]"))) 
+
     lazy val atom 
-        = atomic(ArrayVal(ident, some("[" ~> expr <~ "]"))) |
+        = arrElem |
         atomic((PairVal from pairLiter)) |
         atomic(BoolVal(boolLiter)) |
         Var(ident) | 
@@ -67,6 +68,8 @@ object parser {
     lazy val func: Parsley[Func] = Func(types, ident, "(" ~> paramList <~ ")", "is" ~> stmtList <~ "end") 
 
     lazy val stmtList = sepBy1(stmt, ";")
+    lazy val argList = sepBy1(expr, ",")
+    lazy val arrLiter = ArrLiter(sepBy(expr, ","))
 
     lazy val stmt: Parsley[Stmt] 
         = Skip from "skip" |
@@ -84,8 +87,18 @@ object parser {
 
     lazy val param = Param(types, ident)
     lazy val paramList = sepBy1(param, ",")
-    lazy val rvalue = ???
-    lazy val lvalue = ???
+    lazy val rvalue 
+        = expr | 
+        arrLiter |
+        NewPair("(" ~> expr <~ ",", expr <~ ")") |
+        pairElem |
+        FuncCall("call" ~> ident, "(" ~> argList <~ ")")
+    
+    lazy val lvalue: Parsley[LValue] 
+        = Var(ident) |
+        arrElem |
+        pairElem
+    
     lazy val pairElem 
         = Fst("fst" ~> lvalue) | 
         Snd("snd" ~> lvalue)

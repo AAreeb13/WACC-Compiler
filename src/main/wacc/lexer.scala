@@ -43,7 +43,9 @@ object lexer {
                 "end",
                 "is",
                 "fst",
-                "snd"
+                "snd",
+                "newpair",
+                "call"
             ),
             hardOperators = Set (
                 // binary operators

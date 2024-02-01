@@ -5,7 +5,7 @@ import parsley.generic
 case class Prog(funcs: List[Func], stmts: List[Stmt])
 object Prog extends generic.ParserBridge2[List[Func], List[Stmt], Prog]
 
-sealed trait Expr
+sealed trait Expr extends RValue
 sealed trait Type
 sealed trait Stmt
 sealed trait LValue
@@ -56,8 +56,8 @@ object Or extends generic.ParserBridge2[Expr, Expr, Expr]
 /*------------------------------ Atoms ------------------------------*/
 
 /* For <ident> */
-case class Var(v: String) extends Expr
-object Var extends generic.ParserBridge1[String, Expr]
+case class Var(v: String) extends Expr with LValue
+object Var extends generic.ParserBridge1[String, Expr with LValue]
 
 case class IntVal(i: BigInt) extends Expr
 object IntVal extends generic.ParserBridge1[BigInt, Expr]
@@ -73,8 +73,8 @@ object BoolVal extends generic.ParserBridge1[Boolean, Expr]
 
 case object PairVal extends Expr with generic.ParserBridge0[Expr]
 
-case class ArrayVal(id: String, exprs: List[Expr]) extends Expr
-object ArrayVal extends generic.ParserBridge2[String, List[Expr], Expr]
+case class ArrayVal(id: String, exprs: List[Expr]) extends Expr with LValue
+object ArrayVal extends generic.ParserBridge2[String, List[Expr], Expr with LValue]
 
 /*------------------------------ Unary Operators ------------------------------*/
 
@@ -156,3 +156,12 @@ object Fst extends generic.ParserBridge1[LValue, PairElem]
 
 case class Snd(_rvalue: LValue) extends PairElem
 object Snd extends generic.ParserBridge1[LValue, PairElem]
+
+case class NewPair(_expr1: Expr, _expr2: Expr) extends RValue
+object NewPair extends generic.ParserBridge2[Expr, Expr, RValue]
+
+case class FuncCall(name: String, args: List[Expr]) extends RValue
+object FuncCall extends generic.ParserBridge2[String, List[Expr], RValue]
+
+case class ArrLiter(elems: List[Expr]) extends RValue
+object ArrLiter extends generic.ParserBridge1[List[Expr], RValue]
