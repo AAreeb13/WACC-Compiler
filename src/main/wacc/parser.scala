@@ -72,7 +72,7 @@ object parser {
     lazy val func: Parsley[Func] = Func(types, ident, "(" ~> paramList <~ ")", "is" ~> stmtList <~ "end") 
 
     lazy val stmtList = sepBy1(stmt, ";")
-    lazy val argList = sepBy1(expr, ",")
+    lazy val argList = sepBy(expr, ",")
     lazy val arrLiter = ArrLiter(sepBy(expr, ","))
 
     lazy val stmt: Parsley[Stmt] 
