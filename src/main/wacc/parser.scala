@@ -7,6 +7,7 @@ import parsley.syntax.zipped._
 import parsley.syntax.character.stringLift
 import parsley.errors.ErrorBuilder
 import parsley.expr._
+import parsley.debug._
 import lexer._
 
 
@@ -75,10 +76,10 @@ object parser {
     lazy val arrLiter = ArrLiter(sepBy(expr, ","))
 
     lazy val stmt: Parsley[Stmt] 
-        = Skip from "skip" |
-        AssignNew(types, ident <~ "=", rvalue) |
-        Assign(lvalue, "=" ~> rvalue) |
-        Read("read" ~> lvalue) |
+        = (Skip from "skip").debug("SKIP!!") |
+        atomic(AssignNew(types, ident <~ "=", rvalue)) |
+        atomic(Assign(lvalue, "=" ~> rvalue)) |
+        atomic(Read("read" ~> lvalue)) |
         Free("free" ~> expr) |
         Return("return" ~> expr) |
         Exit("exit" ~> expr) |
