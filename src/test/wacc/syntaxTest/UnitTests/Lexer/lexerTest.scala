@@ -18,13 +18,16 @@ class lexerIdentifierTest extends AnyFlatSpec {
         lexer.ident.parse("B") shouldBe Success("B")
     }
 
-    "An ident" should "not start with a digit" in {
-        lexer.ident.parse("1").isFailure shouldBe true
-        lexer.ident.parse("9sx").isFailure shouldBe true
+    it should "not start with a digit" in {
+        lexer.ident.parse("1") shouldBe a [Failure[_]]
+        lexer.ident.parse("9sx") shouldBe a [Failure[_]]
     }
-    "An ident" should "be able to contain digits, characters or underscore in between" in {
+
+    it should "be able to contain digits, characters or underscore after first character" in {
         lexer.ident.parse("a283") shouldBe Success("a283")
         lexer.ident.parse ("alpha") shouldBe Success("alpha")
-        lexer.ident.parse("__42__") shouldBe Success("__42__")
+        lexer.ident.parse("__42") shouldBe Success("__42")
+        lexer.ident.parse("test_") shouldBe Success("test_")
+
     }
 }
