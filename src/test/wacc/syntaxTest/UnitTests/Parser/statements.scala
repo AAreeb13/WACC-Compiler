@@ -42,5 +42,23 @@ class parserStatementTest extends AnyFlatSpec {
         parser.stmt.parse("if(x==4)then return(5) else return(4) fi") shouldBe 
         Success(If(Eql(Var("x"), IntVal(4)), Return(IntVal(5)) :: Nil, Return(IntVal(4)) :: Nil))
     }
+
+    "\'while do done\'' statements" should "match stmt" in {
+        parser.stmt.parse("while(x==4) do (arr[1]=true) done") shouldBe 
+        Success(While(Eql(Var("x"), IntVal(4)), Assign(ArrayVal("arr", IntVal(1) :: Nil), BoolVal(true)) :: Nil))
+    }
+
+    "\'begin end\'' statements" should "match stmt" in {
+        parser.stmt.parse("begin(int i=0)end") shouldBe Success(Scope(AssignNew(IntType, "i", IntVal(0)) :: Nil))
+    }
+
+    "\'stmt ; stmt\'' statements" should "match stmt" in {
+        parser.stmt.parse("int i=0; i=1") shouldBe Success(List.of(AssignNew(IntType, "i", IntVal(0) :: Nil), Assign(Var("i"), IntVal(1))))
+    }
+
+
+
+
+
     
 }
