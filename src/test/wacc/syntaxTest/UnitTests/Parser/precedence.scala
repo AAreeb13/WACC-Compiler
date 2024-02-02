@@ -16,7 +16,7 @@ class parserPrecedenceTests extends AnyFlatSpec {
         parser.expr.parse("true!=!false") shouldBe Success(NotEql(BoolVal(true), Not(BoolVal(false))))
     }
     "\'-\' prefix" should "have tightest precedence" in {
-        parser.expr.parse("-4+3") shouldBe Success(Add(Neg(IntVal(4)), IntVal(3)))
+        parser.expr.parse("-4+3") shouldBe Success(Add(IntVal(-4), IntVal(3)))
     }
     "\'len\' prefix" should "have tightest precedence" in {
         parser.expr.parse("len(x)+y") shouldBe Success(Add(Len(Var("x")), Var("y")))

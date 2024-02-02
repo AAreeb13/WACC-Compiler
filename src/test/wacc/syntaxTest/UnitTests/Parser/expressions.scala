@@ -26,7 +26,7 @@ class parserExpressionTest extends AnyFlatSpec {
         parser.expr.parse("!true") shouldBe Success(Not(BoolVal(true)))
     }
     it should "match negation, '-', on an expr" in {
-        parser.expr.parse("-4") shouldBe Success(Neg(IntVal(4)))
+        parser.expr.parse("-4") shouldBe Success(IntVal(-4))
     }
     it should "match len on an expr" in {
         parser.expr.parse("len(arr)") shouldBe Success(Len(Var("arr")))
