@@ -53,7 +53,7 @@ class parserStatementTest extends AnyFlatSpec {
     }
 
     "\'stmt ; stmt\'' statements" should "match stmt" in {
-        parser.stmt.parse("int i=0; i=1") shouldBe Success(List.of(AssignNew(IntType, "i", IntVal(0) :: Nil), Assign(Var("i"), IntVal(1))))
+        parser.stmt.parse("int i=0; i=1") shouldBe Success(AssignNew(IntType, "i", IntVal(0)) :: Assign(Var("i"), IntVal(1)) :: Nil)
     }
 
 
