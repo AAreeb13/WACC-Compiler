@@ -15,7 +15,7 @@ class parserStatementTest extends AnyFlatSpec {
         parser.stmt.parse("skip") shouldBe Success(Skip)
     }
     "\'free\'" should "match stmt" in {
-        parser.stmt.parse("free(array)") shouldBe Success(Free(Var("array")))
+        parser.stmt.parse("free array") shouldBe Success(Free(Var("array")))
     }
     "New assignments" should "match stmt" in {
         parser.stmt.parse("int i=0") shouldBe Success(AssignNew(IntType, "i", IntVal(0)))
@@ -24,7 +24,7 @@ class parserStatementTest extends AnyFlatSpec {
         parser.stmt.parse("arr[1]=true") shouldBe Success(Assign(ArrayVal("arr", IntVal(1) :: Nil), BoolVal(true)))
     }
     "\'read\' command" should "match stmt" in {
-        parser.stmt.parse("read(x)") shouldBe Success(Read(Var("x")))
+        parser.stmt.parse("read x") shouldBe Success(Read(Var("x")))
     }
     "\'return\' with expr" should "match stmt" in {
         parser.stmt.parse("return(4+3)") shouldBe Success(Return(Add(IntVal(4), IntVal(3))))
@@ -44,17 +44,19 @@ class parserStatementTest extends AnyFlatSpec {
     }
 
     "\'while do done\'' statements" should "match stmt" in {
-        parser.stmt.parse("while(x==4) do (arr[1]=true) done") shouldBe 
+        parser.stmt.parse("while(x==4) do arr[1]=true done") shouldBe 
         Success(While(Eql(Var("x"), IntVal(4)), Assign(ArrayVal("arr", IntVal(1) :: Nil), BoolVal(true)) :: Nil))
     }
 
     "\'begin end\'' statements" should "match stmt" in {
-        parser.stmt.parse("begin(int i=0)end") shouldBe Success(Scope(AssignNew(IntType, "i", IntVal(0)) :: Nil))
+        parser.stmt.parse("begin int i=0 end") shouldBe Success(Scope(AssignNew(IntType, "i", IntVal(0)) :: Nil))
     }
 
     "\'stmt ; stmt\'' statements" should "match stmt" in {
         parser.stmt.parse("int i=0; i=1") shouldBe Success(AssignNew(IntType, "i", IntVal(0)) :: Assign(Var("i"), IntVal(1)) :: Nil)
     }
+
+    
 
 
 

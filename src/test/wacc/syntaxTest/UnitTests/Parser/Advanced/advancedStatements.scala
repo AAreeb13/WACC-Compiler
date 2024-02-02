@@ -1,0 +1,75 @@
+package wacc
+
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers._
+
+import parsley.Parsley
+import parsley.token.{Lexer, predicate}
+import parsley.token.Lexer
+import parsley.token.descriptions._
+import parsley.{Result, Success, Failure}
+import org.scalactic.Bool
+
+class advancedParserStatementTest extends AnyFlatSpec {    
+    
+    // While tests
+
+    "while loop with mul assignments" should "match stmt" in {
+        parser.stmt.parse("while n > 0 do save = f0 ; f0 = f1 ; f1 = save + f1 ; n = n - 1 done ;") shouldBe
+        Success(
+            While(
+            Grt(Var("n"), IntVal(0)),
+            List(
+            Assign(Var("save"), Var("f0")),
+            Assign(Var("f0"), Var("f1")),
+            Assign(Var("f1"), Add(Var("save"), Var("f1"))),
+            Assign(Var("n"), Sub(Var("n"), IntVal(1)))
+            )))
+    }
+
+    "while loop with mul statements" should "match stmt" in {
+    parser.stmt.parse(
+    """while i < 20 do print f0 ; print ", " ;
+     save = f0 ; f0 = f1 ; f1 = save + f1 ; i = i + 1 done ;""") shouldBe
+    Success(
+      While(
+        Less(Var("i"), IntVal(20)),
+        List(
+          Print(Var("f0")),
+          Print(StrVal(", ")),
+          Assign(Var("save"), Var("f0")),
+          Assign(Var("f0"), Var("f1")),
+          Assign(Var("f1"), Add(Var("save"), Var("f1"))),
+          Assign(Var("i"), Add(Var("i"), IntVal(1)))
+          )))
+    }
+
+    "while loop with arithmetic" should "match stmt" in {
+    parser.stmt.parse(
+    """while (y > 0 || x > 0) do x = x - 1 ; y = y - 1 ; i = i + 1 done ;""") shouldBe
+    Success(
+      While(
+        Or(Grt(Var("y"), IntVal(0)), Grt(Var("x"), IntVal(0))),
+        List(
+          Assign(Var("x"), Sub(Var("x"), IntVal(1))),
+          Assign(Var("y"), Sub(Var("y"), IntVal(1))),
+          Assign(Var("i"), Add(Var("i"), IntVal(1)))
+        )))
+    }
+
+
+
+    // If and Else Tests
+
+    "if-else statement" should "match stmt" in {
+    parser.stmt.parse(
+    """if a == 13 then println "correct" else println "incorrect" fi""") shouldBe
+    Success(
+      If(
+        Eql(Var("a"), IntVal(13)),
+        List(Println(StrVal("correct"))),
+        List(Println(StrVal("incorrect")))
+      ))
+    }
+
+}
