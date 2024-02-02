@@ -22,7 +22,7 @@ object parser {
         pairType
 
     lazy val baseType 
-        = (IntType from "int") |
+        = (IntType from integer) |
         (CharType from "char") |
         (StrType from "string") |
         (BoolType from "bool")
@@ -45,13 +45,13 @@ object parser {
     
     lazy val expr: Parsley[Expr] = 
         precedence(atom)(
-            Ops(Prefix)(Not from "!", Neg from "-", Len from atomic("len"), Ord from atomic("ord"), Chr from atomic("chr")),
+            Ops(Prefix)(Not from "!", Neg from "-", Len from len, Ord from ord, Chr from atomic("chr")),
             Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
             Ops(InfixL)(Add from "+", Sub from "-"),
             Ops(InfixN)(atomic(GrtEql from ">="), Grt from ">", atomic(LessEql from "<="), Less from "<"),
-            Ops(InfixN)(Eql from "==", NotEql from "!="),
-            Ops(InfixR)(And from "&&"),
-            Ops(InfixR)(Or from "||")
+            Ops(InfixN)(Eql from "==", NotEql from notEqual),
+            Ops(InfixR)(And from and),
+            Ops(InfixR)(Or from or)
         )
 
     lazy val arrElem = atomic(ArrayVal(ident, some("[" ~> expr <~ "]"))) 
@@ -65,9 +65,6 @@ object parser {
         CharVal(charLiter) | 
         StrVal(strLiter)| 
         "(" ~> expr <~ ")"    
-
-
-    
 
     lazy val func: Parsley[Func] = Func(types, ident, "(" ~> paramList <~ ")", "is" ~> stmtList <~ "end") 
 

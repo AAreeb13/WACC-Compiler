@@ -76,6 +76,12 @@ object lexer {
     val strLiter = lexer.lexeme.string.ascii
     val boolLiter = lexer.lexeme.symbol("true").as(true) | lexer.lexeme.symbol("false").as(false)
     val pairLiter = lexer.lexeme.symbol("null")
+    val len = lexer.lexeme.symbol("len")
+    val ord = lexer.lexeme.symbol("ord")
+    val notEqual = lexer.lexeme.symbol("!=")
+    val and = lexer.lexeme.symbol("&&")
+    val or = lexer.lexeme.symbol("||")
+    val integer = lexer.lexeme.symbol("int")
 
     val implicits = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
