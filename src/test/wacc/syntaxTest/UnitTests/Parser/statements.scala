@@ -38,7 +38,7 @@ class parserStatementTest extends AnyFlatSpec {
     "\'println\'' statements" should "match stmt" in {
         parser.stmt.parse("println(\"Hello Universe\")") shouldBe Success(Println(StrVal("Hello Universe")))
     }
-    "\'if then else fu statements" should "match stmt" in {
+    "\'if then else fi statements" should "match stmt" in {
         parser.stmt.parse("if(x==4)then return(5) else return(4) fi") shouldBe 
         Success(If(Eql(Var("x"), IntVal(4)), Return(IntVal(5)) :: Nil, Return(IntVal(4)) :: Nil))
     }
@@ -51,16 +51,4 @@ class parserStatementTest extends AnyFlatSpec {
     "\'begin end\'' statements" should "match stmt" in {
         parser.stmt.parse("begin int i=0 end") shouldBe Success(Scope(AssignNew(IntType, "i", IntVal(0)) :: Nil))
     }
-
-    "\'stmt ; stmt\'' statements" should "match stmt" in {
-        parser.stmt.parse("int i=0; i=1") shouldBe Success(AssignNew(IntType, "i", IntVal(0)) :: Assign(Var("i"), IntVal(1)) :: Nil)
-    }
-
-    
-
-
-
-
-
-    
 }

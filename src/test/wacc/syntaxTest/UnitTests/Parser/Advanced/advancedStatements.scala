@@ -74,7 +74,7 @@ class advancedParserStatementTest extends AnyFlatSpec {
 
     "nested if-else statement" should "match stmt" in {
     parser.stmt.parse(
-    """if a == 13 then (if b == 4 then a = 4 else b = 4 fi) else a = 10 fi""") shouldBe
+    """if a == 13 then if b == 4 then a = 4 else b = 4 fi else a = 10 fi""") shouldBe
     Success(
       If(
         Eql(Var("a"), IntVal(13)),
@@ -91,7 +91,7 @@ class advancedParserStatementTest extends AnyFlatSpec {
 
     "while loop with nested if-else statement" should "match stmt" in {
     parser.stmt.parse(
-    """while n > 0 do (if a == 13 then (if b == 4 then a = 4 else b = 4 fi) else println "incorrect" fi) done"""
+    """while n > 0 do if a == 13 then if b == 4 then a = 4 else b = 4 fi else println "incorrect" fi done"""
     ) shouldBe
     Success(
       While(
@@ -112,8 +112,8 @@ class advancedParserStatementTest extends AnyFlatSpec {
 
     "while loop with nested while loop and if-else statement" should "match stmt" in {
   parser.stmt.parse(
-    """while n > 0 do (if a == 13 then 
-    (while a > 0 do a = a - 1 done) else a = 13 fi) done""") shouldBe
+    """while n > 0 do if a == 13 then 
+    while a > 0 do a = a - 1 done else a = 13 fi done""") shouldBe
     Success(
       While(
         Grt(Var("n"), IntVal(0)),
