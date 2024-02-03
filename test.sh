@@ -3,8 +3,7 @@
 # output results during interrupt
 trap 'output_results' SIGINT
 
-make clean
-make
+./init.sh
 
 # update wacc examples for any changes
 git submodule update --init --recursive

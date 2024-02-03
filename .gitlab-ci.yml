@@ -11,7 +11,7 @@ build-job:
   stage: build
   script:
     - echo "Building..."
-    - make
+    - ./init.sh
     - echo "Build complete."
 
 unit-test-job:  
