@@ -30,5 +30,6 @@ lint-test-job:
   stage: test
   script: 
     - echo "Linting..."
-    - scalafix .
+    - scala-cli compile . --test --server=false
+    - scalafix --check src --scalac-options "-Xlint:unused" --auto-classpath --stdout
     - echo "Linting complete."
