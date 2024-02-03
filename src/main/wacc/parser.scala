@@ -1,106 +1,147 @@
 package wacc
 
-import parsley.{Parsley, Result}
-import Parsley._
+import parsley.Parsley, Parsley._
 import parsley.combinator._
 import parsley.syntax.zipped._
-import parsley.syntax.character.stringLift
+import parsley.expr.chain
 import parsley.errors.ErrorBuilder
-import parsley.expr._
 import parsley.debug._
-import lexer._
+import parsley.character.digit
 
+import lexer._
+import lexer.implicits.implicitSymbol
+import parsley.expr.Ops
+import parsley.expr.{InfixL, InfixN, InfixR, Prefix, Postfix}
+import parsley.expr.precedence
+import parsley.errors.combinator._
+import parsley.Result
 
 object parser {
-    def parse[Err: ErrorBuilder](input: String): Result[Err, Prog] = parser.parse(input)
-    
-    lazy val parser = fully(prog)
-    
-    lazy val types 
-        = baseType |
-        arrType |
-        pairType
+    // the Err: ErrorBuilder here is saying that the compiler must be able to find a value
+    // of type ErrorBuilder[Err] to provide implicitly to this function. When you use this
+    // in the REPL, it will default to ErrorBuilder[String]. In part 3, the tests will instantiate
+    // it differently
+    // If you like, you can think of it as having type:
+    //def parse(input: String): Either[String, Prog]
+    def parse[Err: ErrorBuilder](input: String): Result[Err, Node]  = parser.parse(input)
+    //def parse[Err: ErrorBuilder](input: String) = parser.parse(input)
 
-    lazy val baseType 
-        = (IntType from integer) |
-        (CharType from "char") |
-        (StrType from "string") |
+    lazy val parser: Parsley[Node] = fully(prog)
+
+    ////////// TYPE PARSER ///////////
+    lazy val declType: Parsley[Type]
+        = arrayType | 
+        pairType | 
+        baseType
+
+    lazy val baseType: Parsley[BaseType]
+        = (IntType from "int") | 
+        (StringType from "string") | 
+        (CharType from "char") | 
         (BoolType from "bool")
 
-    lazy val arrType: Parsley[Type]
-        = atomic(chain.postfix1(baseType | pairType)(ArrType from "[" <~> "]"))
-
+    lazy val arrayType: Parsley[Type]
+        //= precedence(baseType, pairType)(Ops(Postfix)(ArrayType from "[" <~> "]"))
+        = atomic(chain.postfix1(baseType | pairType)(ArrayType from "[" <~> "]"))
+    
     lazy val pairType
-        = PairType(atomic("pair" ~> "(") ~>  pairElemType, "," ~> pairElemType <~ ")")
+        = PairType(atomic("pair" ~> "(") ~> pairElemType, "," ~> pairElemType <~ ")")
 
-    lazy val pairElemType: Parsley[Type] 
-        = baseType |
-        arrType |
+    lazy val pairElemType
+        = arrayType | 
+        baseType | 
         (ErasedPair from "pair")
+
+    // probably don't need the lastOption since grammar guarantees that
+    // all filtered stmtLists are valid and contains at least one valid during filter
+    // but just to be on the safe side
+    private def containsReturn(stmtOption: Option[Stat]): Boolean = stmtOption match {
+        case None => false
+        case Some(stmt) => stmt match {
+            case Return(expr) => true
+            case Exit(expr) => true
+            case If(cond, ifstmts, elsestmts) => containsReturn(ifstmts.lastOption) && containsReturn(elsestmts.lastOption)
+            case While(cond, stmts) => containsReturn(stmts.lastOption)
+            case Scope(stmts) => containsReturn(stmts.lastOption)
+            case _ => false
+        }
+    }
+        
     
-    lazy val prog = "begin" ~> Prog(many(func), stmtList) <~ "end"
 
+    ////////// stmt PARSER ///////////
 
-    lazy val exprs = many(expr)
-    
-    lazy val expr: Parsley[Expr] = 
-        precedence(atom)(
-            Ops(Prefix)(Not from "!", Neg from "-", Len from len, Ord from ord, Chr from atomic("chr")),
-            Ops(InfixL)(Div from "/", Mul from "*", Mod from "%"), 
-            Ops(InfixL)(Add from "+", Sub from "-"),
-            Ops(InfixN)(atomic(GrtEql from ">="), Grt from ">", atomic(LessEql from "<="), Less from "<"),
-            Ops(InfixN)(Eql from "==", NotEql from notEqual),
-            Ops(InfixR)(And from and),
-            Ops(InfixR)(Or from or)
-        )
+    lazy val prog = "begin" ~> Prog(funcList, stmtList) <~ "end"
+    lazy val funcList = many(func)
+    lazy val func 
+        = atomic(Func(declType, ident, "(" ~> paramList <~ ")", "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"))
 
-    lazy val arrElem = atomic(ArrayVal(ident, some("[" ~> expr <~ "]"))) 
+    lazy val paramList = sepBy(param, ",")
+    lazy val param = Param(declType, ident)
 
-    lazy val atom 
-        = arrElem |
-        atomic((PairVal from pairLiter)) |
-        atomic(BoolVal(boolLiter)) |
-        Var(ident) | 
-        IntVal(intLiter) | 
-        CharVal(charLiter) | 
-        StrVal(strLiter)| 
-        "(" ~> expr <~ ")"    
+    lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt, ";")
 
-    lazy val func: Parsley[Func] = Func(types, ident, "(" ~> paramList <~ ")", "is" ~> stmtList <~ "end") 
-
-    lazy val stmtList = sepBy1(stmt, ";")
-    lazy val argList = sepBy(expr, ",")
-    lazy val arrLiter = ArrLiter(sepBy(expr, ","))
-
-    lazy val stmt: Parsley[Stmt] 
-        = (Skip from "skip") |
-        atomic(AssignNew(types, ident <~ "=", rvalue)) |
-        atomic(Assign(lvalue, "=" ~> rvalue)) |
-        atomic(Read("read" ~> lvalue)) |
-        Free("free" ~> expr) |
-        Return("return" ~> expr) |
-        Exit("exit" ~> expr) |
-        Print("print" ~> expr) |
-        Println("println" ~> expr) |
-        If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi") |
-        While("while" ~> expr, "do" ~> stmtList <~ "done") |
+    lazy val stmt
+        = "skip".as(Skip) | 
+        AssignNew(declType, ident <~ "=", rvalue) | 
+        Assign(atomic(lvalue <~ "="), rvalue) | 
+        Read("read" ~> lvalue) | 
+        Free("free" ~> expr) | 
+        Return("return" ~> expr) | 
+        Exit("exit" ~> expr) | 
+        Print("print" ~> expr) | 
+        Println("println" ~> expr) | 
+        If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi") | 
+        While("while" ~> expr, "do" ~> stmtList <~ "done") | 
         Scope("begin" ~> stmtList <~ "end") 
 
-    lazy val param = Param(types, ident)
-    lazy val paramList = sepBy1(param, ",")
-    lazy val rvalue 
-        = expr | 
-        arrLiter |
-        NewPair("(" ~> expr <~ ",", expr <~ ")") |
-        pairElem |
-        FuncCall("call" ~> ident, "(" ~> argList <~ ")")
-    
-    lazy val lvalue: Parsley[LValue] 
-        = Var(ident) |
-        arrElem |
+    lazy val lvalue: Parsley[LValue]
+        = arrayElem | 
+        Var(ident) | 
         pairElem
     
-    lazy val pairElem 
-        = Fst("fst" ~> lvalue) | 
-        Snd("snd" ~> lvalue)
+    lazy val rvalue: Parsley[RValue]
+        = expr | 
+        arrayLiteral | 
+        PairCons("newpair" ~> "(" ~> expr, "," ~> expr <~ ")") | 
+        pairElem | 
+        FuncCall("call" ~> ident, "(" ~> argList <~ ")")
+        
+    lazy val argList = sepBy(expr, ",")
+    lazy val pairElem: Parsley[PairElem]
+        = FstPair("fst" ~> lvalue) | 
+        SndPair("snd" ~> lvalue)
+
+    lazy val arrayLiteral = ArrayLiteral("[" ~> sepBy(expr, ",") <~ "]")
+
+    //private lazy val asgns = endBy(atomic(asgn), ";")
+    //private lazy val asgn = Asgn(atomic(ident <~ "="), expr)
+
+
+    ////////// EXPR PARSER ///////////
+
+    lazy val atom
+        = IntVal(intLiteral) | 
+        BoolVal(boolLiteral) | 
+        CharVal(charLiteral) | 
+        StrVal(stringLiteral) | 
+        (PairVal from pairLiteral) | 
+        atomic(arrayElem) | 
+        Var(ident) | 
+        ("(" ~> expr <~ ")")
+
+    lazy val arrayElem
+        = atomic(ArrayVal(ident, some("[" ~> expr <~ "]")))
+
+    // todo: fix problem with parsing len/ord/chr
+    lazy val expr: Parsley[Expr] = 
+        precedence(atom)(
+            Ops(Prefix)(Not from "!", Neg from atomic("-" <~ notFollowedBy(digit)), Len from atomic("len"), Ord from atomic("ord"), Chr from atomic("chr")),
+            Ops(InfixL)(Mul from "*", Mod from "%", Div from "/"),
+            Ops(InfixL)(Add from "+", Sub from "-"),
+            Ops(InfixN)(Grt from ">", GrtEql from ">=", Less from "<", LessEql from "<="),
+            Ops(InfixN)(Eql from "==", NotEql from "!="),
+            Ops(InfixR)(And from "&&"),
+            Ops(InfixR)(Or from "||")
+        )
 }

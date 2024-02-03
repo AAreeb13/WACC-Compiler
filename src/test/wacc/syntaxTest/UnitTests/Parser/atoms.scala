@@ -11,31 +11,39 @@ import parsley.{Result, Success, Failure}
 import org.scalactic.Bool
 
 class parserAtomTest extends AnyFlatSpec {
-    "An atom" should "match an integer value" in {
-        parser.atom.parse("1") shouldBe Success(IntVal(1))
-    }
-    it should "match a character" in {
-        parser.atom.parse("\'c\'") shouldBe Success(CharVal('c'))
-    }
-    it should "match a string" in {
-        parser.atom.parse("\"Hello Mahdi Ahmed\"") shouldBe Success(StrVal("Hello Mahdi Ahmed"))
+    val atomParser = lexer.fully(parser.atom)
 
+    "An atom" should "match an integer value" in {
+        atomParser.parse("1") shouldBe Success(IntVal(1))
     }
+
+    it should "match a character" in {
+        atomParser.parse("\'c\'") shouldBe Success(CharVal('c'))
+    }
+
+    it should "match a string" in {
+        atomParser.parse("\"Hello Mahdi Ahmed\"") shouldBe Success(StrVal("Hello Mahdi Ahmed"))
+    }
+
     it should "match a varable name" in {
-        parser.atom.parse("varName") shouldBe Success(Var("varName"))
+        atomParser.parse("varName") shouldBe Success(Var("varName"))
     }
+
     it should "match an expression in nested in brackets" in {
-        parser.atom.parse("((((\"hello\"))))") shouldBe Success(StrVal("hello"))
+        atomParser.parse("((((\"hello\"))))") shouldBe Success(StrVal("hello"))
     }
+
     it should "match a pair literal" in {
-        parser.atom.parse("null") shouldBe Success(PairVal)
+        atomParser.parse("null") shouldBe Success(PairVal)
     }
+
     it should "match a boolean" in {
-        parser.atom.parse("true") shouldBe Success(BoolVal(true))
-        parser.atom.parse("false") shouldBe Success(BoolVal(false))        
+        atomParser.parse("true") shouldBe Success(BoolVal(true))
+        atomParser.parse("false") shouldBe Success(BoolVal(false))        
     }
+
     it should "match an array element" in {
-        parser.expr.parse("arr[3]") shouldBe Success(ArrayVal("arr", IntVal(3) :: Nil))
-    }    
+        atomParser.parse("arr[3]") shouldBe Success(ArrayVal("arr", List(IntVal(3))))
+    }
 }
 
