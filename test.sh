@@ -1,16 +1,24 @@
 #!/bin/bash
 
 # output results during interrupt
-trap 'output_results' SIGINT
+trap 'output_results; exit 2' SIGINT
 
 ./init.sh
 
 # update wacc examples for any changes
 git submodule update --init --recursive
 
+# set to 0 for full check
+syntaxCheckOnly=1
+
 validPassed=0
 syntaxErrPassed=0
 semanticErrPassed=0
+
+validComplete=0
+syntaxErrComplete=0
+semanticErrComplete=0
+
 
 output_results() {
     validTotal=$(find "./wacc_examples/valid" -type f | wc -l | xargs)
@@ -26,7 +34,18 @@ output_results() {
     echo "Semantic Error Tests: $semanticErrPassed/$semanticErrTotal"
     echo "Total: $totalPassed/$totalTotal"
     echo "======================================"
-    exit 1
+
+    if [ "$validPassed" -eq "$validTotal" ]; then
+        validComplete=1
+    fi
+
+    if [ "$syntaxErrPassed" -eq "$syntaxErrTotal" ]; then
+        syntaxErrComplete=1
+    fi
+
+    if [ "$semanticErrPassed" -eq "$semanticErrTotal" ]; then
+        semanticErrComplete=1
+    fi
 }
 
 
@@ -50,3 +69,17 @@ while read -r file; do
 done < <(find "./wacc_examples" -type f -name "*.wacc")
 
 output_results
+
+if [ $syntaxCheckOnly -eq 1 ] ; then
+    if [ $validComplete -eq 1 ] && [ $syntaxErrComplete -eq 1 ]; then
+        exit 0
+    else
+        exit 1
+    fi
+else
+    if [ $validComplete -eq 1 ] && [ $syntaxErrComplete -eq 1 ] && [ $semanticErrComplete -eq 1 ]; then
+        exit 0
+    else
+        exit 1
+    fi
+fi
