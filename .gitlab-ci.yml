@@ -9,7 +9,7 @@ build-job:
   stage: build
   script:
     - echo "Building..."
-    - scala-cli .
+    - make
     - echo "Build complete."
 
 unit-test-job:  
@@ -17,7 +17,14 @@ unit-test-job:
   script:
     - echo "Running unit tests..."
     - scala-cli test .
-    - echo "Tests complete."
+    - echo "Unit tests complete."
+
+integration-test-job:  
+  stage: test   
+  script:
+    - echo "Running integration tests..."
+    - ./test.sh
+    - echo "Integation tests complete."
 
 lint-test-job:
   stage: test
