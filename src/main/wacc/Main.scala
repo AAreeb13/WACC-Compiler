@@ -1,17 +1,24 @@
 package wacc
 
 import parsley.{Success, Failure}
+import scala.io.Source
 
 object Main {
-    def main(args: Array[String]): Unit = {
-        println("hello WACC!")
+    val exitSuccess = 0;
+    val exitSyntaxErr = 100;
+    val exitSemanticErr = 200;
 
-        args.headOption match {
-            case Some(expr) => parser.parse(expr) match {
-                case Success(x) => println(s"$expr = $x")
-                case Failure(msg) => println(msg)
-            }
-            case None => println("please enter an expression")
+    def main(args: Array[String]): Unit = {
+
+        val input = args.headOption.getOrElse {
+            println("Command line input not found, defaulting to file input (in.txt)")
+            Source.fromFile("in.txt").mkString
+        }
+
+        val result = parser.parse(input)
+        result match {
+            case Failure(err) => println(err); sys.exit(exitSyntaxErr)
+            case Success(output) => println(s"$input => $output"); sys.exit(exitSuccess)
         }
     }
 }
