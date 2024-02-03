@@ -1,9 +1,8 @@
-image: docker.io/gumjoe/wacc-ci-scala:slim
+image: gumjoe/wacc-ci-scala:slim
 
 stages:         
   - build
   - test
-  - deploy
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
