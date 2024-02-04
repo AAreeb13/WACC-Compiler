@@ -1,6 +1,5 @@
 package wacc
 
-import parsley.{Failure, Success}
 import scala.io.Source
 
 object Main {
@@ -15,10 +14,29 @@ object Main {
             Source.fromFile("in.txt").mkString
         }
 
-        val result = parser.parse(input)
+        // Syntax Analysis
+
+        var result = parser.parse(input).toEither
         result match {
-            case Failure(err)    => println(err); sys.exit(exitSyntaxErr)
-            case Success(output) => println(s"$input => $output"); sys.exit(exitSuccess)
+            case Left(err) =>
+                println(err)
+                sys.exit(exitSyntaxErr)
+
+            case Right(_) =>
+                result = semanticChecker.verify(result)
         }
+
+        // Semantic Analysis
+
+        result match {
+            case Left(err) =>
+                println(err)
+                sys.exit(exitSemanticErr)
+
+            case Right(output) =>
+                println(s"$input => $output")
+                sys.exit(exitSuccess)
+        }
+
     }
 }
