@@ -16,6 +16,9 @@ case class Analyser(val prog: Prog) {
     var funcTable: HashMap[String, (Type, List[Type])] = HashMap.empty
 
     prog.funcs.foreach { func =>
+        if (funcTable.contains(func.name)) {
+            errList.addOne(s"${func.name} already exists, no support for overloaded functions.")
+        }
         funcTable.addOne((func.name, (func.retType, func.params.map(_.declType))))
     }
 
@@ -28,7 +31,11 @@ case class Analyser(val prog: Prog) {
 
         // add parameters to the table
         func.params.foreach{ param =>
+            if (!funcSymbolTable.contains(param.name)) 
                 funcSymbolTable.addOne(param.name, param.declType)
+            else 
+                errList.addOne(s"Scope error: Parameter ${param.name} has already been declared in function")
+        }
         func.stats.foreach(checkStatement(_, funcSymbolTable))
     }
 
