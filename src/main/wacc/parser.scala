@@ -136,18 +136,18 @@ object parser {
     // todo: fix problem with parsing len/ord/chr
     lazy val expr: Parsley[Expr] =
         precedence(atom)(
-          Ops(Prefix)(
-            Not.from("!"),
-            Neg.from(atomic("-" <~ notFollowedBy(digit))),
-            Len.from(atomic("len")),
-            Ord.from(atomic("ord")),
-            Chr.from(atomic("chr"))
-          ),
-          Ops(InfixL)(Mul.from("*"), Mod.from("%"), Div.from("/")),
-          Ops(InfixL)(Add.from("+"), Sub.from("-")),
-          Ops(InfixN)(Grt.from(">"), GrtEql.from(">="), Less.from("<"), LessEql.from("<=")),
-          Ops(InfixN)(Eql.from("=="), NotEql.from("!=")),
-          Ops(InfixR)(And.from("&&")),
-          Ops(InfixR)(Or.from("||"))
+            Ops(Prefix)(
+                Not.from("!"),
+                Neg.from(atomic("-" <~ notFollowedBy(digit))),
+                Len.from(atomic("len")),
+                Ord.from(atomic("ord")),
+                Chr.from(atomic("chr"))
+            ),
+            Ops(InfixL)(Mul.from("*"), Mod.from("%"), Div.from("/")),
+            Ops(InfixL)(Add.from("+"), Sub.from("-")),
+            Ops(InfixN)(Grt.from(">"), GrtEql.from(">="), Less.from("<"), LessEql.from("<=")),
+            Ops(InfixN)(Eql.from("=="), NotEql.from("!=")),
+            Ops(InfixR)(And.from("&&")),
+            Ops(InfixR)(Or.from("||"))
         )
 }
