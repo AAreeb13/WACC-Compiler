@@ -4,4 +4,6 @@
 # but do *not* change its name.
 
 # feel free to adjust to suit the specific internal flags of your compiler
-./wacc.Main "$@"
+./wacc-compiler "$@"
+
+exit $?

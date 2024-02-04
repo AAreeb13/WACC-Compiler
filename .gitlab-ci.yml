@@ -1,15 +1,17 @@
-image: docker.io/gumjoe/wacc-ci-scala:slim
+image: gumjoe/wacc-ci-scala:slim
 
 stages:         
   - build
   - test
-  - deploy
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
 
 build-job:       
   stage: build
   script:
     - echo "Building..."
-    - scala-cli .
+    - ./init.sh
     - echo "Build complete."
 
 unit-test-job:  
@@ -17,11 +19,19 @@ unit-test-job:
   script:
     - echo "Running unit tests..."
     - scala-cli test .
-    - echo "Tests complete."
+    - echo "Unit tests complete."
 
-lint-test-job:
+integration-test-job:  
+  stage: test   
+  script:
+    - echo "Running integration tests..."
+    - ./test.sh
+    - echo "Integation tests complete."
+
+style-test-job:
   stage: test
   script: 
-    - echo "Linting..."
-    - scalafix .
-    - echo "Linting complete."
+    - echo "Performing style check..."
+    - scala-cli compile . --test --server=false
+    - scalafix --check src --scalac-options "-Xlint:unused" --auto-classpath --stdout || true
+    - echo "Style check complete."

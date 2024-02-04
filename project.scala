@@ -9,6 +9,10 @@
 //> using options -deprecation -unchecked -feature
 //> using options -Xlint:nullary-unit -Xlint:infer-any -Xlint:unused -Xlint:nonlocal-return
 //> using options -Wdead-code -Wextra-implicit -Wnumeric-widen
+//> using options -Yrangepos
+
+//> using plugin org.scalameta:::semanticdb-scalac:4.8.15
+
 
 // these will help ensure you have access to the latest parsley releases
 // even before they land on maven proper, or snapshot versions, if necessary.
