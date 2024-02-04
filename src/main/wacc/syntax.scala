@@ -3,8 +3,6 @@ package wacc
 import parsley.generic
 
 sealed trait Node
-sealed trait Nameable
-sealed trait Orderable
 
 ////////// TYPES ///////////
 
