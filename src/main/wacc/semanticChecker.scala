@@ -13,6 +13,29 @@ object semanticChecker {
 case class Analyser(val prog: Prog) {
     var errList: ListBuffer[String] = ListBuffer.empty
     var globalTable = new SymbolTable();
+    var funcTable: HashMap[String, (Type, List[Type])] = HashMap.empty
+
+    prog.funcs.foreach { func =>
+        funcTable.addOne((func.name, (func.retType, func.params.map(_.declType))))
+    }
+
+    prog.funcs.foreach(checkFunction(_))
+    prog.stats.foreach(checkStatement(_, globalTable))
+
+    def checkFunction(func: Func): Unit = {
+        // create new child table
+        val funcSymbolTable = new SymbolTable()
+
+        // add parameters to the table
+        func.params.foreach{ param =>
+                funcSymbolTable.addOne(param.name, param.declType)
+        func.stats.foreach(checkStatement(_, funcSymbolTable))
+    }
+
+    def checkStatement(stat: Stat, currentScope: SymbolTable): Unit = {
+
+    }
+
     def getResult: Either[String, Node] = {
         if (errList.isEmpty) {
             Right(prog)
