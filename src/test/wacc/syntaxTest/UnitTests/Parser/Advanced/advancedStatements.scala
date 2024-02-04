@@ -1,18 +1,19 @@
 package wacc
 
+import org.scalactic.Bool
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-
+import parsley.Failure
 import parsley.Parsley
-import parsley.token.{Lexer, predicate}
+import parsley.Result
+import parsley.Success
 import parsley.token.Lexer
 import parsley.token.descriptions._
-import parsley.{Result, Success, Failure}
-import org.scalactic.Bool
+import parsley.token.predicate
 
 class advancedParserStatementTest extends AnyFlatSpec {
     val statParser = lexer.fully(parser.stmt)
-    
+
     // While tests
 
     "while loop with multiple assignments" should "match stmt" in {
@@ -24,17 +25,17 @@ class advancedParserStatementTest extends AnyFlatSpec {
             n = n - 1
         done
         """) shouldBe
-        Success(
-            While(
+            Success(
+              While(
                 Grt(Var("n"), IntVal(0)),
                 List(
-                    AssignNew(IntType, "save", Var("f0")),
-                    Assign(Var("f0"), Var("f1")),
-                    Assign(Var("f1"), Add(Var("save"), Var("f1"))),
-                    Assign(Var("n"), Sub(Var("n"), IntVal(1)))
+                  AssignNew(IntType, "save", Var("f0")),
+                  Assign(Var("f0"), Var("f1")),
+                  Assign(Var("f1"), Add(Var("save"), Var("f1"))),
+                  Assign(Var("n"), Sub(Var("n"), IntVal(1)))
                 )
+              )
             )
-        )
     }
 
     "while loop with multiple statements" should "match stmt" in {
@@ -48,19 +49,19 @@ class advancedParserStatementTest extends AnyFlatSpec {
             i = i + 1
         done
         """) shouldBe
-        Success(
-            While(
+            Success(
+              While(
                 Less(Var("i"), IntVal(20)),
                 List(
-                    Print(Var("f0")),
-                    Print(StrVal(", ")),
-                    Assign(Var("save"), Var("f0")),
-                    Assign(Var("f0"), Var("f1")),
-                    Assign(Var("f1"), Add(Var("save"), Var("f1"))),
-                    Assign(Var("i"), Add(Var("i"), IntVal(1)))
+                  Print(Var("f0")),
+                  Print(StrVal(", ")),
+                  Assign(Var("save"), Var("f0")),
+                  Assign(Var("f0"), Var("f1")),
+                  Assign(Var("f1"), Add(Var("save"), Var("f1"))),
+                  Assign(Var("i"), Add(Var("i"), IntVal(1)))
                 )
+              )
             )
-        )
     }
 
     "while loop with arithmetic" should "match stmt" in {
@@ -71,19 +72,17 @@ class advancedParserStatementTest extends AnyFlatSpec {
             i = i + 1
         done
         """) shouldBe
-        Success(
-            While(
+            Success(
+              While(
                 Or(Grt(Var("y"), IntVal(0)), Grt(Var("x"), IntVal(0))),
                 List(
-                    Assign(Var("x"), Sub(Var("x"), IntVal(1))),
-                    Assign(Var("y"), Sub(Var("y"), IntVal(1))),
-                    Assign(Var("i"), Add(Var("i"), IntVal(1)))
+                  Assign(Var("x"), Sub(Var("x"), IntVal(1))),
+                  Assign(Var("y"), Sub(Var("y"), IntVal(1))),
+                  Assign(Var("i"), Add(Var("i"), IntVal(1)))
                 )
+              )
             )
-        )
     }
-
-
 
     // If and Else Tests
 
@@ -95,17 +94,17 @@ class advancedParserStatementTest extends AnyFlatSpec {
             println "incorrect"
         fi
         """) shouldBe
-        Success(
-            If(
+            Success(
+              If(
                 Eql(Var("a"), IntVal(13)),
                 List(
-                    Println(StrVal("correct"))
+                  Println(StrVal("correct"))
                 ),
                 List(
-                    Println(StrVal("incorrect"))
+                  Println(StrVal("incorrect"))
                 )
+              )
             )
-        )
     }
 
     "nested if-else statement" should "match stmt" in {
@@ -119,25 +118,25 @@ class advancedParserStatementTest extends AnyFlatSpec {
         else
             a = 10
         fi""") shouldBe
-        Success(
-            If(
+            Success(
+              If(
                 Eql(Var("a"), IntVal(13)),
                 List(
-                    If(
-                        Eql(Var("b"), IntVal(4)),
-                        List(
-                            Assign(Var("a"), IntVal(4))
-                        ),
-                        List(
-                            Assign(Var("b"), IntVal(4))
-                        )
+                  If(
+                    Eql(Var("b"), IntVal(4)),
+                    List(
+                      Assign(Var("a"), IntVal(4))
+                    ),
+                    List(
+                      Assign(Var("b"), IntVal(4))
                     )
+                  )
                 ),
                 List(
-                    Assign(Var("a"), IntVal(10))
+                  Assign(Var("a"), IntVal(10))
                 )
+              )
             )
-        )
     }
 
     "while loop with nested if-else statement" should "match stmt" in {
@@ -154,30 +153,30 @@ class advancedParserStatementTest extends AnyFlatSpec {
             fi
         done
         """) shouldBe
-        Success(
-            While(
+            Success(
+              While(
                 Grt(Var("n"), IntVal(0)),
                 List(
-                    If(
-                        Eql(Var("a"), IntVal(13)),
+                  If(
+                    Eql(Var("a"), IntVal(13)),
+                    List(
+                      If(
+                        Eql(Var("b"), IntVal(4)),
                         List(
-                            If(
-                                Eql(Var("b"), IntVal(4)),
-                                List(
-                                    Assign(Var("a"), IntVal(4))
-                                ),
-                                List(
-                                    Assign(Var("b"), IntVal(4))
-                                )
-                            )
+                          Assign(Var("a"), IntVal(4))
                         ),
                         List(
-                            Println(StrVal("incorrect"))
+                          Assign(Var("b"), IntVal(4))
                         )
+                      )
+                    ),
+                    List(
+                      Println(StrVal("incorrect"))
                     )
+                  )
                 )
+              )
             )
-        )
     }
 
     "while loop with nested while loop and if-else statement" should "match stmt" in {
@@ -192,28 +191,27 @@ class advancedParserStatementTest extends AnyFlatSpec {
             fi
         done
         """) shouldBe
-        Success(
-            While(
+            Success(
+              While(
                 Grt(Var("n"), IntVal(0)),
                 List(
-                    If(
-                        Eql(Var("a"), IntVal(13)),
+                  If(
+                    Eql(Var("a"), IntVal(13)),
+                    List(
+                      While(
+                        Grt(Var("a"), IntVal(0)),
                         List(
-                            While(
-                                Grt(Var("a"), IntVal(0)),
-                                List(
-                                    Assign(Var("a"), Sub(Var("a"), IntVal(1)))
-                                )
-                            )
-                        ),
-                        List(
-                            Assign(Var("a"), IntVal(13))
+                          Assign(Var("a"), Sub(Var("a"), IntVal(1)))
                         )
+                      )
+                    ),
+                    List(
+                      Assign(Var("a"), IntVal(13))
                     )
+                  )
                 )
+              )
             )
-        )
     }
 
-    
 }

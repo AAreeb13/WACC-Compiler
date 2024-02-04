@@ -1,14 +1,15 @@
 package wacc
 
+import org.scalactic.Bool
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-
+import parsley.Failure
 import parsley.Parsley
-import parsley.token.{Lexer, predicate}
+import parsley.Result
+import parsley.Success
 import parsley.token.Lexer
 import parsley.token.descriptions._
-import parsley.{Result, Success, Failure}
-import org.scalactic.Bool
+import parsley.token.predicate
 
 class parserStatementTest extends AnyFlatSpec {
     val statParser = lexer.fully(parser.stmt)
@@ -42,19 +43,21 @@ class parserStatementTest extends AnyFlatSpec {
     }
     "\'if then else fi statements" should "match stmt" in {
         statParser.parse("if(x==4)then return(5) else return(4) fi") shouldBe
-        Success(If(Eql(Var("x"), IntVal(4)), Return(IntVal(5)) :: Nil, Return(IntVal(4)) :: Nil))
+            Success(If(Eql(Var("x"), IntVal(4)), Return(IntVal(5)) :: Nil, Return(IntVal(4)) :: Nil))
     }
 
     "\'while do done\' statements" should "match stmt" in {
-        statParser.parse("while(x==4) do arr[1]=true done") shouldBe 
-        Success(While(Eql(Var("x"), IntVal(4)), Assign(ArrayVal("arr", IntVal(1) :: Nil), BoolVal(true)) :: Nil))
+        statParser.parse("while(x==4) do arr[1]=true done") shouldBe
+            Success(While(Eql(Var("x"), IntVal(4)), Assign(ArrayVal("arr", IntVal(1) :: Nil), BoolVal(true)) :: Nil))
     }
 
     "\'begin end\' statements" should "match stmt" in {
         statParser.parse("begin int i=0 end") shouldBe Success(Scope(AssignNew(IntType, "i", IntVal(0)) :: Nil))
     }
-    
+
     "\'stmt ; stmt\' statements" should "match a list of statement" in {
-        parser.stmtList.parse("int i=0; i=1") shouldBe Success(List(AssignNew(IntType, "i", IntVal(0)), Assign(Var("i"), IntVal(1))))
+        parser.stmtList.parse("int i=0; i=1") shouldBe Success(
+          List(AssignNew(IntType, "i", IntVal(0)), Assign(Var("i"), IntVal(1)))
+        )
     }
 }

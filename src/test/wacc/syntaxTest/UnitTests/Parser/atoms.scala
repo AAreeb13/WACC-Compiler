@@ -1,14 +1,15 @@
 package wacc
 
+import org.scalactic.Bool
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
-
+import parsley.Failure
 import parsley.Parsley
-import parsley.token.{Lexer, predicate}
+import parsley.Result
+import parsley.Success
 import parsley.token.Lexer
 import parsley.token.descriptions._
-import parsley.{Result, Success, Failure}
-import org.scalactic.Bool
+import parsley.token.predicate
 
 class parserAtomTest extends AnyFlatSpec {
     val atomParser = lexer.fully(parser.atom)
@@ -39,11 +40,10 @@ class parserAtomTest extends AnyFlatSpec {
 
     it should "match a boolean" in {
         atomParser.parse("true") shouldBe Success(BoolVal(true))
-        atomParser.parse("false") shouldBe Success(BoolVal(false))        
+        atomParser.parse("false") shouldBe Success(BoolVal(false))
     }
 
     it should "match an array element" in {
         atomParser.parse("arr[3]") shouldBe Success(ArrayVal("arr", List(IntVal(3))))
     }
 }
-
