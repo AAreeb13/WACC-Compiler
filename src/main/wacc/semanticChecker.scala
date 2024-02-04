@@ -39,8 +39,56 @@ case class Analyser(val prog: Prog) {
         func.stats.foreach(checkStatement(_, funcSymbolTable))
     }
 
-    def checkStatement(stat: Stat, currentScope: SymbolTable): Unit = {
+    def checkStatement(stat: Stat, currentScope: SymbolTable): Unit = stat match {
+        case AssignNew(t, ident, rvalue) =>
+        case Assign(lvalue, rvalue) =>
+        
+        case While(cond, stats) => 
+        case If(cond, ifStat, elseStat) =>
+        case Scope(stats) =>
+        
+        case Return(expr) =>
+        case Free(expr) =>
+        case Read(lvalue) =>
+        case Exit(expr) =>
+        case Print(expr) =>
+        case Println(expr) =>
 
+        case Skip =>
+    }
+
+    def checkExpression(expr: Expr, currentScope: SymbolTable): Unit = expr match {
+        case Var(v) =>
+        case ArrayVal(v, exprs) =>
+
+        case Ord(x) => 
+        case Chr(x) =>
+        case Len(x) =>
+        case Not(x) =>
+        case Neg(x) =>
+
+        case Mul(x, y) =>
+        case Mod(x, y) =>
+        case Add(x, y) =>
+        case Sub(x, y) =>
+        case Div(x, y) =>
+        
+        case And(x, y) =>
+        case Or(x, y) =>
+            
+        case GrtEql(x, y) =>
+        case LessEql(x, y) =>
+        case Less(x, y) =>
+        case Grt(x, y) =>
+                    
+        case NotEql(x, y) =>
+        case Eql(x, y) =>
+        
+        case StrVal(x) =>
+        case BoolVal(x) =>
+        case IntVal(x) =>
+        case CharVal(x) =>
+        case PairVal =>
     }
 
     def getResult: Either[String, Node] = {
@@ -52,7 +100,7 @@ case class Analyser(val prog: Prog) {
     }
 
     def generateErrors: String = {
-        "A semantic error occured"
+        s"Semantic check failed:\n${errList.mkString("\n")}"
     }
 }
 
