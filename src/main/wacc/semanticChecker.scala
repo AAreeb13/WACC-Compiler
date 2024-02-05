@@ -96,17 +96,23 @@ case class Analyser(val prog: Prog) {
       case PairVal => ???
   }
 
-  def checkBinExpression(x: Expr, y: Expr, expectedType: Type, currentScope: SymbolTable): Option[Type] = checkExpression(x, currentScope) match {
+  private def checkBinExpression(x: Expr, y: Expr, expectedType: Type, currentScope: SymbolTable): Option[Type] = {
+      def handleNoneCase(expectedType: Type): Option[Type] = expectedType match {
+          case IntType => errList.addOne(s"Expected type: int")
+              None
+          case BoolType => errList.addOne(s"Expected type: bool")
+              None
+      }
+      
+      checkExpression(x, currentScope) match {
         case Some(expectedType) => checkExpression(y, currentScope) match {
             case Some(expectedType) => Some(expectedType)
+            case None => handleNoneCase(expectedType)
         }
-        case _ => expectedType match {
-            case IntType => errList.addOne(s"Expected type: int")
-                None
-            case BoolType => errList.addOne(s"Expected type: bool")
-                None
-        }
+        case _ => handleNoneCase(expectedType)
     } 
+  }
+
 
   def getResult: Either[String, Node] = {
       if (errList.isEmpty) {
