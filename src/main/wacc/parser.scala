@@ -34,14 +34,14 @@ object parser {
     lazy val parser: Parsley[Node] = fully(prog)
 
     ////////// TYPE PARSER ///////////
-    lazy val declType: Parsley[Type] = arrayType |
+    lazy val declType: Parsley[Type] = (arrayType |
         pairType |
-        baseType
+        baseType).label("declarable Type")
 
-    lazy val baseType: Parsley[BaseType] = (IntType.from("int")) |
+    lazy val baseType: Parsley[BaseType] = ((IntType.from("int")) |
         (StringType.from("string")) |
         (CharType.from("char")) |
-        (BoolType.from("bool"))
+        (BoolType.from("bool"))).label("base type")
 
     lazy val arrayType: Parsley[Type]
     // = precedence(baseType, pairType)(Ops(Postfix)(ArrayType from "[" <~> "]"))
@@ -89,17 +89,17 @@ object parser {
     lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt, ";")
 
     lazy val stmt = "skip".as(Skip) |
-        AssignNew(declType, ident <~ "=", rvalue) |
-        Assign(atomic(lvalue <~ "="), rvalue) |
-        Read("read" ~> lvalue) |
-        Free("free" ~> expr) |
-        Return("return" ~> expr) |
-        Exit("exit" ~> expr) |
-        Print("print" ~> expr) |
-        Println("println" ~> expr) |
-        If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi") |
-        While("while" ~> expr, "do" ~> stmtList <~ "done") |
-        Scope("begin" ~> stmtList <~ "end")
+        (AssignNew(declType, ident <~ "=", rvalue)).label("variable declaration") |
+        (Assign(atomic(lvalue <~ "="), rvalue)).label("assignment") |
+        Read("read" ~> lvalue).hide |
+        Free("free" ~> expr).hide |
+        Return("return" ~> expr).label("return statement") |
+        Exit("exit" ~> expr).hide |
+        Print("print" ~> expr).hide |
+        Println("println" ~> expr).hide |
+        (If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")).label("if statement") |
+        (While("while" ~> expr, "do" ~> stmtList <~ "done")).label("while loop") |
+        Scope("begin" ~> stmtList <~ "end").hide
 
     lazy val lvalue: Parsley[LValue] = arrayElem |
         Var(ident) |
