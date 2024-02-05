@@ -30,7 +30,7 @@ object Main {
 
         result match {
             case Left(err) =>
-                println(err)
+                println(s"$input\n$err")
                 sys.exit(exitSemanticErr)
 
             case Right(output) =>
