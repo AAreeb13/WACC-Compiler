@@ -4,7 +4,6 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
-
 object semanticChecker {
     def verify(result: Either[String, Node]): Either[String, Node] = result.flatMap(_ match {
         case prog: Prog => new Analyser(prog).getResult
@@ -16,7 +15,6 @@ class Analyser(val prog: Prog) {
     var errList: ListBuffer[String] = ListBuffer.empty
     var globalTable = new SymbolTable();
     var funcTable: HashMap[String, (Type, List[Type])] = HashMap.empty
-
 
     checkProgram()
 
@@ -49,9 +47,9 @@ class Analyser(val prog: Prog) {
 
         // add parameters to the table
         func.params.foreach{ param =>
-            if (!funcSymbolTable.contains(param.name))
+            if (!funcSymbolTable.contains(param.name)) 
                 funcSymbolTable.addOne(param.name, param.declType)
-            else
+            else 
                 errList.addOne(s"Scope error: Parameter ${param.name} has already been declared in function")
         }
         func.stats.foreach(checkStatement(_, func.retType)(funcSymbolTable))

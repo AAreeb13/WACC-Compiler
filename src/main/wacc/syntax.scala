@@ -223,7 +223,7 @@ sealed trait UnOp extends Expr {
     val x: Expr
 }
 object UnOp {
-    def unapply(op: BinOp): Option[Expr] = Some(op.x)
+    def unapply(op: UnOp): Option[Expr] = Some(op.x)
 }
 
 case class Not(x: Expr) extends UnOp
