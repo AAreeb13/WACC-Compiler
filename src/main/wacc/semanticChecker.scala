@@ -15,6 +15,10 @@ class Analyser(val prog: Prog) {
     var globalTable = new SymbolTable();
     var funcTable: HashMap[String, (Type, List[Type])] = HashMap.empty
 
+
+    verifyProgram()
+    
+    def verifyProgram() = {
     prog.funcs.foreach { func =>
         if (funcTable.contains(func.name)) {
             errList.addOne(s"${func.name} already exists, no support for overloaded functions.")
@@ -22,8 +26,9 @@ class Analyser(val prog: Prog) {
         funcTable.addOne((func.name, (func.retType, func.params.map(_.declType))))
     }
 
-    prog.funcs.foreach(checkFunction(_))
-    prog.stats.foreach(checkStatement(_, globalTable))
+        prog.funcs.foreach(checkFunction(_))
+        prog.stats.foreach(checkStatement(_, globalTable))
+    }
 
     def checkFunction(func: Func): Unit = {
         // create new child table
