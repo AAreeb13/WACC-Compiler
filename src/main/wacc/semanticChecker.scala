@@ -75,89 +75,72 @@ class Analyser(val prog: Prog) {
         case Skip =>
     }
 
-    def checkExpression(expr: Expr)(implicit currentScope: SymbolTable): Option[Type] = expr match {
-        case Var(v) =>
-            currentScope.typeof(v) match {
-                case None =>
-                    errList.addOne(s"Variable ${v} is not in scope")
-                    None
-                case x => x
+    def checkVar(v: Var)(implicit currentScope: SymbolTable) = 
+        currentScope.typeof(v.v).getOrElse {
+            errList.addOne(s"Scope error: Variable ${v.v} has not been declared in this scope")
+            NoneType
+        }
+
+    def checkPair(pairElem: PairElem)(implicit currentScope: SymbolTable): Type = ???
+
+    def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): Type = ???
+
+
+    def checkExpression(expr: Expr)(implicit currentScope: SymbolTable): Type = expr match {
+        case arrayElem: ArrayVal => checkArray(arrayElem)
+        case variable: Var => checkVar(variable)
+
+        case Ord(x) =>
+            matchesType(checkExpression(x), CharType)
+            IntType
+
+        case ArithmeticOp(x, y) =>
+            matchesType(checkExpression(x), IntType)
+            matchesType(checkExpression(y), IntType)
+            IntType
+
+        case ComparisonOp(x, y) =>
+            val lhsType = checkExpression(x)
+            matchesType(lhsType, List(IntType, CharType))
+            matchesType(checkExpression(y), lhsType)
+            BoolType
+
+        case EqualityOp(x, y) =>
+            matchesType(checkExpression(x), checkExpression(y))
+            BoolType
+
+        case LogicalOp(x, y) =>
+            matchesType(checkExpression(x), BoolType)
+            matchesType(checkExpression(y), BoolType)
+            BoolType
+        
+        case Neg(x) =>
+            matchesType(checkExpression(x), IntType)
+            IntType
+
+        case Not(x) =>
+            matchesType(checkExpression(x), BoolType)
+            BoolType
+        
+        case Len(x) => 
+            checkExpression(x) match {
+                case arr: ArrayType => IntType
+                case other =>
+                    errList.addOne(s"Type error: Len can only take in an array type but $other was given")
+                    NoneType
             }
 
-        case ArrayVal(v, exprs) => ???
+        case Chr(x) =>
+            matchesType(checkExpression(x), IntType)
+            CharType
 
-        case Ord(x) => checkUnaryExpression(x, CharType, IntType)
+        case BoolVal(x) => BoolType
+        case CharVal(x) => CharType
+        case StrVal(x) => StringType
+        case PairVal => AnyType
+        case IntVal(x) => IntType
 
-        case Chr(x) => checkUnaryExpression(x, IntType, CharType)
-
-        case Len(x) => ???
-
-        case Not(x) => checkUnaryExpression(x, BoolType, BoolType)
-
-        case Neg(x) => checkUnaryExpression(x, IntType, IntType)
-
-        case LogicalOp(x, y) => checkBinExpression(x, y, BoolType)
-
-        case ComparisonOp(x, y) => checkInequality(x, y)
-
-        case ArithmeticOp(x, y) => checkBinExpression(x, y, IntType)
-
-
-        case EqualityOp(x, y) => ???
-
-        case StrVal(x)  => Some(StringType)
-        case BoolVal(x) => Some(BoolType)
-        case IntVal(x)  => Some(IntType)
-        case CharVal(x) => Some(CharType)
-        case PairVal    => Some(AnyType)
-
-        case _ => None // should not happen, metals is bugging
-    }
-
-    def checkRightExpression(y: Expr, expectedType: Type)(implicit currentScope: SymbolTable): Option[Type] = 
-        checkExpression(y) match {
-            case Some(expectedType) => Some(expectedType)
-            case None               => Some(expectedType)
-            case otherwise =>
-                errList.addOne(s"Expected type: $expectedType}, found ${otherwise.get}")
-                Some(expectedType)
-        }
-
-    private def checkBinExpression(x: Expr, y: Expr, expectedType: Type)(implicit currentScope: SymbolTable): Option[Type] = {
-
-
-        checkExpression(x) match {
-            case Some(expectedType) => checkRightExpression(y, expectedType)
-            case None => checkRightExpression(y, expectedType)
-            case otherwise =>
-              errList.addOne(s"Expected type: $expectedType, found ${otherwise.get}")
-              checkRightExpression(y, expectedType)
-        }
-    }
-
-    private def checkUnaryExpression(x: Expr, expectedType: Type, returnType: Type)(implicit currentScope: SymbolTable) = checkExpression(x) match {
-      case Some(expectedType) => Some(returnType)
-      case None => Some(returnType)
-      case otherwise => errList.addOne(s"Expected type: $expectedType, found ${otherwise.get}")
-        Some(returnType)
-    }
-
-    def checkRightExpression(y: Expr)(implicit currentScope: SymbolTable): Option[Type] = checkExpression(y) match {
-        case Some(IntType) | Some(CharType) => Some(BoolType)
-        case None => Some(BoolType)
-        case otherwise => errList.addOne(s"Expected type: char or int, found ${otherwise.get}")
-            Some(BoolType) 
-    }
-
-    private def checkInequality(x: Expr, y: Expr)(implicit currentScope: SymbolTable): Option[Type] = {
-
-      
-      checkExpression(x) match {
-        case Some(IntType) | Some(CharType) => checkRightExpression(y)
-        case None => checkRightExpression(y)
-        case otherwise => errList.addOne(s"Expected type: char or int, found ${otherwise.get}")
-          checkRightExpression(y)
-      }
+        case _ => errList.addOne("unknown error"); NoneType // should not happen, metals is bugging
     }
 
     def getResult: Either[String, Node] = {
