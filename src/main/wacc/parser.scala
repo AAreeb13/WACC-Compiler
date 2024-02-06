@@ -36,12 +36,12 @@ object parser {
     ////////// TYPE PARSER ///////////
     lazy val declType: Parsley[Type] = (arrayType |
         pairType |
-        baseType).label("declarable Type")
+        baseType).label("declarable Type").explain("declarable types are: arrayType, pairType and baseType")
 
     lazy val baseType: Parsley[BaseType] = ((IntType.from("int")) |
         (StringType.from("string")) |
         (CharType.from("char")) |
-        (BoolType.from("bool"))).label("base type")
+        (BoolType.from("bool"))).label("base type").explain("base types are : int, string, char, bool")
 
     lazy val arrayType: Parsley[Type]
     // = precedence(baseType, pairType)(Ops(Postfix)(ArrayType from "[" <~> "]"))
