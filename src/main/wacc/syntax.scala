@@ -39,6 +39,10 @@ case object ErasedPair extends Type with generic.ParserBridge0[Type]  {
     override def toString = "pair"
 }
 
+case object AnyType extends BaseType
+
+case object NoneType extends BaseType
+
 ////////// STATEMENTS ///////////
 
 case class Prog(funcs: List[Func], stats: List[Stat]) extends Node
@@ -79,7 +83,14 @@ object Scope     extends generic.ParserBridge1[List[Stat], Stat]
 sealed trait LValue extends Node
 sealed trait RValue extends Node
 
-sealed trait PairElem              extends LValue with RValue
+sealed trait PairElem extends LValue with RValue {
+    val lvalue: LValue
+}
+
+object PairElem {
+    def unapply(p: PairElem): Option[LValue] = Some(p.lvalue)
+}
+
 case class FstPair(lvalue: LValue) extends PairElem
 case class SndPair(lvalue: LValue) extends PairElem
 
@@ -121,19 +132,50 @@ object ArrayVal                                   extends generic.ParserBridge2[
 
 // binary operators
 
-case class Mul(x: Expr, y: Expr)     extends Expr
-case class Div(x: Expr, y: Expr)     extends Expr
-case class Mod(x: Expr, y: Expr)     extends Expr
-case class Add(x: Expr, y: Expr)     extends Expr
-case class Sub(x: Expr, y: Expr)     extends Expr
-case class Grt(x: Expr, y: Expr)     extends Expr
-case class GrtEql(x: Expr, y: Expr)  extends Expr
-case class Less(x: Expr, y: Expr)    extends Expr
-case class LessEql(x: Expr, y: Expr) extends Expr
-case class Eql(x: Expr, y: Expr)     extends Expr
-case class NotEql(x: Expr, y: Expr)  extends Expr
-case class And(x: Expr, y: Expr)     extends Expr
-case class Or(x: Expr, y: Expr)      extends Expr
+sealed trait BinOp extends Expr {
+    val x: Expr
+    val y: Expr
+}
+object BinOp {
+    def unapply(op: BinOp): Option[(Expr, Expr)] = Some((op.x, op.y))
+}
+
+sealed trait LogicalOp extends BinOp
+object LogicalOp {
+    def unapply(op: LogicalOp): Option[(Expr, Expr)] = Some((op.x, op.y))
+}
+
+sealed trait ArithmeticOp extends BinOp
+object ArithmeticOp {
+    def unapply(op: ArithmeticOp): Option[(Expr, Expr)] = Some((op.x, op.y))
+}
+
+sealed trait EqualityOp extends BinOp
+object EqualityOp {
+    def unapply(op: EqualityOp): Option[(Expr, Expr)] = Some((op.x, op.y))
+}
+
+sealed trait ComparisonOp extends BinOp
+object ComparisonOp {
+    def unapply(op: ComparisonOp): Option[(Expr, Expr)] = Some((op.x, op.y))
+}
+
+case class Mul(x: Expr, y: Expr)     extends ArithmeticOp
+case class Div(x: Expr, y: Expr)     extends ArithmeticOp
+case class Mod(x: Expr, y: Expr)     extends ArithmeticOp
+case class Add(x: Expr, y: Expr)     extends ArithmeticOp
+case class Sub(x: Expr, y: Expr)     extends ArithmeticOp
+
+case class Grt(x: Expr, y: Expr)     extends ComparisonOp 
+case class GrtEql(x: Expr, y: Expr)  extends ComparisonOp 
+case class Less(x: Expr, y: Expr)    extends ComparisonOp 
+case class LessEql(x: Expr, y: Expr) extends ComparisonOp 
+
+case class Eql(x: Expr, y: Expr)     extends EqualityOp
+case class NotEql(x: Expr, y: Expr)  extends EqualityOp
+
+case class And(x: Expr, y: Expr)     extends LogicalOp
+case class Or(x: Expr, y: Expr)      extends LogicalOp
 
 object Mul     extends generic.ParserBridge2[Expr, Expr, Expr]
 object Div     extends generic.ParserBridge2[Expr, Expr, Expr]
