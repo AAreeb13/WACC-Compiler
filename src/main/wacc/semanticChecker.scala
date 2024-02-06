@@ -186,7 +186,26 @@ class Analyser(val prog: Prog) {
         } 
     }
 
-    def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): Type = ???
+    def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): Type = {
+            arrayElem.exprs.foreach(e => matchesType(checkExpression(e), IntType))
+            currentScope.typeof(arrayElem.v) match {
+                case None => 
+                    errList.addOne(s"Scope error: Variable ${arrayElem.v} has not been declared in this scope")
+                    NoneType
+                case Some(declType) => declType match {
+                    case arrType: ArrayType => arrType.unfold(arrayElem.exprs.size) match {
+                        case None =>
+                            errList.addOne(s"Type error: array ${arrayElem.v} has type $arrType with dimension ${arrType.dimensions} but dimenesion ${arrayElem.exprs.size} was provided")
+                            NoneType
+                        case Some(innerType) =>
+                            innerType
+                    }
+                    case other => 
+                        errList.addOne(s"Type error: Variable ${arrayElem.v} has type $other when an array was expected")
+                        NoneType
+                }
+            }
+    }
 
     def checkExpression(expr: Expr)(implicit currentScope: SymbolTable): Type = expr match {
         case arrayElem: ArrayVal => checkArray(arrayElem)

@@ -40,6 +40,17 @@ case object StringType extends BaseType with generic.ParserBridge0[BaseType] {
 
 case class ArrayType(t: Type) extends Type  {
     override def toString = s"${t.toString}[]"
+
+    def dimensions: Int = t match {
+        case arrType: ArrayType => 1 + arrType.dimensions
+        case _ => 1
+    }
+
+    def unfold(levels: Int): Option[Type] = (levels, t) match {
+        case (1, t) => Some(t)
+        case (n, arr: ArrayType) => arr.unfold(n-1)
+        case _ => None
+    }
 }
 
 object ArrayType              extends generic.ParserBridge1[Type, Type]
