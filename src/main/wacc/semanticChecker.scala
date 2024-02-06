@@ -263,12 +263,12 @@ class Analyser(val prog: Prog) {
     }
 
     def getResult: Either[String, Node] = {
-        Right(prog) // :)
-        // if (errList.isEmpty) {
-        //     Right(prog)
-        // } else {
-        //     Left(generateErrors)
-        // }
+        //Right(prog) // :)
+        if (errList.isEmpty) {
+            Right(prog)
+        } else {
+            Left(generateErrors)
+        }
     }
 
     def generateErrors: String = {
