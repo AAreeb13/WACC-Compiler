@@ -7,7 +7,22 @@ sealed trait Node
 
 ////////// TYPES ///////////
 
-sealed trait Type extends Node
+sealed trait Type extends Node {
+    def reducesTo(otherType: Type): Boolean = (this, otherType) match {
+        case (NoneType, _) | (_, NoneType) => false
+        case (AnyType, _) | (_, AnyType) => true
+        case (IntType, IntType) | 
+             (CharType, CharType) | 
+             (BoolType, BoolType) | 
+             (StringType, StringType) => true
+        case (ArrayType(a1), ArrayType(a2)) => a1 == a2
+        case (ArrayType(CharType), StringType) => true
+        case (PairType(l1, r1), PairType(l2, r2)) => (l1 == l2) && (r1 == r2)
+        case (ErasedPair, PairType(_, _)) | (PairType(_, _), ErasedPair) => true
+        case (ErasedPair, ErasedPair) => false  // last bullet point on pair coercion
+        case _ => false
+    }
+}
 
 sealed trait BaseType  extends Type
 case object IntType    extends BaseType with generic.ParserBridge0[BaseType] {
