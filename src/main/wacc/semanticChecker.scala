@@ -5,14 +5,14 @@ import scala.collection.mutable.ListBuffer
 
 object semanticChecker {
     def verify(result: Either[String, Node]): Either[String, Node] = result.flatMap(_ match {
-        case prog: Prog => Analyser(prog).getResult
-        case _          => Left("Invalid AST type for top-level verification")
+        case prog: Prog => new Analyser(prog).getResult
+        case _ => Left("Invalid AST type for semantic verification")
     })
 }
 
-case class Analyser(val prog: Prog) {
-    var errList: ListBuffer[String]                    = ListBuffer.empty
-    var globalTable                                    = new SymbolTable();
+class Analyser(val prog: Prog) {
+    var errList: ListBuffer[String] = ListBuffer.empty
+    var globalTable = new SymbolTable();
     var funcTable: HashMap[String, (Type, List[Type])] = HashMap.empty
 
     prog.funcs.foreach { func =>
@@ -30,7 +30,7 @@ case class Analyser(val prog: Prog) {
         val funcSymbolTable = new SymbolTable()
 
         // add parameters to the table
-        func.params.foreach { param =>
+        func.params.foreach{ param =>
             if (!funcSymbolTable.contains(param.name))
                 funcSymbolTable.addOne(param.name, param.declType)
             else
