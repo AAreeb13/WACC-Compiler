@@ -19,6 +19,19 @@ class Analyser(val prog: Prog) {
 
 
     checkProgram()
+
+    def checkProgram() = {
+        prog.funcs.foreach { func =>
+            if (funcTable.contains(func.name)) {
+                errList.addOne(s"${func.name} already exists, no support for overloaded functions.")
+            }
+            funcTable.addOne((func.name, (func.retType, func.params.map(_.declType))))
+        }
+
+        prog.funcs.foreach(checkFunction(_))
+        prog.stats.foreach(checkStatement(_, NoneType)(globalTable))
+    }
+
     def matchesType(actual: Type, expected: Type): Type = 
         matchesType(actual, List(expected))
 
@@ -29,19 +42,6 @@ class Analyser(val prog: Prog) {
             errList.addOne(s"Type error: Expected: ${expected.mkString(", ")} but received $actual instead")
             NoneType
         }
-
-    
-    def checkProgram() = {
-    prog.funcs.foreach { func =>
-        if (funcTable.contains(func.name)) {
-            errList.addOne(s"${func.name} already exists, no support for overloaded functions.")
-        }
-        funcTable.addOne((func.name, (func.retType, func.params.map(_.declType))))
-    }
-
-        prog.funcs.foreach(checkFunction(_))
-        prog.stats.foreach(checkStatement(_)(globalTable))
-    }
 
     def checkFunction(func: Func): Unit = {
         // create new child table
@@ -54,10 +54,10 @@ class Analyser(val prog: Prog) {
             else
                 errList.addOne(s"Scope error: Parameter ${param.name} has already been declared in function")
         }
-        func.stats.foreach(checkStatement(_)(funcSymbolTable))
+        func.stats.foreach(checkStatement(_, func.retType)(funcSymbolTable))
     }
 
-    def checkStatement(stat: Stat)(implicit currentScope: SymbolTable): Unit = stat match {
+    def checkStatement(stat: Stat, expectedType: Type)(implicit currentScope: SymbolTable): Unit = stat match {
         case AssignNew(t, ident, rvalue) =>
         case Assign(lvalue, rvalue)      =>
 
@@ -96,28 +96,22 @@ class Analyser(val prog: Prog) {
 
         case Neg(x) => checkUnaryExpression(x, IntType, IntType)
 
-        case Mul(x, y) => checkBinExpression(x, y, IntType)
-        case Mod(x, y) => checkBinExpression(x, y, IntType)
-        case Add(x, y) => checkBinExpression(x, y, IntType)
-        case Sub(x, y) => checkBinExpression(x, y, IntType)
-        case Div(x, y) => checkBinExpression(x, y, IntType)
+        case LogicalOp(x, y) => checkBinExpression(x, y, BoolType)
 
-        case And(x, y) => checkBinExpression(x, y, BoolType)
-        case Or(x, y)  => checkBinExpression(x, y, BoolType)
+        case ComparisonOp(x, y) => checkInequality(x, y)
 
-        case GrtEql(x, y)  => checkInequality(x, y)
-        case LessEql(x, y) => checkInequality(x, y)
-        case Less(x, y)    => checkInequality(x, y)
-        case Grt(x, y)     => checkInequality(x, y)
+        case ArithmeticOp(x, y) => checkBinExpression(x, y, IntType)
 
-        case NotEql(x, y) => ???
-        case Eql(x, y)    => ???
+
+        case EqualityOp(x, y) => ???
 
         case StrVal(x)  => Some(StringType)
         case BoolVal(x) => Some(BoolType)
         case IntVal(x)  => Some(IntType)
         case CharVal(x) => Some(CharType)
-        case PairVal    => ???
+        case PairVal    => Some(AnyType)
+
+        case _ => None // should not happen, metals is bugging
     }
 
     def checkRightExpression(y: Expr, expectedType: Type)(implicit currentScope: SymbolTable): Option[Type] = 
