@@ -105,9 +105,41 @@ class Analyser(val prog: Prog) {
         }
     }
 
-    def checkRValue(rvalue: RValue)(implicit currentScope: SymbolTable): Type = ???
-
-    def checkLValue(lvalue: LValue)(implicit currentScope: SymbolTable): Type = ???
+    def checkLValue(lvalue: LValue)(implicit currentScope: SymbolTable): Type = lvalue match {
+        case arrayElem: ArrayVal => checkArray(arrayElem)
+        case pairElem: PairElem => checkPair(pairElem)
+        case variable: Var => checkVar(variable)
+    }
+    
+    def checkRValue(rvalue: RValue)(implicit currentScope: SymbolTable): Type = rvalue match {
+        case ArrayLiteral(exprs) => 
+            exprs.map(checkExpression(_)).fold(AnyType)((acc, expType) =>
+                if  (acc reducesTo expType) expType
+                else if (expType reducesTo acc) acc
+                else NoneType
+            )
+        case pairElem: PairElem => checkPair(pairElem)
+        case PairCons(fst, snd) => PairType(checkExpression(fst), checkExpression(snd))
+        case FuncCall(ident, args) => funcTable.get(ident) match {
+            case None =>
+                errList.addOne(s"Undefined function error: Function $ident has not been defined")
+                args.foreach(checkExpression(_)) // scope check only
+                NoneType
+            case Some((retType, paramTypes)) =>
+                if (paramTypes.size != args.size) {
+                    errList.addOne(s"Function call error: Wrong number of arguments provided to function $ident." +
+                                   s"unexpected ${args.size}. expected ${paramTypes.size}")
+                    args.foreach(checkExpression(_))
+                    NoneType
+                } else { 
+                    args.zip(paramTypes).foreach{ case (arg, paramType) => 
+                        matchesType(checkExpression(arg), paramType)
+                    }
+                    retType
+                }
+            }
+        case expr: Expr => checkExpression(expr)
+    }
 
     def checkVar(v: Var)(implicit currentScope: SymbolTable) = 
         currentScope.typeof(v.v).getOrElse {
