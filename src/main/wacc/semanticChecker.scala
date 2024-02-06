@@ -117,7 +117,18 @@ class Analyser(val prog: Prog) {
                 else NoneType
             )
         case pairElem: PairElem => checkPair(pairElem)
-        case PairCons(fst, snd) => PairType(checkExpression(fst), checkExpression(snd))
+        case PairCons(fst, snd) => 
+            val fstType = checkExpression(fst) match {
+                case PairType(_, _) => ErasedPair
+                case other => other
+            }
+
+            val sndType = checkExpression(snd) match {
+                case PairType(_, _) => ErasedPair
+                case other => other
+            }
+            PairType(fstType, sndType)
+            
         case FuncCall(ident, args) => funcTable.get(ident) match {
             case None =>
                 errList.addOne(s"Undefined function error: Function $ident has not been defined")
