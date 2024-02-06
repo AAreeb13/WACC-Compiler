@@ -7,7 +7,7 @@ import scala.language.implicitConversions
 
 object semanticChecker {
     def verify(result: Either[String, Node]): Either[String, Node] = result.flatMap(_ match {
-        case prog: Prog => result//new Analyser(prog).getResult
+        case prog: Prog => new Analyser(prog).getResult
         case _ => Left("Invalid AST type for semantic verification")
     })
 }
@@ -147,7 +147,44 @@ class Analyser(val prog: Prog) {
             NoneType
         }
 
-    def checkPair(pairElem: PairElem)(implicit currentScope: SymbolTable): Type = ???
+    def checkPair(pairElem: PairElem)(implicit currentScope: SymbolTable): Type = {
+        // maybe propagate PairType up instead of noneType?
+        pairElem.lvalue match {
+            case variable: Var => checkVar(variable) match {
+                case NoneType => NoneType // inner error, do nothing
+                case ErasedPair => AnyType // handle later
+                case PairType(t1, t2) => pairElem match {
+                    case fst: FstPair => t1
+                    case snd: SndPair => t2
+                }
+                case other =>
+                    errList.addOne(s"Type error: Variable ${variable.v} has type $other when a pair was expected")
+                    NoneType
+            }
+
+            case arrayVal: ArrayVal => checkArray(arrayVal) match {
+                case NoneType => NoneType // inner error, do nothing
+                case ErasedPair => AnyType // handle later
+                case PairType(t1, t2) => pairElem match {
+                    case fst: FstPair => t1
+                    case snd: SndPair => t2
+                }
+                case other =>
+                    errList.addOne(s"Type error: Variable ${arrayVal.v} has type $other when a pair was expected")
+                    NoneType
+            }
+
+            case pairElem: PairElem => checkPair(pairElem) match {
+                //case innerPair: PairType => ErasedPair // pair erasure?
+                //case other => other
+                case PairType(_, _) | ErasedPair => ErasedPair
+                case NoneType => NoneType // inner error
+                case other =>
+                    errList.addOne(s"Type error: Nested pair has type $other when an inner pair was expected")
+                    NoneType
+            }
+        } 
+    }
 
     def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): Type = ???
 
