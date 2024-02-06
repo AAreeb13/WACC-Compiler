@@ -111,11 +111,17 @@ class Analyser(val prog: Prog) {
     
     def checkRValue(rvalue: RValue)(implicit currentScope: SymbolTable): Type = rvalue match {
         case ArrayLiteral(exprs) => 
-            exprs.map(checkExpression(_)).fold(AnyType)((acc, expType) =>
-                if  (acc reducesTo expType) expType
-                else if (expType reducesTo acc) acc
-                else NoneType
-            )
+            exprs.map(checkExpression(_)).fold(AnyType) {
+                case (ErasedPair, ErasedPair) => ErasedPair // since reducesTo will fail here if not specified
+                case (acc, expType) if (acc reducesTo expType) => expType
+                case (acc, expType) if (expType reducesTo acc) => acc
+                case _ => NoneType
+            } match {
+                case NoneType => NoneType
+                case AnyType => AnyType
+                case other => ArrayType(other)
+            }
+            
         case pairElem: PairElem => checkPair(pairElem)
         case PairCons(fst, snd) => 
             val fstType = checkExpression(fst) match {
@@ -128,7 +134,7 @@ class Analyser(val prog: Prog) {
                 case other => other
             }
             PairType(fstType, sndType)
-            
+
         case FuncCall(ident, args) => funcTable.get(ident) match {
             case None =>
                 errList.addOne(s"Undefined function error: Function $ident has not been defined")
@@ -186,7 +192,8 @@ class Analyser(val prog: Prog) {
             case pairElem: PairElem => checkPair(pairElem) match {
                 //case innerPair: PairType => ErasedPair // pair erasure?
                 //case other => other
-                case PairType(_, _) | ErasedPair => ErasedPair
+                case PairType(_, _) => ErasedPair
+                case ErasedPair => AnyType
                 case NoneType => NoneType // inner error
                 case other =>
                     errList.addOne(s"Type error: Nested pair has type $other when an inner pair was expected")

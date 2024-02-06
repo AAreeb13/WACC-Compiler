@@ -15,10 +15,21 @@ sealed trait Type extends Node {
              (CharType, CharType) | 
              (BoolType, BoolType) | 
              (StringType, StringType) => true
+
         case (ArrayType(a1), ArrayType(a2)) => a1 == a2
         case (ArrayType(CharType), StringType) => true
+
+        case (PairType(AnyType, AnyType), PairType(l1, r1)) => true
+        case (PairType(AnyType, r1), PairType(l2, r2)) => r1 == r2
+        case (PairType(l1, AnyType), PairType(l2, r2)) => l1 == l2
+
+        case (PairType(l1, r1), PairType(AnyType, AnyType)) => true
+        case (PairType(l1, r1), PairType(AnyType, r2)) => r1 == r2
+        case (PairType(l1, r1), PairType(l2, AnyType)) => l1 == l2
+
         case (PairType(l1, r1), PairType(l2, r2)) => (l1 == l2) && (r1 == r2)
         case (ErasedPair, PairType(_, _)) | (PairType(_, _), ErasedPair) => true
+
         case (ErasedPair, ErasedPair) => false  // last bullet point on pair coercion
         case _ => false
     }
