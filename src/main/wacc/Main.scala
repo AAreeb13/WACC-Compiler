@@ -8,10 +8,12 @@ object Main {
     val exitSemanticErr = 200;
 
     def main(args: Array[String]): Unit = {
-
-        val input = args.headOption.getOrElse {
-            println("Command line input not found, defaulting to file input (in.txt)")
-            Source.fromFile("in.txt").mkString
+        val input = args.headOption match {
+            case None =>
+                println("Command line input not found, defaulting to file input (in.txt)")
+                Source.fromFile("in.txt").mkString
+            case Some(path) =>
+                Source.fromFile(path).mkString
         }
 
         // Syntax Analysis

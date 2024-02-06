@@ -55,8 +55,8 @@ output_results() {
 
 while read -r file; do
     echo "======= Running: $file ======="
-    file_contents=$(cat "$file")
-    ./compile "$file_contents"
+    #file_contents=$(cat "$file")
+    ./compile "$file"
 
     exit_code=$?
     if [[ $file == *"/valid/"* ]]; then
