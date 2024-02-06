@@ -2,6 +2,8 @@ package wacc
 
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
+import scala.language.implicitConversions
+
 
 object semanticChecker {
     def verify(result: Either[String, Node]): Either[String, Node] = result.flatMap(_ match {
@@ -17,6 +19,18 @@ class Analyser(val prog: Prog) {
 
 
     checkProgram()
+
+    def matchesType(actual: Type, expected: Type): Type = 
+        matchesType(actual, List(expected))
+
+    def matchesType(actual: Type, expected: List[Type]): Type = 
+        if (expected.exists(actual == _))
+            actual
+        else {
+            errList.addOne(s"Type error: Expected: ${expected.mkString(", ")} but received $actual instead")
+            NoneType
+        }
+
     
     def checkProgram() = {
     prog.funcs.foreach { func =>
@@ -27,7 +41,7 @@ class Analyser(val prog: Prog) {
     }
 
         prog.funcs.foreach(checkFunction(_))
-        prog.stats.foreach(checkStatement(_, globalTable))
+        prog.stats.foreach(checkStatement(_)(globalTable))
     }
 
     def checkFunction(func: Func): Unit = {
@@ -41,10 +55,10 @@ class Analyser(val prog: Prog) {
             else
                 errList.addOne(s"Scope error: Parameter ${param.name} has already been declared in function")
         }
-        func.stats.foreach(checkStatement(_, funcSymbolTable))
+        func.stats.foreach(checkStatement(_)(funcSymbolTable))
     }
 
-    def checkStatement(stat: Stat, currentScope: SymbolTable): Unit = stat match {
+    def checkStatement(stat: Stat)(implicit currentScope: SymbolTable): Unit = stat match {
         case AssignNew(t, ident, rvalue) =>
         case Assign(lvalue, rvalue)      =>
 
@@ -62,7 +76,7 @@ class Analyser(val prog: Prog) {
         case Skip =>
     }
 
-    def checkExpression(expr: Expr, currentScope: SymbolTable): Option[Type] = expr match {
+    def checkExpression(expr: Expr)(implicit currentScope: SymbolTable): Option[Type] = expr match {
         case Var(v) =>
             currentScope.typeof(v) match {
                 case None =>
@@ -73,29 +87,29 @@ class Analyser(val prog: Prog) {
 
         case ArrayVal(v, exprs) => ???
 
-        case Ord(x) => checkUnaryExpression(x, CharType, IntType, currentScope)
+        case Ord(x) => checkUnaryExpression(x, CharType, IntType)
 
-        case Chr(x) => checkUnaryExpression(x, IntType, CharType, currentScope)
+        case Chr(x) => checkUnaryExpression(x, IntType, CharType)
 
         case Len(x) => ???
 
-        case Not(x) => checkUnaryExpression(x, BoolType, BoolType, currentScope)
+        case Not(x) => checkUnaryExpression(x, BoolType, BoolType)
 
-        case Neg(x) => checkUnaryExpression(x, IntType, IntType, currentScope)
+        case Neg(x) => checkUnaryExpression(x, IntType, IntType)
 
-        case Mul(x, y) => checkBinExpression(x, y, IntType, currentScope)
-        case Mod(x, y) => checkBinExpression(x, y, IntType, currentScope)
-        case Add(x, y) => checkBinExpression(x, y, IntType, currentScope)
-        case Sub(x, y) => checkBinExpression(x, y, IntType, currentScope)
-        case Div(x, y) => checkBinExpression(x, y, IntType, currentScope)
+        case Mul(x, y) => checkBinExpression(x, y, IntType)
+        case Mod(x, y) => checkBinExpression(x, y, IntType)
+        case Add(x, y) => checkBinExpression(x, y, IntType)
+        case Sub(x, y) => checkBinExpression(x, y, IntType)
+        case Div(x, y) => checkBinExpression(x, y, IntType)
 
-        case And(x, y) => checkBinExpression(x, y, BoolType, currentScope)
-        case Or(x, y)  => checkBinExpression(x, y, BoolType, currentScope)
+        case And(x, y) => checkBinExpression(x, y, BoolType)
+        case Or(x, y)  => checkBinExpression(x, y, BoolType)
 
-        case GrtEql(x, y)  => checkInequality(x, y, currentScope)
-        case LessEql(x, y) => checkInequality(x, y, currentScope)
-        case Less(x, y)    => checkInequality(x, y, currentScope)
-        case Grt(x, y)     => checkInequality(x, y, currentScope)
+        case GrtEql(x, y)  => checkInequality(x, y)
+        case LessEql(x, y) => checkInequality(x, y)
+        case Less(x, y)    => checkInequality(x, y)
+        case Grt(x, y)     => checkInequality(x, y)
 
         case NotEql(x, y) => ???
         case Eql(x, y)    => ???
@@ -107,44 +121,49 @@ class Analyser(val prog: Prog) {
         case PairVal    => ???
     }
 
-    private def checkBinExpression(x: Expr, y: Expr, expectedType: Type, currentScope: SymbolTable): Option[Type] = {
-        def checkRightExpression(y: Expr, expectedType: Type, currentScope: SymbolTable): Option[Type] = checkExpression(y, currentScope) match {
+    def checkRightExpression(y: Expr, expectedType: Type)(implicit currentScope: SymbolTable): Option[Type] = 
+        checkExpression(y) match {
             case Some(expectedType) => Some(expectedType)
             case None               => Some(expectedType)
             case otherwise =>
-              errList.addOne(s"Expected type: $expectedType}, found ${otherwise.get}")
-              Some(expectedType)
+                errList.addOne(s"Expected type: $expectedType}, found ${otherwise.get}")
+                Some(expectedType)
         }
 
-        checkExpression(x, currentScope) match {
-            case Some(expectedType) => checkRightExpression(y, expectedType, currentScope)
-            case None => checkRightExpression(y, expectedType, currentScope)
+    private def checkBinExpression(x: Expr, y: Expr, expectedType: Type)(implicit currentScope: SymbolTable): Option[Type] = {
+
+
+        checkExpression(x) match {
+            case Some(expectedType) => checkRightExpression(y, expectedType)
+            case None => checkRightExpression(y, expectedType)
             case otherwise =>
               errList.addOne(s"Expected type: $expectedType, found ${otherwise.get}")
-              checkRightExpression(y, expectedType, currentScope)
+              checkRightExpression(y, expectedType)
         }
     }
 
-    private def checkUnaryExpression(x: Expr, expectedType: Type, returnType: Type, currentScope: SymbolTable) = checkExpression(x, currentScope) match {
+    private def checkUnaryExpression(x: Expr, expectedType: Type, returnType: Type)(implicit currentScope: SymbolTable) = checkExpression(x) match {
       case Some(expectedType) => Some(returnType)
       case None => Some(returnType)
       case otherwise => errList.addOne(s"Expected type: $expectedType, found ${otherwise.get}")
         Some(returnType)
     }
 
-    private def checkInequality(x: Expr, y: Expr, currentScope: SymbolTable): Option[Type] = {
-      def checkRightExpression(y: Expr, currentScope: SymbolTable): Option[Type] = checkExpression(y, currentScope) match {
+    def checkRightExpression(y: Expr)(implicit currentScope: SymbolTable): Option[Type] = checkExpression(y) match {
         case Some(IntType) | Some(CharType) => Some(BoolType)
         case None => Some(BoolType)
         case otherwise => errList.addOne(s"Expected type: char or int, found ${otherwise.get}")
-          Some(BoolType) 
-      }
+            Some(BoolType) 
+    }
+
+    private def checkInequality(x: Expr, y: Expr)(implicit currentScope: SymbolTable): Option[Type] = {
+
       
-      checkExpression(x, currentScope) match {
-        case Some(IntType) | Some(CharType) => checkRightExpression(y, currentScope)
-        case None => checkRightExpression(y, currentScope)
+      checkExpression(x) match {
+        case Some(IntType) | Some(CharType) => checkRightExpression(y)
+        case None => checkRightExpression(y)
         case otherwise => errList.addOne(s"Expected type: char or int, found ${otherwise.get}")
-          checkRightExpression(y, currentScope)
+          checkRightExpression(y)
       }
     }
 
