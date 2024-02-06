@@ -193,11 +193,18 @@ object Or      extends generic.ParserBridge2[Expr, Expr, Expr]
 
 // unary operators
 
-case class Not(x: Expr) extends Expr
-case class Neg(x: Expr) extends Expr
-case class Len(x: Expr) extends Expr
-case class Ord(x: Expr) extends Expr
-case class Chr(x: Expr) extends Expr
+sealed trait UnOp extends Expr {
+    val x: Expr
+}
+object UnOp {
+    def unapply(op: BinOp): Option[Expr] = Some(op.x)
+}
+
+case class Not(x: Expr) extends UnOp
+case class Neg(x: Expr) extends UnOp
+case class Len(x: Expr) extends UnOp
+case class Ord(x: Expr) extends UnOp
+case class Chr(x: Expr) extends UnOp
 
 object Not extends generic.ParserBridge1[Expr, Expr]
 object Neg extends generic.ParserBridge1[Expr, Expr]
