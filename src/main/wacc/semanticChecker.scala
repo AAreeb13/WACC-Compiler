@@ -7,7 +7,7 @@ import scala.language.implicitConversions
 
 object semanticChecker {
     def verify(result: Either[String, Node]): Either[String, Node] = result.flatMap(_ match {
-        case prog: Prog => new Analyser(prog).getResult
+        case prog: Prog => result//new Analyser(prog).getResult
         case _ => Left("Invalid AST type for semantic verification")
     })
 }
@@ -57,23 +57,57 @@ class Analyser(val prog: Prog) {
         func.stats.foreach(checkStatement(_, func.retType)(funcSymbolTable))
     }
 
-    def checkStatement(stat: Stat, expectedType: Type)(implicit currentScope: SymbolTable): Unit = stat match {
-        case AssignNew(t, ident, rvalue) =>
-        case Assign(lvalue, rvalue)      =>
+    def checkStatement(stat: Stat, expectedType: Type)(implicit currentScope: SymbolTable): Unit = {
+        stat match {
+            case While(cond, stats) => 
+                matchesType(checkExpression(cond), BoolType)
+                val childScope = new SymbolTable(Some(currentScope))
+                stats.foreach(checkStatement(_, expectedType)(childScope))
 
-        case While(cond, stats)         =>
-        case If(cond, ifStat, elseStat) =>
-        case Scope(stats)               =>
+            case Assign(lvalue, rvalue) => matchesType(checkLValue(lvalue), checkRValue(rvalue))
+            case Free(expr) => checkExpression(expr) match {
+                    case ArrayType(_) | AnyType | PairType(_, _) =>
+                    case other => errList.addOne(s"Type error: Expected an array or pair type but got $other instead")
+                }
 
-        case Return(expr)  =>
-        case Free(expr)    =>
-        case Read(lvalue)  =>
-        case Exit(expr)    =>
-        case Print(expr)   =>
-        case Println(expr) =>
+            case Print(expr) => checkExpression(expr)
 
-        case Skip =>
+            case Exit(expr) => matchesType(checkExpression(expr), IntType)
+
+            case Scope(stats) =>
+                val childScope = new SymbolTable(Some(currentScope))
+                stats.foreach(checkStatement(_, expectedType)(childScope))
+
+            case Skip =>
+
+            case If(cond, ifStats, elseStats) =>
+                matchesType(checkExpression(cond), BoolType)
+            
+                val ifChild = new SymbolTable(Some(currentScope))
+                ifStats.foreach(checkStatement(_, expectedType)(ifChild))
+                val elseChild = new SymbolTable(Some(currentScope))
+                elseStats.foreach(checkStatement(_, expectedType)(elseChild))
+
+            case Println(expr) => checkExpression(expr)
+            case Return(expr) => expectedType match {
+                case NoneType => errList.addOne(s"Return placement error: Return outside function is not allowed")
+                case retType => matchesType(checkExpression(expr), retType)
+            }
+                
+            case Read(lvalue) => matchesType(checkLValue(lvalue), List[Type](IntType, CharType))
+
+            case AssignNew(declType, ident, rvalue) =>
+                matchesType(checkRValue(rvalue), declType)
+                if (!currentScope.contains(ident))
+                    currentScope.addOne(ident, declType)
+                else
+                    errList.addOne(s"Scope error: Variable $ident has already been declared in this scope")
+        }
     }
+
+    def checkRValue(rvalue: RValue)(implicit currentScope: SymbolTable): Type = ???
+
+    def checkLValue(lvalue: LValue)(implicit currentScope: SymbolTable): Type = ???
 
     def checkVar(v: Var)(implicit currentScope: SymbolTable) = 
         currentScope.typeof(v.v).getOrElse {
@@ -84,7 +118,6 @@ class Analyser(val prog: Prog) {
     def checkPair(pairElem: PairElem)(implicit currentScope: SymbolTable): Type = ???
 
     def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): Type = ???
-
 
     def checkExpression(expr: Expr)(implicit currentScope: SymbolTable): Type = expr match {
         case arrayElem: ArrayVal => checkArray(arrayElem)
