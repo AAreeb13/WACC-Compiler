@@ -16,9 +16,9 @@ class Analyser(val prog: Prog) {
     var funcTable: HashMap[String, (Type, List[Type])] = HashMap.empty
 
 
-    verifyProgram()
+    checkProgram()
     
-    def verifyProgram() = {
+    def checkProgram() = {
     prog.funcs.foreach { func =>
         if (funcTable.contains(func.name)) {
             errList.addOne(s"${func.name} already exists, no support for overloaded functions.")
@@ -112,7 +112,7 @@ class Analyser(val prog: Prog) {
             case Some(expectedType) => Some(expectedType)
             case None               => Some(expectedType)
             case otherwise =>
-              errList.addOne(s"Expected type: ${typeFinder(expectedType)}, found ${typeFinder(otherwise.get)}")
+              errList.addOne(s"Expected type: $expectedType}, found ${otherwise.get}")
               Some(expectedType)
         }
 
@@ -120,7 +120,7 @@ class Analyser(val prog: Prog) {
             case Some(expectedType) => checkRightExpression(y, expectedType, currentScope)
             case None => checkRightExpression(y, expectedType, currentScope)
             case otherwise =>
-              errList.addOne(s"Expected type: ${typeFinder(expectedType)}, found ${typeFinder(otherwise.get)}")
+              errList.addOne(s"Expected type: $expectedType, found ${otherwise.get}")
               checkRightExpression(y, expectedType, currentScope)
         }
     }
@@ -128,7 +128,7 @@ class Analyser(val prog: Prog) {
     private def checkUnaryExpression(x: Expr, expectedType: Type, returnType: Type, currentScope: SymbolTable) = checkExpression(x, currentScope) match {
       case Some(expectedType) => Some(returnType)
       case None => Some(returnType)
-      case otherwise => errList.addOne(s"Expected type: ${typeFinder(expectedType)}, found ${typeFinder(otherwise.get)}")
+      case otherwise => errList.addOne(s"Expected type: $expectedType, found ${otherwise.get}")
         Some(returnType)
     }
 
@@ -136,23 +136,16 @@ class Analyser(val prog: Prog) {
       def checkRightExpression(y: Expr, currentScope: SymbolTable): Option[Type] = checkExpression(y, currentScope) match {
         case Some(IntType) | Some(CharType) => Some(BoolType)
         case None => Some(BoolType)
-        case otherwise => errList.addOne(s"Expected type: char or int, found ${typeFinder(otherwise.get)}")
+        case otherwise => errList.addOne(s"Expected type: char or int, found ${otherwise.get}")
           Some(BoolType) 
       }
       
       checkExpression(x, currentScope) match {
         case Some(IntType) | Some(CharType) => checkRightExpression(y, currentScope)
         case None => checkRightExpression(y, currentScope)
-        case otherwise => errList.addOne(s"Expected type: char or int, found ${typeFinder(otherwise.get)}")
+        case otherwise => errList.addOne(s"Expected type: char or int, found ${otherwise.get}")
           checkRightExpression(y, currentScope)
       }
-    }
-
-    private def typeFinder(givenType: Type) = givenType match {
-      case IntType => "int"
-      case BoolType => "bool"
-      case CharType => "char"
-      case StringType => "string"
     }
 
     def getResult: Either[String, Node] = {

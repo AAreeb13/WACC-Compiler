@@ -1,3 +1,4 @@
+
 package wacc
 
 import parsley.generic
@@ -9,17 +10,34 @@ sealed trait Node
 sealed trait Type extends Node
 
 sealed trait BaseType  extends Type
-case object IntType    extends BaseType with generic.ParserBridge0[BaseType]
-case object CharType   extends BaseType with generic.ParserBridge0[BaseType]
-case object BoolType   extends BaseType with generic.ParserBridge0[BaseType]
-case object StringType extends BaseType with generic.ParserBridge0[BaseType]
+case object IntType    extends BaseType with generic.ParserBridge0[BaseType] {
+    override def toString = "int"
+}
+case object CharType   extends BaseType with generic.ParserBridge0[BaseType] {
+    override def toString = "char"
+}
+case object BoolType   extends BaseType with generic.ParserBridge0[BaseType] {
+    override def toString = "bool"
+}
+case object StringType extends BaseType with generic.ParserBridge0[BaseType] {
+    override def toString = "string"
+}
 
-case class ArrayType(t: Type) extends Type
+case class ArrayType(t: Type) extends Type  {
+    override def toString = s"${t.toString}[]"
+}
+
 object ArrayType              extends generic.ParserBridge1[Type, Type]
 
-case class PairType(t1: Type, t2: Type) extends Type
-object PairType                         extends generic.ParserBridge2[Type, Type, Type]
-case object ErasedPair                  extends Type with generic.ParserBridge0[Type]
+case class PairType(t1: Type, t2: Type) extends Type  {
+    override def toString = s"pair(${t1.toString}, ${t2.toString})"
+
+}
+object PairType extends generic.ParserBridge2[Type, Type, Type]
+
+case object ErasedPair extends Type with generic.ParserBridge0[Type]  {
+    override def toString = "pair"
+}
 
 ////////// STATEMENTS ///////////
 
