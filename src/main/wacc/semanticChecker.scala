@@ -95,7 +95,10 @@ class Analyser(val prog: Prog) {
                 case retType => matchesType(checkExpression(expr), retType)
             }
                 
-            case Read(lvalue) => matchesType(checkLValue(lvalue), List[Type](IntType, CharType))
+            case Read(lvalue) => checkLValue(lvalue) match {
+                case AnyType => errList.addOne(s"Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure")
+                case other => matchesType(checkLValue(lvalue), List[Type](IntType, CharType))
+            }
 
             case AssignNew(declType, ident, rvalue) =>
                 matchesType(checkRValue(rvalue), declType)
