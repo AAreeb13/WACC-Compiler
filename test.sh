@@ -9,7 +9,7 @@ trap 'output_results; exit 2' SIGINT
 git submodule update --init --recursive
 
 # set to 0 for full check
-syntaxCheckOnly=1
+syntaxCheckOnly=0
 
 validPassed=0
 syntaxErrPassed=0

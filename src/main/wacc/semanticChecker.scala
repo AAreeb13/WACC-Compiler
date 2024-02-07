@@ -65,7 +65,13 @@ class Analyser(val prog: Prog) {
                 val childScope = new SymbolTable(Some(currentScope))
                 stats.foreach(checkStatement(_, expectedType)(childScope))
 
-            case Assign(lvalue, rvalue) => matchesType(checkLValue(lvalue), checkRValue(rvalue))
+            case Assign(lvalue, rvalue) => 
+                // im really sorry this is super bad way of doing it but only 1 more test case left
+                ((lvalue, checkLValue(lvalue)), (rvalue, checkRValue(rvalue))) match {
+                    case ((PairElem(_), AnyType), (PairElem(_), AnyType)) => 
+                        errList.addOne(s"Attempting to exchange values between pairs of unknown types. Pair exchange is only legal when the type of at least one of the sides is known or specified")
+                    case ((_, lvalType), (_, rvalType)) => matchesType(lvalType, rvalType)
+                }
             case Free(expr) => checkExpression(expr) match {
                     case ArrayType(_) | AnyType | PairType(_, _) =>
                     case other => errList.addOne(s"Type error: Expected an array or pair type but got $other instead")
