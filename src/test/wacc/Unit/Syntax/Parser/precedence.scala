@@ -1,5 +1,6 @@
-package wacc
+package wacc.unit.syntax.parser
 
+import wacc._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 import parsley.Failure
