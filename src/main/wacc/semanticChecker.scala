@@ -43,16 +43,19 @@ class Analyser(val prog: Prog) {
 
     def checkFunction(func: Func): Unit = {
         // create new child table
-        val funcSymbolTable = new SymbolTable()
+        val funcArgSymbolTable = new SymbolTable()
 
         // add parameters to the table
         func.params.foreach{ param =>
-            if (!funcSymbolTable.contains(param.name)) 
-                funcSymbolTable.addOne(param.name, param.declType)
+            if (!funcArgSymbolTable.contains(param.name)) 
+                funcArgSymbolTable.addOne(param.name, param.declType)
             else 
                 errList.addOne(s"Scope error: Parameter ${param.name} has already been declared in function")
         }
-        func.stats.foreach(checkStatement(_, func.retType)(funcSymbolTable))
+        
+        val funcBodySymbolTable = new SymbolTable(Some(funcArgSymbolTable))
+
+        func.stats.foreach(checkStatement(_, func.retType)(funcBodySymbolTable))
     }
 
     def checkStatement(stat: Stat, expectedType: Type)(implicit currentScope: SymbolTable): Unit = {
@@ -96,7 +99,7 @@ class Analyser(val prog: Prog) {
 
             case AssignNew(declType, ident, rvalue) =>
                 matchesType(checkRValue(rvalue), declType)
-                if (!currentScope.contains(ident))
+                if (!currentScope.containsInCurrent(ident))
                     currentScope.addOne(ident, declType)
                 else
                     errList.addOne(s"Scope error: Variable $ident has already been declared in this scope")
@@ -305,6 +308,9 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
 
     def contains(name: String): Boolean =
         table.contains(name) || parent.exists(_.contains(name))
+
+    def containsInCurrent(name: String): Boolean =
+        table.contains(name)
 
     def typeof(name: String): Option[Type] = table
         .get(name)
