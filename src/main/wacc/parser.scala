@@ -72,7 +72,9 @@ object parser {
 
     ////////// STAT PARSER ///////////
 
-    lazy val prog     = "begin" ~> Prog(funcList, stmtList) <~ "end"
+    lazy val prog     = "begin".explain(
+        "WACC programs must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
+        "WACC programs must finish with end")
     lazy val funcList = many(func)
     lazy val func = atomic(
       Func(
