@@ -3,4 +3,6 @@
 .scala-build/
 .vscode/
 .idea/
+target/
+project/
 wacc-compiler
