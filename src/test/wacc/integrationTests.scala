@@ -56,7 +56,7 @@ class IntegrationTest extends AnyFlatSpec {
             .filter(_.isFile)
             .map(_.toString)
             .map(compileSingle(_))
-   ??? }
+        }
 
     // dont worry its all just aesthetics
     def aBunchOfDashes(path: String) = ("-" * (24 + path.size)) ++ "\n"

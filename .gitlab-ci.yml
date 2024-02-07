@@ -18,14 +18,14 @@ unit-test-job:
   stage: test   
   script:
     - echo "Running unit tests..."
-    - scala-cli test .
+    - scala-cli test . --test-only 'wacc.unit*'
     - echo "Unit tests complete."
 
 integration-test-job:  
   stage: test   
   script:
     - echo "Running integration tests..."
-    - ./test.sh
+    - scala-cli test . --test-only 'wacc.integration*'
     - echo "Integation tests complete."
 
 style-test-job:
