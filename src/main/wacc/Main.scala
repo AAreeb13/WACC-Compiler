@@ -1,6 +1,5 @@
 package wacc
 
-import parsley.{Failure, Success}
 import scala.io.Source
 
 object Main {
@@ -9,16 +8,37 @@ object Main {
     val exitSemanticErr = 200;
 
     def main(args: Array[String]): Unit = {
-
-        val input = args.headOption.getOrElse {
-            println("Command line input not found, defaulting to file input (in.txt)")
-            Source.fromFile("in.txt").mkString
+        val input = args.headOption match {
+            case None =>
+                println("Command line input not found, defaulting to file input (in.txt)")
+                Source.fromFile("in.txt").mkString
+            case Some(path) =>
+                Source.fromFile(path).mkString
         }
 
-        val result = parser.parse(input)
+        // Syntax Analysis
+
+        var result = parser.parse(input).toEither
         result match {
-            case Failure(err)    => println(err); sys.exit(exitSyntaxErr)
-            case Success(output) => println(s"$input => $output"); sys.exit(exitSuccess)
+            case Left(err) =>
+                println(err)
+                sys.exit(exitSyntaxErr)
+
+            case Right(_) =>
+                result = semanticChecker.verify(result)
         }
+
+        // Semantic Analysis
+
+        result match {
+            case Left(err) =>
+                println(s"$input\n$err")
+                sys.exit(exitSemanticErr)
+
+            case Right(output) =>
+                println(s"$input => $output")
+                sys.exit(exitSuccess)
+        }
+
     }
 }

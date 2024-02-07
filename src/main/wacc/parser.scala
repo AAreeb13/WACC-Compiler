@@ -74,14 +74,12 @@ object parser {
 
     lazy val prog     = "begin" ~> Prog(funcList, stmtList) <~ "end"
     lazy val funcList = many(func)
-    lazy val func = atomic(
-      Func(
+    lazy val func = atomic(Func(
         declType,
         ident,
         "(" ~> paramList <~ ")",
         "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"
-      )
-    )
+    ))
 
     lazy val paramList = sepBy(param, ",")
     lazy val param     = Param(declType, ident)

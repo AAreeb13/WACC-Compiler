@@ -9,7 +9,7 @@ trap 'output_results; exit 2' SIGINT
 git submodule update --init --recursive
 
 # set to 0 for full check
-syntaxCheckOnly=1
+syntaxCheckOnly=0
 
 validPassed=0
 syntaxErrPassed=0
@@ -18,6 +18,10 @@ semanticErrPassed=0
 validComplete=0
 syntaxErrComplete=0
 semanticErrComplete=0
+
+validCurrent=0
+syntaxErrCurrent=0
+semanticErrCurrent=0
 
 
 output_results() {
@@ -29,9 +33,9 @@ output_results() {
     totalTotal=$((validTotal + syntaxErrTotal + semanticErrTotal))
 
     echo -e "\n=======INTEGRATION TEST RESULTS======="
-    echo "Valid Tests: $validPassed/$validTotal"
-    echo "Syntax Error Tests: $syntaxErrPassed/$syntaxErrTotal"
-    echo "Semantic Error Tests: $semanticErrPassed/$semanticErrTotal"
+    echo "Valid Tests: $validPassed/$validCurrent (total: $validTotal)"
+    echo "Syntax Error Tests: $syntaxErrPassed/$syntaxErrCurrent (total: $syntaxErrTotal)"
+    echo "Semantic Error Tests: $semanticErrPassed/$semanticErrCurrent (total: $semanticErrTotal)"
     echo "Total: $totalPassed/$totalTotal"
     echo "======================================"
 
@@ -51,19 +55,28 @@ output_results() {
 
 while read -r file; do
     echo "======= Running: $file ======="
-    file_contents=$(cat "$file")
-    ./compile "$file_contents"
+    #file_contents=$(cat "$file")
+    ./compile "$file"
 
     exit_code=$?
-    if [ $exit_code == "0" ] && [[ $file == *"/valid/"* ]]; then
-        validPassed=$((validPassed+1))
-        echo "Result: Valid"
-    elif [ $exit_code == "100" ] && [[ $file == *"/invalid/syntaxErr/"* ]]; then
-        syntaxErrPassed=$((syntaxErrPassed+1))
-        echo "Result: Syntax Error"
-    elif [ $exit_code == "200" ] && [[ $file == *"/invalid/semanticErr/"* ]]; then
-        semanticErrPassed=$((semanticErrPassed+1))
-        echo "Result: Semantic Error"
+    if [[ $file == *"/valid/"* ]]; then
+        if [ $exit_code == "0" ]; then
+            validPassed=$((validPassed+1))
+            echo "Result: Valid"
+        fi
+        validCurrent=$((validCurrent+1))
+    elif [[ $file == *"/invalid/syntaxErr/"* ]]; then
+        if [ $exit_code == "100" ]; then
+            syntaxErrPassed=$((syntaxErrPassed+1))
+            echo "Result: Syntax Error"
+        fi
+        syntaxErrCurrent=$((syntaxErrCurrent+1))
+    elif [[ $file == *"/invalid/semanticErr/"* ]]; then
+        if [ $exit_code == "200" ]; then
+            semanticErrPassed=$((semanticErrPassed+1))
+            echo "Result: Semantic Error"
+        fi
+        semanticErrCurrent=$((semanticErrCurrent+1))
     fi
     echo
 done < <(find "./wacc_examples" -type f -name "*.wacc")
