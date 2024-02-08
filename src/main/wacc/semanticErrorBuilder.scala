@@ -1,126 +1,162 @@
 
-// import parsley.errors.ErrorBuilder
-// import scala.collection.mutable.ListBuffer
+import parsley.errors.ErrorBuilder
+import scala.collection.mutable.ListBuffer
 
-// case class SemanticError(position: (Int, Int), source: String, lines: Error, code : Seq[String]) {
-//     def formatFullError() : String = {
-//         val formatStr = new StringBuilder
-//         formatStr.append("Exit code 200 returned.\n")
-//         lines match {
-//             case typeError: TypeError => formatStr.append(s"Type error")
-//             case scopeError: ScopeError => formatStr.append(s"Scope error")
-//             case specialError: SpecialError => formatStr.append(specialError.errType)
-//         }
-//         formatStr.append(s" in ${source} ${position}")
-//         formatStr.append(lines.formatError())
-//         for (codeline: String <- code) {
-//             formatStr.append(s"|    ${codeline} \n")
-//         }
-//         return formatStr.toString
-//     }
-// }
+case class SemanticError(position: (Int, Int), fileName: String, lines: Error, codeSnippet : Seq[String]) {
+    def formatFullError() : String = {
+        val formatStr = new StringBuilder
+        formatStr.append("Exit code 200 returned.\n")
+        lines match {
+            case typeError: TypeError => formatStr.append(s"Type error")
+            case scopeError: ScopeError => formatStr.append(s"Scope error")
+            case specialError: SpecialError => formatStr.append(specialError.errType)
+        }
+        formatStr.append(s" in ${fileName} ${position}")
+        formatStr.append(lines.formatError())
+        for (codeline: String <- codeSnippet) {
+            formatStr.append(s"${codeline}\n")
+        }
+        return formatStr.toString
+    }
+}
 
 
-// sealed trait Error {
-//     def formatError(): String
-// }
+sealed trait Error {
+    def formatError(): String
+}
 
-// case class TypeError(unexpected: String, expected: String) extends Error {
-//     override def formatError(): String = {
-//         val formatStr: StringBuilder = new StringBuilder
+case class TypeError(unexpected: String, expected: String) extends Error {
+    override def formatError(): String = {
+        val formatStr: StringBuilder = new StringBuilder
 
-//         formatStr.append(s"  unexpected ${unexpected} \n")
-//         formatStr.append(s"  expected ${expected} \n")
+        formatStr.append(s"  unexpected ${unexpected} \n")
+        formatStr.append(s"  expected ${expected} \n")   
+        return formatStr.toString()
+    }
+}
 
-//         for (item: ErrorItem <- expecteds) {
-//             item match {
-//                 case SemanticNamed(types) => formatStr.append(s"types \n")
-//             }
-//         }
-        
-//         return formatStr.toString()
-//     }
-// }
+case class ScopeError(variable: String, errType: String, lineNum : Int) extends Error {
+    // errType = redec | undec
+    override def formatError(): String = {
+        val formatStr: StringBuilder = new StringBuilder
+        errType match {
+            case "reDec" => formatStr.append(s"illegal redeclaration of variable ${variable}\npreviously declared on line ${lineNum}")
+            case "unDec" => formatStr.append(s"variable ${variable} has not been declared in this scope\n")
+        }
+        return formatStr.toString()
+    }
+}
 
-// case class ScopeError(variable: String, errType: String, lineNum : Int) extends Error {
-//     // errType = redec | undec
-//     override def formatError(): String = {
-//         val formatStr: StringBuilder = new StringBuilder
-//         errType match {
-//             case "reDec" => formatStr.append(s"illegal redeclaration of variable ${variable}\npreviously declared on line ${lineNum}")
-//             case "unDec" => formatStr.append(s"variable ${variable} has not been declared in this scope\n")
-//         }
-//         return formatStr.toString()
-//     }
-// }
+// Function Errors: Redefining function, Undefined function
+sealed trait SpecialError extends Error {
+    val errType: String
+}
+case class UndefinedFunc(funName: String) extends SpecialError {
 
-// // Function Errors: Redefining function, Undefined function
-// sealed trait SpecialError extends Error
-// case class UndefinedFunc(funName: String) extends SpecialError
-// case class RedefinedFunc(funName: String) extends SpecialError
-// case class PairExchange
+  override def formatError(): String = ???
 
-// sealed trait ErrorItem
-// case class SemanticRaw(item: String) extends ErrorItem
-// case class SemanticNamed(item: String) extends ErrorItem
-// case object SemanticEndOfInput extends  ErrorItem
+  override val errType: String = ???
 
-// class SemanticErrorCollector(builder: SemanticErrorBuilder, source: String ) {
-//     // Mutable list buffer to store semantic errors
-//     private val semanticErrors: ListBuffer[SemanticError] = ListBuffer.empty
+}
+case class RedefinedFunc(funName: String) extends SpecialError {
+
+  override def formatError(): String = ???
+
+  override val errType: String = ???
+
+}
+case class PairExchange() extends SpecialError {
+
+  override def formatError(): String = ???
+
+  override val errType: String = ???
+
+}
+
+sealed trait ErrorItem
+case class SemanticRaw(item: String) extends ErrorItem
+case class SemanticNamed(item: String) extends ErrorItem
+case object SemanticEndOfInput extends  ErrorItem
+
+class SemanticErrorCollector(builder: SemanticErrorBuilder, fileName: String ) {
+    // Mutable list buffer to store semantic errors
+    private val semanticErrors: ListBuffer[SemanticError] = ListBuffer.empty
     
-//     // Method to add a new semantic error
-//     def addError(position: (Int, Int), lines: Error): Unit = {
-//         semanticErrors += builder.format(position, (), lines)
-//     }
+    // Method to add a new semantic error
+    def addError(position: (Int, Int), lines: Error): Unit = {
+        semanticErrors += builder.format(position, "Dummy fileName", lines)
+    }
     
-//     // Method to get the collected semantic errors
-//     def getSemanticErrors: Seq[SemanticError] = semanticErrors.toList
+    // Method to get the collected semantic errors
+    def getSemanticErrors: Seq[SemanticError] = semanticErrors.toList
 
-//     def formatErrors : String = {
-//         val builder = new StringBuilder
-//         builder.append(s"Semantic Errors in %source\n")
-//         for (errorLine <- getSemanticErrors) {
-//             builder.append(errorLine.toString())
-//         }
-//     }
-// }
+    def formatErrors : String = {
+        val builder = new StringBuilder
+        builder.append(s"Semantic Errors in ${fileName}\n")
+        for (errorLine <- getSemanticErrors) {
+            builder.append(errorLine.formatFullError())
+        }
+        return builder.toString()
+    }
+}
 
-
-// class SemanticErrorBuilder {
+// input hold
+class SemanticErrorBuilder(implicit val input: String) {
     
-//     val fileName: Source
 
-//     override def format(pos: (Int, Int), source: Unit, lines: ErrorInfoLines): SemanticError = SemanticError(pos, lines)
+    // THe whole code file line by line.
+    val wholeCodeArray: Array[String] = input.split("(?<=\n)")
 
-//     type Position = (Int, Int)
-//     override def pos(line: Int, col: Int): Position = (line, col)
+    def format(pos: (Int, Int), source: String, lines: ErrorInfoLines): SemanticError = {
+        val codeSnippet = getCodeSnippet(pos)
+        SemanticError(position = pos, fileName = "Dummy file name", lines = UndefinedFunc("Nothing"), codeSnippet = codeSnippet)
+    }
 
-//     type Source = String
+    type Position = (Int, Int)
+    def pos(line: Int, col: Int): Position = (line, col)
+
+    type Source = String
     
-//     type ErrorInfoLines = Error
+    type ErrorInfoLines = Error
+
+    type LineInfo = String
 
     
-//     override def typeError(unexpected: UnexpectedLine, expected: ExpectedLine, reasons: Messages, line: LineInfo): ErrorInfoLines = {
-//         TypeError(unexpected, expected, reasons, line)
-//     }
-//     type UnexpectedLine = Option[Item]
-//     type Item = ErrorItem
-//     type ExpectedItems = Set[Item]
-//     type ExpectedLine = ExpectedItems
-//     type raw = SemanticRaw
-//     type Named = SemanticNamed
+    // def typeError(unexpected: String, expected: String, reasons: Messages, line: LineInfo): ErrorInfoLines = {
+    //     TypeError(unexpected, expected)
+    // }
+    // type UnexpectedLine = Option[Item]
+    // type Item = ErrorItem
+    // type ExpectedItems = Set[Item]
+    // type ExpectedLine = ExpectedItems
+    // type raw = SemanticRaw
+    // type Named = SemanticNamed
 
-//     type Message = String
-//     type Messages = Set[Message]
+    // type Message = String
+    // type Messages = Set[Message]
 
-//     override def reason(reason: String): Message = reason
-//     override def message(msg: String): Message = msg
-// }
+    // def reason(reason: String): Message = reason
+    // def message(msg: String): Message = msg
+
+    def getCodeSnippet (position:(Int, Int), linesAbove: Int = 2, linesBelow: Int = 2): Seq[String] = {
+        var codelines: ListBuffer[String] = ListBuffer.empty
+        for (lineNo <- position._1 - linesAbove to position._1 + linesBelow) {
+            if (lineNo >= 1 && lineNo <= wholeCodeArray.length) {
+                codelines.append(s"|${lineNo}     ${wholeCodeArray(lineNo - 1)}")
+            }
+        }
+        return codelines.toSeq
+
+    }
+}
 
 
-
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -179,55 +215,55 @@
 // val collectedErrors = errorCollector.getSemanticErrors
 
 
-// /*
+/*
 
-// -- Compiling...
-// Errors detected during compilation! Exit code 200 returned.
-// Function redefinition error in new.wacc (6, 3):
-//   illegal redefinition of function teri
-//   previously declared on line 2
-//   |  
-//   |  char teri(char x) is
-//   |  ^^^^
-//   |    return x
+-- Compiling...
+Errors detected during compilation! Exit code 200 returned.
+Function redefinition error in new.wacc (6, 3):
+  illegal redefinition of function teri
+  previously declared on line 2
+  |  
+  |  char teri(char x) is
+  |  ^^^^
+  |    return x
 
-// Scope error in new.wacc (9, 3):
-//   variable y has not been declared in this scope
-//   |  end
-//   |  y = 10;
-//   |  ^
-//   |  int y = 'a';
+Scope error in new.wacc (9, 3):
+  variable y has not been declared in this scope
+  |  end
+  |  y = 10;
+  |  ^
+  |  int y = 'a';
 
-// Type error in new.wacc (10, 11):
-//   unexpected char
-//   expected int
-//   |  y = 10;
-//   |  int y = 'a';
-//   |          ^
-//   |  int ab = 10;
+Type error in new.wacc (10, 11):
+  unexpected char
+  expected int
+  |  y = 10;
+  |  int y = 'a';
+  |          ^
+  |  int ab = 10;
 
-// Scope error in new.wacc (12, 7):
-//   illegal redeclaration of variable ab
-//   previously declared (in this scope) on line 11
-//   |  int ab = 10;
-//   |  int ab = 20;
-//   |      ^
-//   |  x = call func()
+Scope error in new.wacc (12, 7):
+  illegal redeclaration of variable ab
+  previously declared (in this scope) on line 11
+  |  int ab = 10;
+  |  int ab = 20;
+  |      ^
+  |  x = call func()
 
-// Scope error in new.wacc (13, 3):
-//   variable x has not been declared in this scope
-//   relevant in-scope variables include:
-//     int ab (declared on line 12)
-//     int y (declared on line 10)
-//   |  int ab = 20;
-//   |  x = call func()
-//   |  ^
-//   |end
+Scope error in new.wacc (13, 3):
+  variable x has not been declared in this scope
+  relevant in-scope variables include:
+    int ab (declared on line 12)
+    int y (declared on line 10)
+  |  int ab = 20;
+  |  x = call func()
+  |  ^
+  |end
 
-// Undefined function error in new.wacc (13, 7):
-//   function func has not been defined
-//   |  int ab = 20;
-//   |  x = call func()
-//   |      ^^^^
-//   |end
-// */
+Undefined function error in new.wacc (13, 7):
+  function func has not been defined
+  |  int ab = 20;
+  |  x = call func()
+  |      ^^^^
+  |end
+*/
