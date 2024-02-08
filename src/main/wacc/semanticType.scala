@@ -1,14 +1,15 @@
 package wacc
 
 import scala.language.implicitConversions
+import ast._
 
 object Implicits {
     implicit def syntaxToSemanticType(t: Type): SemType = t match {
-        case IntType => SemInt
-        case CharType => SemChar
-        case StringType => SemString
-        case BoolType => SemBool
-        case ErasedPair => SemErasedPair
+        case IntType() => SemInt
+        case CharType() => SemChar
+        case StringType() => SemString
+        case BoolType() => SemBool
+        case ErasedPair() => SemErasedPair
         case ArrayType(t) => SemArray(syntaxToSemanticType(t))
         case PairType(t1, t2) => SemPair(syntaxToSemanticType(t1), syntaxToSemanticType(t2))
         case _ => SemNone
@@ -111,7 +112,7 @@ case object SemNull extends SemBaseType {
     override def toString = "null"
 }
 
-// null keyword for pairvla
+// null keyword for pairval
 
 case object SemAny extends SemBaseType  {
     override def toString = "any"

@@ -21,6 +21,8 @@ import Parsley._
 import lexer._
 import lexer.implicits.implicitSymbol
 
+import ast._
+
 object parser {
     // the Err: ErrorBuilder here is saying that the compiler must be able to find a value
     // of type ErrorBuilder[Err] to provide implicitly to this function. When you use this
@@ -86,7 +88,7 @@ object parser {
 
     lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt, ";")
 
-    lazy val stmt = "skip".as(Skip) |
+    lazy val stmt = (Skip from "skip") |
         AssignNew(declType, ident <~ "=", rvalue) |
         Assign(atomic(lvalue <~ "="), rvalue) |
         Read("read" ~> lvalue) |
