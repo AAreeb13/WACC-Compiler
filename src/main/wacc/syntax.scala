@@ -14,10 +14,18 @@ sealed trait Node {
 sealed trait Type extends Node
 
 sealed trait BaseType  extends Type
-case class IntType()(val pos: (Int, Int))    extends BaseType
-case class CharType()(val pos: (Int, Int))   extends BaseType
-case class BoolType()(val pos: (Int, Int))   extends BaseType
-case class StringType()(val pos: (Int, Int)) extends BaseType
+case class IntType()(val pos: (Int, Int))    extends BaseType {
+    override def toString = "IntType"
+}
+case class CharType()(val pos: (Int, Int))   extends BaseType {
+    override def toString = "CharType"
+}
+case class BoolType()(val pos: (Int, Int))   extends BaseType {
+    override def toString = "BoolType"
+}
+case class StringType()(val pos: (Int, Int)) extends BaseType {
+    override def toString = "StringType"
+}
 
 case class ArrayType(t: Type)(val pos: (Int, Int)) extends Type
 case class PairType(t1: Type, t2: Type)(val pos: (Int, Int)) extends Type
@@ -34,7 +42,7 @@ case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node
 sealed trait Stat                                                   extends Node
 case class Skip()(val pos: (Int, Int))                                                     extends Stat
 case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat {
-    override def toString = s"AssignNew($t, \"$ident\", $rvalue)"
+    override def toString = s"AssignNew($t,\"$ident\",$rvalue)"
 }
 case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
 case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat

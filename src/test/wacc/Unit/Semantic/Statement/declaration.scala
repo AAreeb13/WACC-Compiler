@@ -6,7 +6,7 @@ import astFactory._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 
-class statementTest extends AnyFlatSpec {
+class DeclarationTest extends AnyFlatSpec {
     /*
     begin
         int x = 1;
