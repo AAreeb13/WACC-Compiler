@@ -10,8 +10,8 @@ object Main {
     def main(args: Array[String]): Unit = {
         val input = args.headOption match {
             case None =>
-                println("Command line input not found, defaulting to file input (in.txt)")
-                Source.fromFile("in.txt").mkString
+            println("Command line input not found, defaulting to file input (in.txt)")
+            Source.fromFile("in.txt").mkString
             case Some(path) =>
                 Source.fromFile(path).mkString
         }
@@ -25,7 +25,7 @@ object Main {
                 sys.exit(exitSyntaxErr)
 
             case Right(_) =>
-                result = semanticChecker.verify(result)
+                //result = semanticChecker.verify(result)
         }
 
         // Semantic Analysis

@@ -33,7 +33,9 @@ case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node
 
 sealed trait Stat                                                   extends Node
 case class Skip()(val pos: (Int, Int))                                                     extends Stat
-case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat
+case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat {
+    override def toString = s"AssignNew($t, \"$ident\", $rvalue)"
+}
 case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
 case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat
 case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
@@ -78,7 +80,9 @@ case class StrVal(x: String)(val pos: (Int, Int)) extends Expr {
     override def toString = s"StringVal(\"$x\")"
 }
 case class PairVal()(val pos: (Int, Int))       extends Expr
-case class Var(v: String)(val pos: (Int, Int)) extends Expr with LValue
+case class Var(v: String)(val pos: (Int, Int)) extends Expr with LValue {
+    override def toString = s"Var(\"$v\")"
+}
 
 case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue
 
