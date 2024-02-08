@@ -49,7 +49,7 @@ case object StringType extends BaseType with generic.ParserBridge0[BaseType] {
     override def toString = "string"
 }
 
-case class ArrayType(t: Type) extends Type  {
+case class ArrayType(t: Type) extends Type {
     override def toString = s"${t.toString}[]"
 
     def dimensions: Int = t match {
