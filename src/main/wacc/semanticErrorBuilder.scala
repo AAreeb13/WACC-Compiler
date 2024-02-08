@@ -30,7 +30,7 @@
 // case class SemanticNamed(item: String) extends ErrorItem
 // case object SemanticEndOfInput extends  ErrorItem
 
-// class SemanticErrorCollector(builder: SemanticErrorBuilder) {
+// class SemanticErrorCollector(builder: SemanticErrorBuilder, source: String ) {
 //     // Mutable list buffer to store semantic errors
 //     private val semanticErrors: ListBuffer[SemanticError] = ListBuffer.empty
     
@@ -41,6 +41,14 @@
     
 //     // Method to get the collected semantic errors
 //     def getSemanticErrors: Seq[SemanticError] = semanticErrors.toList
+
+//     def formatErrors : String = {
+//         val builder = new StringBuilder
+//         builder.append(s"Semantic Errors in %source")
+//         for (errorLine <- getSemanticErrors) {
+//             builder.append(errorLine.)
+//         }
+//     }
 // }
 
 
