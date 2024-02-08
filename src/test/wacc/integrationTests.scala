@@ -13,7 +13,7 @@ class IntegrationTest extends AnyFlatSpec {
     val exitSuccess     = 0
     val exitSyntaxErr   = 100
     val exitSemanticErr = 200
-    val syntaxCheckOnly = true
+    val syntaxCheckOnly = false
 
     "Valid examples" should "compile successfully" in {
         runTests("wacc_examples/valid", exitSuccess) 
