@@ -6,7 +6,7 @@ import astFactory._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 
-class DeclarationTest extends AnyFlatSpec {
+class ConditionalTest extends AnyFlatSpec {
     /*
     begin
         int x = 1;
@@ -16,39 +16,6 @@ class DeclarationTest extends AnyFlatSpec {
     "declaration statements" should "fail for redeclaring existing variables in current scope" in {
         semanticChecker.verify(Right(
             Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), AssignNew(IntType,"x",IntVal(3))))
-        )) shouldBe a [Left[_, _]]
-    }
-
-    /*
-    begin
-        int x = y
-    end
-    */
-    it should "fail for undeclared variables in rhs" in {
-        semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType,"x",Var("y"))))
-        )) shouldBe a [Left[_, _]]
-    }
-
-    /*
-    begin
-        int x = x
-    end
-    */
-    it should "fail referencing itself in rhs" in {
-        semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType, "x", Var("x"))))
-        )) shouldBe a [Left[_, _]]
-    }
-
-    /*
-    begin
-        int x = null
-    end
-    */
-    it should "fail for type mismatch" in {
-        semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType,"x",PairVal)))
         )) shouldBe a [Left[_, _]]
     }
 

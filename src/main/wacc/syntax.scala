@@ -85,7 +85,7 @@ case class CharVal(x: Char)(val pos: (Int, Int)) extends Expr {
 }
 case class BoolVal(x: Boolean)(val pos: (Int, Int)) extends Expr
 case class StrVal(x: String)(val pos: (Int, Int)) extends Expr {
-    override def toString = s"StringVal(\"$x\")"
+    override def toString = s"StrVal(\"$x\")"
 }
 case class PairVal()(val pos: (Int, Int))       extends Expr
 case class Var(v: String)(val pos: (Int, Int)) extends Expr with LValue {
