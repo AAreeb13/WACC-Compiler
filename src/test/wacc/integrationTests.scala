@@ -4,6 +4,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 
 import wacc._
+import astFactory._
 import java.io.File
 import java.nio.file.Files
 import scala.io.Source

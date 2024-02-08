@@ -4,6 +4,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 import wacc.Implicits._
+import ast._
 
 object semanticChecker {
     def verify(result: Either[String, Node]): Either[String, Node] = result.flatMap(_ match {
@@ -87,7 +88,7 @@ class Analyser(val prog: Prog) {
                 val childScope = new SymbolTable(Some(currentScope))
                 stats.foreach(checkStatement(_, expectedType)(childScope))
 
-            case Skip =>
+            case Skip() =>
 
             case If(cond, ifStats, elseStats) =>
                 matchesType(checkExpression(cond), SemBool)
@@ -286,7 +287,7 @@ class Analyser(val prog: Prog) {
         case BoolVal(x) => SemBool
         case CharVal(x) => SemChar
         case StrVal(x) => SemString
-        case PairVal => SemNull
+        case PairVal() => SemNull
         case IntVal(x) => SemInt
 
         case _ => errList.addOne("unknown error"); SemNone // should not happen, metals is bugging

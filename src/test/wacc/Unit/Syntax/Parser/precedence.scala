@@ -1,6 +1,7 @@
 package wacc.unit.syntax.parser
 
 import wacc._
+import astFactory._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 import parsley.Failure

@@ -1,6 +1,7 @@
 package wacc.unit.syntax.parser.advanced
 
 import wacc._
+import astFactory._
 import org.scalactic.Bool
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
