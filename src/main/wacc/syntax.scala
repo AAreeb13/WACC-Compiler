@@ -1,121 +1,49 @@
 
 package wacc
 
-import parsley.generic
+import bridges._
 
-sealed trait Node
+object ast {
+
+sealed trait Node {
+    val pos: (Int, Int)
+}
 
 ////////// TYPES ///////////
 
-sealed trait Type extends Node {
-    def reducesTo(otherType: Type): Boolean = (this, otherType) match {
-        case (NoneType, _) | (_, NoneType) => false
-        case (AnyType, _) | (_, AnyType) => true
-        case (IntType, IntType) | 
-             (CharType, CharType) | 
-             (BoolType, BoolType) | 
-             (StringType, StringType) => true
-
-        case (ArrayType(a1), ArrayType(a2)) => a1 == a2
-        case (ArrayType(CharType), StringType) => true
-
-        case (PairType(AnyType, AnyType), PairType(l1, r1)) => true
-        case (PairType(AnyType, r1), PairType(l2, r2)) => r1 == r2
-        case (PairType(l1, AnyType), PairType(l2, r2)) => l1 == l2
-
-        case (PairType(l1, r1), PairType(AnyType, AnyType)) => true
-        case (PairType(l1, r1), PairType(AnyType, r2)) => r1 == r2
-        case (PairType(l1, r1), PairType(l2, AnyType)) => l1 == l2
-
-        case (PairType(l1, r1), PairType(l2, r2)) => (l1 == l2) && (r1 == r2)
-        case (ErasedPair, PairType(_, _)) | (PairType(_, _), ErasedPair) => true
-
-        case (ErasedPair, ErasedPair) => false  // last bullet point on pair coercion
-        case _ => false
-    }
-}
+sealed trait Type extends Node
 
 sealed trait BaseType  extends Type
-case object IntType    extends BaseType with generic.ParserBridge0[BaseType] {
-    override def toString = "int"
-}
-case object CharType   extends BaseType with generic.ParserBridge0[BaseType] {
-    override def toString = "char"
-}
-case object BoolType   extends BaseType with generic.ParserBridge0[BaseType] {
-    override def toString = "bool"
-}
-case object StringType extends BaseType with generic.ParserBridge0[BaseType] {
-    override def toString = "string"
-}
+case class IntType()(val pos: (Int, Int))    extends BaseType
+case class CharType()(val pos: (Int, Int))   extends BaseType
+case class BoolType()(val pos: (Int, Int))   extends BaseType
+case class StringType()(val pos: (Int, Int)) extends BaseType
 
-case class ArrayType(t: Type) extends Type {
-    override def toString = s"${t.toString}[]"
-
-    def dimensions: Int = t match {
-        case arrType: ArrayType => 1 + arrType.dimensions
-        case _ => 1
-    }
-
-    def unfold(levels: Int): Option[Type] = (levels, t) match {
-        case (1, t) => Some(t)
-        case (n, arr: ArrayType) => arr.unfold(n-1)
-        case _ => None
-    }
-}
-
-object ArrayType              extends generic.ParserBridge1[Type, Type]
-
-case class PairType(t1: Type, t2: Type) extends Type  {
-    override def toString = s"pair(${t1.toString}, ${t2.toString})"
-
-}
-object PairType extends generic.ParserBridge2[Type, Type, Type]
-
-case object ErasedPair extends Type with generic.ParserBridge0[Type]  {
-    override def toString = "pair"
-}
-
-case object AnyType extends BaseType
-
-case object NoneType extends BaseType
+case class ArrayType(t: Type)(val pos: (Int, Int)) extends Type
+case class PairType(t1: Type, t2: Type)(val pos: (Int, Int)) extends Type
+case class ErasedPair()(val pos: (Int, Int)) extends Type
 
 ////////// STATEMENTS ///////////
 
-case class Prog(funcs: List[Func], stats: List[Stat]) extends Node
-object Prog                                           extends generic.ParserBridge2[List[Func], List[Stat], Prog]
+case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node
 
-case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat]) extends Node
-object Func extends generic.ParserBridge4[Type, String, List[Param], List[Stat], Func]
+case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node
 
-case class Param(declType: Type, name: String) extends Node
-object Param                                   extends generic.ParserBridge2[Type, String, Param]
+case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node
 
 sealed trait Stat                                                   extends Node
-case object Skip                                                    extends Stat with generic.ParserBridge0[Stat]
-case class AssignNew(t: Type, ident: String, rvalue: RValue)        extends Stat
-case class Assign(lvalue: LValue, rvalue: RValue)                   extends Stat
-case class Read(lvalue: LValue)                                     extends Stat
-case class Free(expr: Expr)                                         extends Stat
-case class Return(expr: Expr)                                       extends Stat
-case class Exit(expr: Expr)                                         extends Stat
-case class Print(expr: Expr)                                        extends Stat
-case class Println(expr: Expr)                                      extends Stat
-case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat]) extends Stat
-case class While(cond: Expr, stats: List[Stat])                     extends Stat
-case class Scope(stats: List[Stat])                                 extends Stat
-
-object AssignNew extends generic.ParserBridge3[Type, String, RValue, Stat]
-object Assign    extends generic.ParserBridge2[LValue, RValue, Stat]
-object Read      extends generic.ParserBridge1[LValue, Stat]
-object Free      extends generic.ParserBridge1[Expr, Stat]
-object Return    extends generic.ParserBridge1[Expr, Stat]
-object Exit      extends generic.ParserBridge1[Expr, Stat]
-object Print     extends generic.ParserBridge1[Expr, Stat]
-object Println   extends generic.ParserBridge1[Expr, Stat]
-object If        extends generic.ParserBridge3[Expr, List[Stat], List[Stat], Stat]
-object While     extends generic.ParserBridge2[Expr, List[Stat], Stat]
-object Scope     extends generic.ParserBridge1[List[Stat], Stat]
+case class Skip()(val pos: (Int, Int))                                                     extends Stat
+case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat
+case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
+case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat
+case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
+case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
+case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
+case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat
+case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat
+case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat
+case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat
+case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat
 
 sealed trait LValue extends Node
 sealed trait RValue extends Node
@@ -128,18 +56,12 @@ object PairElem {
     def unapply(p: PairElem): Option[LValue] = Some(p.lvalue)
 }
 
-case class FstPair(lvalue: LValue) extends PairElem
-case class SndPair(lvalue: LValue) extends PairElem
+case class FstPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
+case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 
-case class ArrayLiteral(exprs: List[Expr])           extends RValue
-case class PairCons(fst: Expr, snd: Expr)            extends RValue
-case class FuncCall(ident: String, args: List[Expr]) extends RValue
-
-object FstPair      extends generic.ParserBridge1[LValue, PairElem]
-object SndPair      extends generic.ParserBridge1[LValue, PairElem]
-object ArrayLiteral extends generic.ParserBridge1[List[Expr], RValue]
-object PairCons     extends generic.ParserBridge2[Expr, Expr, RValue]
-object FuncCall     extends generic.ParserBridge2[String, List[Expr], RValue]
+case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue
+case class PairCons(fst: Expr, snd: Expr)(val pos: (Int, Int))            extends RValue
+case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue
 
 ////////// EXPRESSIONS ///////////
 
@@ -147,25 +69,18 @@ sealed trait Expr extends RValue
 
 // literals
 
-case class IntVal(x: BigInt) extends Expr
-case class CharVal(x: Char) extends Expr {
+case class IntVal(x: BigInt)(val pos: (Int, Int)) extends Expr
+case class CharVal(x: Char)(val pos: (Int, Int)) extends Expr {
     override def toString = s"CharVal(\'$x\')"
 }
-case class BoolVal(x: Boolean) extends Expr
-case class StrVal(x: String) extends Expr {
+case class BoolVal(x: Boolean)(val pos: (Int, Int)) extends Expr
+case class StrVal(x: String)(val pos: (Int, Int)) extends Expr {
     override def toString = s"StringVal(\"$x\")"
 }
-case object PairVal       extends Expr with generic.ParserBridge0[Expr]
-case class Var(v: String) extends Expr with LValue
+case class PairVal()(val pos: (Int, Int))       extends Expr
+case class Var(v: String)(val pos: (Int, Int)) extends Expr with LValue
 
-object IntVal  extends generic.ParserBridge1[BigInt, Expr]
-object CharVal extends generic.ParserBridge1[Char, Expr]
-object BoolVal extends generic.ParserBridge1[Boolean, Expr]
-object StrVal  extends generic.ParserBridge1[String, Expr]
-object Var     extends generic.ParserBridge1[String, Expr with LValue]
-
-case class ArrayVal(v: String, exprs: List[Expr]) extends Expr with LValue
-object ArrayVal                                   extends generic.ParserBridge2[String, List[Expr], Expr with LValue]
+case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue
 
 // binary operators
 
@@ -197,36 +112,22 @@ object ComparisonOp {
     def unapply(op: ComparisonOp): Option[(Expr, Expr)] = Some((op.x, op.y))
 }
 
-case class Mul(x: Expr, y: Expr)     extends ArithmeticOp
-case class Div(x: Expr, y: Expr)     extends ArithmeticOp
-case class Mod(x: Expr, y: Expr)     extends ArithmeticOp
-case class Add(x: Expr, y: Expr)     extends ArithmeticOp
-case class Sub(x: Expr, y: Expr)     extends ArithmeticOp
+case class Mul(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
+case class Div(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
+case class Mod(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
+case class Add(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
+case class Sub(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
 
-case class Grt(x: Expr, y: Expr)     extends ComparisonOp 
-case class GrtEql(x: Expr, y: Expr)  extends ComparisonOp 
-case class Less(x: Expr, y: Expr)    extends ComparisonOp 
-case class LessEql(x: Expr, y: Expr) extends ComparisonOp 
+case class Grt(x: Expr, y: Expr)(val pos: (Int, Int))     extends ComparisonOp 
+case class GrtEql(x: Expr, y: Expr)(val pos: (Int, Int))  extends ComparisonOp 
+case class Less(x: Expr, y: Expr)(val pos: (Int, Int))    extends ComparisonOp 
+case class LessEql(x: Expr, y: Expr)(val pos: (Int, Int)) extends ComparisonOp 
 
-case class Eql(x: Expr, y: Expr)     extends EqualityOp
-case class NotEql(x: Expr, y: Expr)  extends EqualityOp
+case class Eql(x: Expr, y: Expr)(val pos: (Int, Int))     extends EqualityOp
+case class NotEql(x: Expr, y: Expr)(val pos: (Int, Int))  extends EqualityOp
 
-case class And(x: Expr, y: Expr)     extends LogicalOp
-case class Or(x: Expr, y: Expr)      extends LogicalOp
-
-object Mul     extends generic.ParserBridge2[Expr, Expr, Expr]
-object Div     extends generic.ParserBridge2[Expr, Expr, Expr]
-object Mod     extends generic.ParserBridge2[Expr, Expr, Expr]
-object Add     extends generic.ParserBridge2[Expr, Expr, Expr]
-object Sub     extends generic.ParserBridge2[Expr, Expr, Expr]
-object Grt     extends generic.ParserBridge2[Expr, Expr, Expr]
-object GrtEql  extends generic.ParserBridge2[Expr, Expr, Expr]
-object Less    extends generic.ParserBridge2[Expr, Expr, Expr]
-object LessEql extends generic.ParserBridge2[Expr, Expr, Expr]
-object Eql     extends generic.ParserBridge2[Expr, Expr, Expr]
-object NotEql  extends generic.ParserBridge2[Expr, Expr, Expr]
-object And     extends generic.ParserBridge2[Expr, Expr, Expr]
-object Or      extends generic.ParserBridge2[Expr, Expr, Expr]
+case class And(x: Expr, y: Expr)(val pos: (Int, Int))     extends LogicalOp
+case class Or(x: Expr, y: Expr)(val pos: (Int, Int))      extends LogicalOp
 
 // unary operators
 
@@ -237,14 +138,75 @@ object UnOp {
     def unapply(op: UnOp): Option[Expr] = Some(op.x)
 }
 
-case class Not(x: Expr) extends UnOp
-case class Neg(x: Expr) extends UnOp
-case class Len(x: Expr) extends UnOp
-case class Ord(x: Expr) extends UnOp
-case class Chr(x: Expr) extends UnOp
+case class Not(x: Expr)(val pos: (Int, Int)) extends UnOp
+case class Neg(x: Expr)(val pos: (Int, Int)) extends UnOp
+case class Len(x: Expr)(val pos: (Int, Int)) extends UnOp
+case class Ord(x: Expr)(val pos: (Int, Int)) extends UnOp
+case class Chr(x: Expr)(val pos: (Int, Int)) extends UnOp
 
-object Not extends generic.ParserBridge1[Expr, Expr]
-object Neg extends generic.ParserBridge1[Expr, Expr]
-object Len extends generic.ParserBridge1[Expr, Expr]
-object Ord extends generic.ParserBridge1[Expr, Expr]
-object Chr extends generic.ParserBridge1[Expr, Expr]
+
+
+////////////////////////////////////////////////////////
+
+
+object IntType extends ParserBridge0[BaseType]
+object CharType extends ParserBridge0[BaseType]
+object BoolType extends ParserBridge0[BaseType]
+object StringType extends ParserBridge0[BaseType]
+
+object ArrayType extends ParserBridge1[Type, Type]
+object PairType extends ParserBridge2[Type, Type, Type]
+object ErasedPair extends ParserBridge0[Type]
+
+object Prog extends ParserBridge2[List[Func], List[Stat], Prog]
+object Func extends ParserBridge4[Type, String, List[Param], List[Stat], Func]
+object Param extends ParserBridge2[Type, String, Param]
+
+object Skip      extends ParserBridge0[Stat]
+object AssignNew extends ParserBridge3[Type, String, RValue, Stat]
+object Assign    extends ParserBridge2[LValue, RValue, Stat]
+object Read      extends ParserBridge1[LValue, Stat]
+object Free      extends ParserBridge1[Expr, Stat]
+object Return    extends ParserBridge1[Expr, Stat]
+object Exit      extends ParserBridge1[Expr, Stat]
+object Print     extends ParserBridge1[Expr, Stat]
+object Println   extends ParserBridge1[Expr, Stat]
+object If        extends ParserBridge3[Expr, List[Stat], List[Stat], Stat]
+object While     extends ParserBridge2[Expr, List[Stat], Stat]
+object Scope     extends ParserBridge1[List[Stat], Stat]
+
+object FstPair      extends ParserBridge1[LValue, PairElem]
+object SndPair      extends ParserBridge1[LValue, PairElem]
+object ArrayLiteral extends ParserBridge1[List[Expr], RValue]
+object PairCons     extends ParserBridge2[Expr, Expr, RValue]
+object FuncCall     extends ParserBridge2[String, List[Expr], RValue]
+
+object PairVal extends ParserBridge0[Expr]
+object IntVal  extends ParserBridge1[BigInt, Expr]
+object CharVal extends ParserBridge1[Char, Expr]
+object BoolVal extends ParserBridge1[Boolean, Expr]
+object StrVal  extends ParserBridge1[String, Expr]
+object Var     extends ParserBridge1[String, Expr with LValue]
+object ArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue]
+
+object Mul     extends ParserBridge2[Expr, Expr, Expr]
+object Div     extends ParserBridge2[Expr, Expr, Expr]
+object Mod     extends ParserBridge2[Expr, Expr, Expr]
+object Add     extends ParserBridge2[Expr, Expr, Expr]
+object Sub     extends ParserBridge2[Expr, Expr, Expr]
+object Grt     extends ParserBridge2[Expr, Expr, Expr]
+object GrtEql  extends ParserBridge2[Expr, Expr, Expr]
+object Less    extends ParserBridge2[Expr, Expr, Expr]
+object LessEql extends ParserBridge2[Expr, Expr, Expr]
+object Eql     extends ParserBridge2[Expr, Expr, Expr]
+object NotEql  extends ParserBridge2[Expr, Expr, Expr]
+object And     extends ParserBridge2[Expr, Expr, Expr]
+object Or      extends ParserBridge2[Expr, Expr, Expr]
+
+object Not extends ParserBridge1[Expr, Expr]
+object Neg extends ParserBridge1[Expr, Expr]
+object Len extends ParserBridge1[Expr, Expr]
+object Ord extends ParserBridge1[Expr, Expr]
+object Chr extends ParserBridge1[Expr, Expr]
+
+}
