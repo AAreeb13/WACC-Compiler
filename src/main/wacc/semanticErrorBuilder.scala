@@ -2,10 +2,27 @@
 // import parsley.errors.ErrorBuilder
 // import scala.collection.mutable.ListBuffer
 
-// case class SemanticError(position: (Int, Int), lines: ErrorLines)
+// case class SemanticError(position: (Int, Int), lines: ErrorLines) {
+//     def formatFullError() : String = {
+//         val builder = new StringBuilder
+//         builder.append("Errors detected during compilation! Exit code 200 returned.\n")
+//         lines match {
+//             case typeError: TypeError => builder.append("Type error:\n")
+//             case scopeError: ScopeError => builder.append("Scope error:\n")
+//         }
+//         builder.append(lines.formatError())
+//         return builder.toString
+//     }
+// }
 
-// sealed trait ErrorLines
-// case class TypeError(unexpected: Option[ErrorItem], expecteds: Set[ErrorItem], reasons: Set[String], width: Int) extends ErrorLines
+// sealed trait ErrorLines {
+//     def formatError(): String
+// }
+// case class TypeError(unexpected: Option[ErrorItem], expecteds: Set[ErrorItem], reasons: Set[String], width: Int) extends ErrorLines {
+//     def formatError(): String = {
+
+//     }
+// }
 // case class ScopeError(msgs: Set[String], width: Int) extends ErrorLines
 
 // sealed trait ErrorItem
@@ -61,47 +78,47 @@
 
 
 
-// // // Define the semantic error case class and sealed traits
-// // case class SemanticError(position: (Int, Int), lines: ErrorLines)
-// // sealed trait ErrorLines
-// // case class TypeError(unexpected: Option[ErrorItem], expecteds: Set[ErrorItem], reasons: Set[String], width: Int) extends ErrorLines
-// // case class ScopeError(msgs: Set[String], width: Int) extends ErrorLines
-// // sealed trait ErrorItem
-// // case class SemanticRaw(item: String) extends ErrorItem
-// // case class SemanticNamed(item: String) extends ErrorItem
-// // case object SemanticEndOfInput extends ErrorItem
+// // Define the semantic error case class and sealed traits
+// case class SemanticError(position: (Int, Int), lines: ErrorLines)
+// sealed trait ErrorLines
+// case class TypeError(unexpected: Option[ErrorItem], expecteds: Set[ErrorItem], reasons: Set[String], width: Int) extends ErrorLines
+// case class ScopeError(msgs: Set[String], width: Int) extends ErrorLines
+// sealed trait ErrorItem
+// case class SemanticRaw(item: String) extends ErrorItem
+// case class SemanticNamed(item: String) extends ErrorItem
+// case object SemanticEndOfInput extends ErrorItem
 
-// // // Define the SemanticErrorBuilder class implementing ErrorBuilder trait
-// // class SemanticErrorBuilder extends ErrorBuilder[SemanticError] {
+// // Define the SemanticErrorBuilder class implementing ErrorBuilder trait
+// class SemanticErrorBuilder extends ErrorBuilder[SemanticError] {
     
-// //     // Implement the format method to create SemanticError instances
-// //     override def format(pos: (Int, Int), source: Unit, lines: ErrorInfoLines): SemanticError = SemanticError(pos, lines)
+//     // Implement the format method to create SemanticError instances
+//     override def format(pos: (Int, Int), source: Unit, lines: ErrorInfoLines): SemanticError = SemanticError(pos, lines)
 
     
-// //     // Define the types needed for the builder
-// //     type Position = (Int, Int)
+//     // Define the types needed for the builder
+//     type Position = (Int, Int)
 
-// //     override def pos(line: Int, col: Int): Position = (line, col)
-// //     type Source = Unit
-// //     type ErrorInfoLines = ErrorLines
+//     override def pos(line: Int, col: Int): Position = (line, col)
+//     type Source = Unit
+//     type ErrorInfoLines = ErrorLines
     
-// //     // Implement the typeError method to create TypeError instances
-// //     override def typeError(unexpected: UnexpectedLine, expected: ExpectedLine, reasons: Messages, line: LineInfo): ErrorInfoLines = {
-// //         TypeError(unexpected, expected, reasons, line)
-// //     }
+//     // Implement the typeError method to create TypeError instances
+//     override def typeError(unexpected: UnexpectedLine, expected: ExpectedLine, reasons: Messages, line: LineInfo): ErrorInfoLines = {
+//         TypeError(unexpected, expected, reasons, line)
+//     }
     
-// //     // Define the types for error items and messages
-// //     type UnexpectedLine = Option[Item]
-// //     type Item = ErrorItem
-// //     type ExpectedItems = Set[Item]
-// //     type ExpectedLine = ExpectedItems
-// //     type Message = String
-// //     type Messages = Set[Message]
+//     // Define the types for error items and messages
+//     type UnexpectedLine = Option[Item]
+//     type Item = ErrorItem
+//     type ExpectedItems = Set[Item]
+//     type ExpectedLine = ExpectedItems
+//     type Message = String
+//     type Messages = Set[Message]
     
-// //     // Implement the reason and message methods
-// //     override def reason(reason: String): Message = reason
-// //     override def message(msg: String): Message = msg
-// // }
+//     // Implement the reason and message methods
+//     override def reason(reason: String): Message = reason
+//     override def message(msg: String): Message = msg
+// }
 
 
 // // Example usage
