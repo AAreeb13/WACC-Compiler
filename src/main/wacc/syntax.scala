@@ -11,10 +11,25 @@ sealed trait Orderable
 sealed trait Type extends Node
 
 sealed trait BaseType  extends Type
-case object IntType    extends BaseType with generic.ParserBridge0[BaseType]
-case object CharType   extends BaseType with generic.ParserBridge0[BaseType]
-case object BoolType   extends BaseType with generic.ParserBridge0[BaseType]
-case object StringType extends BaseType with generic.ParserBridge0[BaseType]
+case object IntType    extends BaseType with generic.ParserBridge0[BaseType] {
+    override def labels = List{"base type"} 
+    override def reason = Some("base types are : bool, char, int, string")
+}
+
+case object CharType   extends BaseType with generic.ParserBridge0[BaseType] {
+    override def labels = List{"base type"} 
+    override def reason = Some("base types are : bool, char, int, string")
+}
+
+case object BoolType   extends BaseType with generic.ParserBridge0[BaseType] {
+    override def labels = List{"base type"} 
+    override def reason = Some("base types are : bool, char, int, string")
+}
+
+case object StringType extends BaseType with generic.ParserBridge0[BaseType] {
+    override def labels = List{"base type"}
+    override def reason = Some("base types are : bool, char, int, string")
+}
 
 case class ArrayType(t: Type) extends Type
 object ArrayType              extends generic.ParserBridge1[Type, Type]
@@ -71,11 +86,19 @@ case class ArrayLiteral(exprs: List[Expr])           extends RValue
 case class PairCons(fst: Expr, snd: Expr)            extends RValue
 case class FuncCall(ident: String, args: List[Expr]) extends RValue
 
-object FstPair      extends generic.ParserBridge1[LValue, PairElem]
-object SndPair      extends generic.ParserBridge1[LValue, PairElem]
+object FstPair      extends generic.ParserBridge1[LValue, PairElem] {
+    override def labels = List("value", "identifier")
+}
+object SndPair      extends generic.ParserBridge1[LValue, PairElem] {
+    override def labels = List("value", "identifier")
+}
 object ArrayLiteral extends generic.ParserBridge1[List[Expr], RValue]
-object PairCons     extends generic.ParserBridge2[Expr, Expr, RValue]
-object FuncCall     extends generic.ParserBridge2[String, List[Expr], RValue]
+object PairCons     extends generic.ParserBridge2[Expr, Expr, RValue] {
+    override def labels = List("value", "identifier")
+}
+object FuncCall     extends generic.ParserBridge2[String, List[Expr], RValue] {
+    override def labels = List("value", "identifier")
+}
 
 ////////// EXPRESSIONS ///////////
 
@@ -83,7 +106,7 @@ sealed trait Expr extends RValue
 
 // literals
 
-case class IntVal(x: BigInt) extends Expr
+case class IntVal(x: BigInt) extends Expr 
 case class CharVal(x: Char) extends Expr {
     override def toString = s"CharVal(\'$x\')"
 }
@@ -91,18 +114,36 @@ case class BoolVal(x: Boolean) extends Expr
 case class StrVal(x: String) extends Expr {
     override def toString = s"StringVal(\"$x\")"
 }
-case object PairVal       extends Expr with generic.ParserBridge0[Expr]
+case object PairVal       extends Expr with generic.ParserBridge0[Expr] {
+    override def labels = List("value", "identifier")
+}
 case class Var(v: String) extends Expr with LValue
 
-object IntVal  extends generic.ParserBridge1[BigInt, Expr]
-object CharVal extends generic.ParserBridge1[Char, Expr]
-object BoolVal extends generic.ParserBridge1[Boolean, Expr]
-object StrVal  extends generic.ParserBridge1[String, Expr]
+object IntVal  extends generic.ParserBridge1[BigInt, Expr] {
+    override def labels = List("value", "identifier")
+}
+object CharVal extends generic.ParserBridge1[Char, Expr] {
+    override def labels = List("value", "identifier")
+}
+object BoolVal extends generic.ParserBridge1[Boolean, Expr] {
+    override def labels = List("value", "identifier")
+}
+object StrVal  extends generic.ParserBridge1[String, Expr] {
+    override def labels = List("value", "identifier")
+}
 object Var     extends generic.ParserBridge1[String, Expr with LValue]
 
 case class ArrayVal(v: String, exprs: List[Expr]) extends Expr with LValue
-object ArrayVal                                   extends generic.ParserBridge2[String, List[Expr], Expr with LValue]
+object ArrayVal                                   extends generic.ParserBridge2[String, List[Expr], Expr with LValue] {
+    override def labels = List("value", "identifier")
+}
 
+object VarOrArrayVal extends ParserBridge2[Expr, List[Expr], Expr] {
+    def apply(_expr: Expr, exprs: List[Expr]): Expr = exprs match {
+        case head :: next => ArrayVal(_expr, exprs)
+        case Nil => Var(_expr)
+    }
+}
 // binary operators
 
 case class Mul(x: Expr, y: Expr)     extends Expr
@@ -141,8 +182,18 @@ case class Len(x: Expr) extends Expr
 case class Ord(x: Expr) extends Expr
 case class Chr(x: Expr) extends Expr
 
-object Not extends generic.ParserBridge1[Expr, Expr]
-object Neg extends generic.ParserBridge1[Expr, Expr]
-object Len extends generic.ParserBridge1[Expr, Expr]
-object Ord extends generic.ParserBridge1[Expr, Expr]
-object Chr extends generic.ParserBridge1[Expr, Expr]
+object Not extends generic.ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Neg extends generic.ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Len extends generic.ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Ord extends generic.ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Chr extends generic.ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}

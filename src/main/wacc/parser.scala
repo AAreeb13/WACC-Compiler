@@ -41,7 +41,7 @@ object parser {
     lazy val baseType: Parsley[BaseType] = ((IntType.from("int")) |
         (StringType.from("string")) |
         (CharType.from("char")) |
-        (BoolType.from("bool"))).label("base type").explain("base types are : int, string, char, bool")
+        (BoolType.from("bool")))
 
     lazy val arrayType: Parsley[Type]
     // = precedence(baseType, pairType)(Ops(Postfix)(ArrayType from "[" <~> "]"))
@@ -89,7 +89,7 @@ object parser {
     lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt, ";")
 
     lazy val stmt = "skip".as(Skip) |
-        (AssignNew(declType, ident <~ "=", rvalue)).label("variable declaration") |
+        AssignNew(declType, ident <~ "=", rvalue) |
         (Assign(atomic(lvalue <~ "="), rvalue)).label("assignment") |
         Read("read" ~> lvalue).hide |
         Free("free" ~> expr).hide |
@@ -115,29 +115,29 @@ object parser {
     lazy val pairElem: Parsley[PairElem] = FstPair("fst" ~> lvalue) |
         SndPair("snd" ~> lvalue)
 
-    lazy val arrayLiteral = ArrayLiteral("[" ~> sepBy(expr, ",") <~ "]")
+    lazy val arrayLiteral = ArrayLiteral("[".hide ~> sepBy(expr, ",") <~ "]")
 
     // private lazy val asgns = endBy(atomic(asgn), ";")
     // private lazy val asgn = Asgn(atomic(ident <~ "="), expr)
 
     ////////// EXPR PARSER ///////////
 
-    lazy val atom = IntVal(intLiteral) |
+    lazy val atom = IntVal(intLiteral).debug("int") |
         BoolVal(boolLiteral) |
         CharVal(charLiteral) |
         StrVal(stringLiteral) |
         (PairVal.from(pairLiteral)) |
-        atomic(arrayElem) |
-        Var(ident) |
-        ("(" ~> expr <~ ")")
+        arrayElem.debug("arrayyyyy") |
+        Var(ident).debug("variable") |
+        ("(".hide ~> expr <~ ")")
 
-    lazy val arrayElem = atomic(ArrayVal(ident, some("[" ~> expr <~ "]")))
+    lazy val arrayElem = VarOrArrayVal(ident, many("[" ~> expr <~ "]"))
 
     // todo: fix problem with parsing len/ord/chr
     lazy val expr: Parsley[Expr] =
         precedence(atom)(
             Ops(Prefix)(
-                Not.from("!"),
+                Not.from("!").debug("not"),
                 Neg.from(atomic("-" <~ notFollowedBy(digit))),
                 Len.from(atomic("len")),
                 Ord.from(atomic("ord")),
@@ -148,6 +148,6 @@ object parser {
             Ops(InfixN)(Grt.from(">"), GrtEql.from(">="), Less.from("<"), LessEql.from("<=")),
             Ops(InfixN)(Eql.from("=="), NotEql.from("!=")),
             Ops(InfixR)(And.from("&&")),
-            Ops(InfixR)(Or.from("||"))
+            Ops(InfixR)(Or.from("||").debug("or"))
         )
 }
