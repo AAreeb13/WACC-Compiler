@@ -7,7 +7,7 @@ import parsley.position.pos
 
 object bridges {
 
-    trait ParserSingletonBridge[+A] extends generic.ErrorBridge {
+    trait ParserSingletonBridgePos[+A] extends generic.ErrorBridge {
         protected def con(pos: (Int, Int) = (0, 0)): A
         def from(op: Parsley[_]): Parsley[A] = error(pos.map(this.con(_)) <~ op)
     }
@@ -20,21 +20,21 @@ object bridges {
     }
 
 
-    trait ParserBridge1[-A, +B] extends ParserSingletonBridge[A => B] {
+    trait ParserBridge1[-A, +B] extends ParserSingletonBridgePos[A => B] {
         def apply(x: A)(pos: (Int, Int) = (0, 0)): B
         def apply(x: Parsley[A]): Parsley[B] = error(ap1(pos.map(con), x))
         override final def con(pos: (Int, Int) = (0, 0)): A => B = this.apply(_)(pos)
         def default(x: A): B = this.apply(x)()
     }
 
-    trait ParserBridge2[-A, -B, +C] extends ParserSingletonBridge[(A, B) => C] {
+    trait ParserBridge2[-A, -B, +C] extends ParserSingletonBridgePos[(A, B) => C] {
         def apply(x: A, y: B)(pos: (Int, Int) = (0, 0)): C
         def apply(x: Parsley[A], y: =>Parsley[B]): Parsley[C] = error(ap2(pos.map(con), x, y))
         override final def con(pos: (Int, Int) = (0, 0)): (A, B) => C = this.apply(_, _)(pos)
         def default(x: A, y: B): C = this.apply(x, y)()
     }
 
-    trait ParserBridge3[-A, -B, -C, +D] extends ParserSingletonBridge[(A, B, C) => D] {
+    trait ParserBridge3[-A, -B, -C, +D] extends ParserSingletonBridgePos[(A, B, C) => D] {
         def apply(x: A, y: B, z: C)(pos: (Int, Int) = (0, 0)): D
         def apply(x: Parsley[A], y: => Parsley[B], z: => Parsley[C]): Parsley[D]
             = error(ap3(pos.map(con), x, y, z))
@@ -42,7 +42,7 @@ object bridges {
         def default(x: A, y: B, z: C): D = this.apply(x, y, z)()
     }
 
-    trait ParserBridge4[-A, -B, -C, -D, +E] extends ParserSingletonBridge[(A, B, C, D) => E] {
+    trait ParserBridge4[-A, -B, -C, -D, +E] extends ParserSingletonBridgePos[(A, B, C, D) => E] {
         def apply(x: A, y: B, z: C, w: D)(pos: (Int, Int) = (0, 0)): E
         def apply(x: Parsley[A], y: => Parsley[B], z: => Parsley[C], w: => Parsley[D]): Parsley[E] 
             = error(ap4(pos.map(con), x, y, z, w))
