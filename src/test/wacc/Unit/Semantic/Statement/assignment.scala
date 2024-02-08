@@ -6,50 +6,51 @@ import astFactory._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 
-class DeclarationTest extends AnyFlatSpec {
+class AssignmentTest extends AnyFlatSpec {
     /*
     begin
-        int x = 1;
-        int x = 3
+        x = 1
     end
     */
-    "declaration statements" should "fail for redeclaring existing variables in current scope" in {
+    "Assignments" should "fail for undeclared variables in lhs" in {
         semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), AssignNew(IntType,"x",IntVal(3))))
+            Prog(List(),List(Assign(Var("x"),IntVal(1))))        
         )) shouldBe a [Left[_, _]]
     }
 
     /*
     begin
-        int x = y
+        x = y
     end
     */
     it should "fail for undeclared variables in rhs" in {
         semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType,"x",Var("y"))))
-        )) shouldBe a [Left[_, _]]
-    }
-
-    /*
-    begin
-        int x = x
-    end
-    */
-    it should "fail referencing itself in rhs" in {
-        semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType, "x", Var("x"))))
+            Prog(List(),List(Assign(Var("x"),Var("y"))))       
         )) shouldBe a [Left[_, _]]
     }
 
     /*
     begin
         int x = 1;
-        int y = x
+        x = 'a'
     end
     */
-    it should "succeed otherwise" in {
+    it should "fail for type mismatch" in {
         semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType, "x",IntVal(1)), AssignNew(IntType, "y",Var("x"))))
+            Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), Assign(Var("x"),CharVal('a'))))     
+        )) shouldBe a [Left[_, _]]
+    }
+
+
+    /*
+    begin
+        int x = 1;
+        x = 3
+    end
+    */
+    it should "succeeed otherwise" in {
+        semanticChecker.verify(Right(
+            Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), Assign(Var("x"),IntVal(3))))         
         )) shouldBe a [Right[_, _]]
     }
 }
