@@ -29,18 +29,27 @@ case class StringType()(val pos: (Int, Int)) extends BaseType {
 
 case class ArrayType(t: Type)(val pos: (Int, Int)) extends Type
 case class PairType(t1: Type, t2: Type)(val pos: (Int, Int)) extends Type
-case class ErasedPair()(val pos: (Int, Int)) extends Type
+case class ErasedPair()(val pos: (Int, Int)) extends Type {
+    override def toString = "ErasedPair"
+}
 
 ////////// STATEMENTS ///////////
 
 case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node
 
-case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node
+case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node {
+    override def toString = s"Func($retType,\"$name\",$params,$stats)"
+}
 
-case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node
+case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node {
+    override def toString = s"Param($declType,\"$name\")"
+}
 
 sealed trait Stat                                                   extends Node
-case class Skip()(val pos: (Int, Int))                                                     extends Stat
+case class Skip()(val pos: (Int, Int))                                                   extends Stat {
+    override def toString = "Skip"
+}
+
 case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat {
     override def toString = s"AssignNew($t,\"$ident\",$rvalue)"
 }
@@ -71,7 +80,9 @@ case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 
 case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue
 case class PairCons(fst: Expr, snd: Expr)(val pos: (Int, Int))            extends RValue
-case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue
+case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
+    override def toString = s"FuncCall(\"$ident\",$args)"
+}
 
 ////////// EXPRESSIONS ///////////
 
@@ -87,12 +98,16 @@ case class BoolVal(x: Boolean)(val pos: (Int, Int)) extends Expr
 case class StrVal(x: String)(val pos: (Int, Int)) extends Expr {
     override def toString = s"StrVal(\"$x\")"
 }
-case class PairVal()(val pos: (Int, Int))       extends Expr
+case class PairVal()(val pos: (Int, Int))       extends Expr {
+    override def toString = "PairVal"
+}
 case class Var(v: String)(val pos: (Int, Int)) extends Expr with LValue {
     override def toString = s"Var(\"$v\")"
 }
 
-case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue
+case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue {
+    override def toString = s"ArrayVal(\"$v\",$exprs)"
+}
 
 // binary operators
 

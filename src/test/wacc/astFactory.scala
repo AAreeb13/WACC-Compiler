@@ -67,17 +67,3 @@ object astFactory {
     def Ord(x: ast.Expr) = ast.Ord.default(x)
     def Chr(x: ast.Expr) = ast.Chr.default(x)
 }
-
-// package wacc
-
-// object astFactory {
-//     def IntType = ast.IntType.default.default
-//     def CharType = ast.CharType.default.default
-//     def BoolType = ast.BoolType.default.default
-//     def StringType = ast.StringType.default.default
-//     def ErasedPair = ast.ErasedPair.default.default
-
-//     def ArrayType(t: ast.Type) = ast.ArrayType.default.default(t)
-//     def PairType(t1: ast.Type, t2: ast.Type)  = ast.PairType.default.default(t1, t2)
-//     def Prog(funcs: List[ast.Func], stats: List[ast.Stat]) = ast.Prog.default.default(funcs, stats)
-// }
