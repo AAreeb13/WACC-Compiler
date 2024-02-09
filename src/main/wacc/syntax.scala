@@ -194,8 +194,8 @@ object ErasedPair extends ParserBridge0[Type]
 
 object Prog extends ParserBridge2[List[Func], List[Stat], Prog]
 object Func extends ParserBridge3[(Type, String), List[Param], List[Stat], Func] {
-    def apply(tuple: (Type, String), params: List[Param], stats: List[Stat]) = tuple match {
-        case (retType, name) => Func(retType, name, params, stats)
+    def apply(tuple: (Type, String), params: List[Param], stats: List[Stat])(pos: (Int, Int) = (0, 0)) = tuple match {
+        case (retType, name) => Func(retType, name, params, stats)(pos)
     }
 }
 object Param extends ParserBridge2[Type, String, Param]
@@ -291,9 +291,9 @@ object Chr extends ParserBridge1[Expr, Expr] {
 }
 
 object VarOrArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue] {
-    def apply(_expr: String, exprs: List[Expr]): Expr with LValue = exprs match {
-        case head :: next => ArrayVal(_expr, exprs)
-        case Nil => Var(_expr)
+    def apply(_expr: String, exprs: List[Expr])(pos: (Int, Int) = (0, 0)): Expr with LValue = exprs match {
+        case head :: next => ArrayVal(_expr, exprs)(pos)
+        case Nil => Var(_expr)(pos)
     }
 }
 
