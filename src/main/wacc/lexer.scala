@@ -11,89 +11,89 @@ import parsley.token.predicate
 object lexer {
     private val escapedLiterals = Set('\\', '\"', '\'')
     private val desc = LexicalDesc.plain.copy(
-      nameDesc = NameDesc.plain.copy(
-        identifierStart = predicate.Basic(c => c.isLetter || c == '_'),
-        identifierLetter = predicate.Basic(c => c.isLetterOrDigit || c == '_')
-      ),
-      spaceDesc = SpaceDesc.plain.copy(
-        lineCommentStart = "#",
-        space = predicate.Basic(c => c == ' ' || c == '\t' || c == '\n' || c == '\r')
-      ),
-      symbolDesc = SymbolDesc.plain.copy(
-        hardKeywords = Set(
-          "skip",
-          "begin",
-          "end",
-          "read",
-          "is",
-          "free",
-          "return",
-          "exit",
-          "print",
-          "println",
-          "if",
-          "then",
-          "else",
-          "fi",
-          "while",
-          "do",
-          "done",
-          "newpair",
-          "call",
-          "fst",
-          "snd",
-          "int",
-          "bool",
-          "char",
-          "string",
-          "pair",
-          "len",
-          "ord",
-          "chr",
-          "true",
-          "false",
-          "null"
+        nameDesc = NameDesc.plain.copy(
+            identifierStart = predicate.Basic(c => c.isLetter || c == '_'),
+            identifierLetter = predicate.Basic(c => c.isLetterOrDigit || c == '_')
         ),
-        hardOperators = Set(
-          // binary operators
-          "*",
-          "/",
-          "%",
-          "+",
-          "-",
-          ">",
-          ">=",
-          "<",
-          "<=",
-          "==",
-          "!=",
-          "&&",
-          "||",
-          // unary operators
-          "!",
-          "-"
+        spaceDesc = SpaceDesc.plain.copy(
+            lineCommentStart = "#",
+            space = predicate.Basic(c => c == ' ' || c == '\t' || c == '\n' || c == '\r')
+        ),
+        symbolDesc = SymbolDesc.plain.copy(
+            hardKeywords = Set(
+                "skip",
+                "begin",
+                "end",
+                "read",
+                "is",
+                "free",
+                "return",
+                "exit",
+                "print",
+                "println",
+                "if",
+                "then",
+                "else",
+                "fi",
+                "while",
+                "do",
+                "done",
+                "newpair",
+                "call",
+                "fst",
+                "snd",
+                "int",
+                "bool",
+                "char",
+                "string",
+                "pair",
+                "len",
+                "ord",
+                "chr",
+                "true",
+                "false",
+                "null"
+            ),
+            hardOperators = Set(
+                // binary operators
+                "*",
+                "/",
+                "%",
+                "+",
+                "-",
+                ">",
+                ">=",
+                "<",
+                "<=",
+                "==",
+                "!=",
+                "&&",
+                "||",
+                // unary operators
+                "!",
+                "-"
+            )
+        ),
+        numericDesc = numeric.NumericDesc.plain.copy(
+            integerNumbersCanBeHexadecimal = false,
+            integerNumbersCanBeOctal = false,
+            decimalExponentDesc = numeric.ExponentDesc.NoExponents
+        ),
+        textDesc = text.TextDesc.plain.copy(
+            escapeSequences = text.EscapeDesc.plain.copy(
+                escBegin = '\\',
+                literals = escapedLiterals,
+                mapping = Map(
+                    "0" -> 0x0,
+                    "b" -> 0x8,
+                    "t" -> 0x9,
+                    "n" -> 0xa,
+                    "f" -> 0xc,
+                    "r" -> 0xd
+                )
+            ),
+            graphicCharacter = predicate.Basic(c => c >= ' '.toInt && !escapedLiterals.contains(c))
         )
-      ),
-      numericDesc = numeric.NumericDesc.plain.copy(
-        integerNumbersCanBeHexadecimal = false,
-        integerNumbersCanBeOctal = false,
-        decimalExponentDesc = numeric.ExponentDesc.NoExponents
-      ),
-      textDesc = text.TextDesc.plain.copy(
-        escapeSequences = text.EscapeDesc.plain.copy(
-          escBegin = '\\',
-          literals = escapedLiterals,
-          mapping = Map(
-            "0" -> 0x0,
-            "b" -> 0x8,
-            "t" -> 0x9,
-            "n" -> 0xa,
-            "f" -> 0xc,
-            "r" -> 0xd
-          )
-        ),
-        graphicCharacter = predicate.Basic(c => c >= ' '.toInt && !escapedLiterals.contains(c))
-      )
     )
     private val errConfig = new ErrorConfig {
         override def labelSymbolOperator(symbol: String): LabelConfig =
