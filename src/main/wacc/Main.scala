@@ -25,7 +25,7 @@ object Main {
                 sys.exit(exitSyntaxErr)
 
             case Right(_) =>
-                //result = semanticChecker.verify(result)
+                result = semanticChecker.verify(result)
         }
 
         // Semantic Analysis
