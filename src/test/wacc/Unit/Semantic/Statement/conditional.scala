@@ -7,27 +7,31 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 
 class ConditionalTest extends AnyFlatSpec {
-    /*
-    begin
-        int x = 1;
-        int x = 3
-    end
-    */
-    "declaration statements" should "fail for redeclaring existing variables in current scope" in {
-        semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), AssignNew(IntType,"x",IntVal(3))))
-        )) shouldBe a [Left[_, _]]
-    }
+    ////////////// IF/WHILE //////////////
 
-    /*
-    begin
-        int x = 1;
-        int y = x
-    end
-    */
-    it should "succeed otherwise" in {
+    "conditional statements" must "have a boolean expression" in {
+        /*
+        begin
+            if (true) then
+                skip
+            else
+                skip
+            fi 
+        end
+        */
         semanticChecker.verify(Right(
-            Prog(List(),List(AssignNew(IntType, "x",IntVal(1)), AssignNew(IntType, "y",Var("x"))))
+            Prog(List(),List(If(BoolVal(true),List(Skip),List(Skip))))
         )) shouldBe a [Right[_, _]]
+
+        /*
+        begin
+            while (1) do
+                skip
+            done
+        end
+        */
+        semanticChecker.verify(Right(
+            Prog(List(),List(While(IntVal(1),List(Skip))))
+        )) shouldBe a [Left[_, _]]
     }
 }
