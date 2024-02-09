@@ -12,23 +12,19 @@ sealed trait Type extends Node
 
 sealed trait BaseType  extends Type
 case object IntType    extends BaseType with generic.ParserBridge0[BaseType] {
-    override def labels = List{"base type"} 
-    override def reason = Some("base types are : bool, char, int, string")
+    override def labels = List{"type"} 
 }
 
 case object CharType   extends BaseType with generic.ParserBridge0[BaseType] {
-    override def labels = List{"base type"} 
-    override def reason = Some("base types are : bool, char, int, string")
+    override def labels = List{"type"} 
 }
 
 case object BoolType   extends BaseType with generic.ParserBridge0[BaseType] {
-    override def labels = List{"base type"} 
-    override def reason = Some("base types are : bool, char, int, string")
+    override def labels = List{"type"} 
 }
 
 case object StringType extends BaseType with generic.ParserBridge0[BaseType] {
-    override def labels = List{"base type"}
-    override def reason = Some("base types are : bool, char, int, string")
+    override def labels = List{"type"} 
 }
 
 case class ArrayType(t: Type) extends Type
@@ -44,7 +40,11 @@ case class Prog(funcs: List[Func], stats: List[Stat]) extends Node
 object Prog                                           extends generic.ParserBridge2[List[Func], List[Stat], Prog]
 
 case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat]) extends Node
-object Func extends generic.ParserBridge4[Type, String, List[Param], List[Stat], Func]
+object Func extends generic.ParserBridge3[(Type, String), List[Param], List[Stat], Func] {
+    def apply(tuple: (Type, String), params: List[Param], stats: List[Stat]) = tuple match {
+        case (retType, name) => Func(retType, name, params, stats)
+    } 
+}
 
 case class Param(declType: Type, name: String) extends Node
 object Param                                   extends generic.ParserBridge2[Type, String, Param]
@@ -63,17 +63,30 @@ case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat]) extends Stat
 case class While(cond: Expr, stats: List[Stat])                     extends Stat
 case class Scope(stats: List[Stat])                                 extends Stat
 
-object AssignNew extends generic.ParserBridge3[Type, String, RValue, Stat]
-object Assign    extends generic.ParserBridge2[LValue, RValue, Stat]
-object Read      extends generic.ParserBridge1[LValue, Stat]
+object AssignNew extends generic.ParserBridge3[Type, String, RValue, Stat] 
+object Assign    extends generic.ParserBridge2[LValue, RValue, Stat] {
+    override def labels = List{"assignment"}
+}
+object Read      extends generic.ParserBridge1[LValue, Stat] {
+    override def labels = List{"read"}
+}
 object Free      extends generic.ParserBridge1[Expr, Stat]
-object Return    extends generic.ParserBridge1[Expr, Stat]
+object Return    extends generic.ParserBridge1[Expr, Stat] {
+    override def labels = List{"return"}
+}
 object Exit      extends generic.ParserBridge1[Expr, Stat]
 object Print     extends generic.ParserBridge1[Expr, Stat]
 object Println   extends generic.ParserBridge1[Expr, Stat]
-object If        extends generic.ParserBridge3[Expr, List[Stat], List[Stat], Stat]
-object While     extends generic.ParserBridge2[Expr, List[Stat], Stat]
-object Scope     extends generic.ParserBridge1[List[Stat], Stat]
+object If        extends generic.ParserBridge3[Expr, List[Stat], List[Stat], Stat] {
+    override def labels = List{"if"}
+}
+object While     extends generic.ParserBridge2[Expr, List[Stat], Stat] {
+    override def labels = List{"while"}
+}
+object Scope     extends generic.ParserBridge1[List[Stat], Stat] {
+    override def labels = List{"new scope"}
+    override def reason = Some("all program body and function declarations must be within `begin` and `end`")
+}
 
 sealed trait LValue extends Node
 sealed trait RValue extends Node

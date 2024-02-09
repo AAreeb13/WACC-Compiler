@@ -16,6 +16,7 @@ import parsley.expr.Prefix
 import parsley.expr.chain
 import parsley.expr.precedence
 import parsley.syntax.zipped._
+import parsley.errors.patterns.VerifiedErrors
 
 import Parsley._
 import lexer._
@@ -33,10 +34,12 @@ object parser {
 
     lazy val parser: Parsley[Node] = fully(prog)
 
+    val _semicheck = "end".verifiedExplain("semi-colons may not appear at the end of a block") 
+
     ////////// TYPE PARSER ///////////
-    lazy val declType: Parsley[Type] = (arrayType |
+    lazy val declType: Parsley[Type] = arrayType |
         pairType |
-        baseType).label("declarable Type").explain("declarable types are: arrayType, pairType and baseType")
+        baseType
 
     lazy val baseType: Parsley[BaseType] = ((IntType.from("int")) |
         (StringType.from("string")) |
@@ -76,32 +79,31 @@ object parser {
         "WACC programs must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
         "WACC programs must finish with end")
     lazy val funcList = many(func)
-    lazy val func = atomic(
-      Func(
-        declType,
-        ident,
-        "(" ~> paramList <~ ")",
-        "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"
-      )
-    )
+    lazy val func = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end")
+    //   Func(
+    //     declType,
+    //     ident,
+    //     "(" ~> paramList <~ ")",
+    //     "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"
+    //   )
+    
 
     lazy val paramList = sepBy(param, ",")
     lazy val param     = Param(declType, ident)
-
-    lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt, ";")
+    lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt | _semicheck, ";")
 
     lazy val stmt = "skip".as(Skip) |
         AssignNew(declType, ident <~ "=", rvalue) |
-        (Assign(atomic(lvalue <~ "="), rvalue)).label("assignment") |
-        Read("read" ~> lvalue).hide |
+        (Assign(atomic(lvalue <~ "="), rvalue)) |
+        Read("read" ~> lvalue) |
         Free("free" ~> expr).hide |
-        Return("return" ~> expr).label("return statement") |
+        Return("return" ~> expr) |
         Exit("exit" ~> expr).hide |
         Print("print" ~> expr).hide |
         Println("println" ~> expr).hide |
-        (If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")).label("if statement") |
-        (While("while" ~> expr, "do" ~> stmtList <~ "done")).label("while loop") |
-        Scope("begin" ~> stmtList <~ "end").hide
+        (If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")) |
+        (While("while" ~> expr, "do" ~> stmtList <~ "done")) |
+        Scope("begin" ~> stmtList <~ "end")
 
     lazy val lvalue: Parsley[LValue] = VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
         pairElem

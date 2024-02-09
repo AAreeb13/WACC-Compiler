@@ -13,6 +13,7 @@ import parsley.token.predicate
 
 class parserAtomTest extends AnyFlatSpec {
     val atomParser = lexer.fully(parser.atom)
+    val funcParser = lexer.fully(parser.func)
 
     "An atom" should "match an integer value" in {
         atomParser.parse("1") shouldBe Success(IntVal(1))
