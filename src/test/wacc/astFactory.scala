@@ -12,7 +12,7 @@ object astFactory {
 
     def Prog(funcs: List[ast.Func], stats: List[ast.Stat]) = ast.Prog.default(funcs, stats)
 
-    def Func(retType: ast.Type, name: String, params: List[ast.Param], stats: List[ast.Stat]) = ast.Func.default(retType, name, params, stats)
+    def Func(retType: ast.Type, name: String, params: List[ast.Param], stats: List[ast.Stat]) = ast.Func.default((retType, name), params, stats)
 
     def Param(declType: ast.Type, name: String) = ast.Param.default(declType, name)
 
