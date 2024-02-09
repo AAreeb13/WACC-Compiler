@@ -188,9 +188,15 @@ object StringType extends ParserBridge0[BaseType] {
     override def labels = List{"type"}
 }
 
-object ArrayType extends ParserBridge1[Type, Type]
-object PairType extends ParserBridge2[Type, Type, Type]
-object ErasedPair extends ParserBridge0[Type]
+object ArrayType extends ParserBridge1[Type, Type] {
+    override def labels = List{"type"}
+}
+object PairType extends ParserBridge2[Type, Type, Type] {
+    override def labels = List{"type"}
+}
+object ErasedPair extends ParserBridge0[Type] {
+    override def labels = List{"type"}
+}
 
 object Prog extends ParserBridge2[List[Func], List[Stat], Prog]
 object Func extends ParserBridge3[(Type, String), List[Param], List[Stat], Func] {
