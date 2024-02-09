@@ -37,6 +37,7 @@ case class ErasedPair()(val pos: (Int, Int)) extends Type {
 
 case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node
 
+
 case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node {
     override def toString = s"Func($retType,\"$name\",$params,$stats)"
 }
@@ -171,50 +172,93 @@ case class Len(x: Expr)(val pos: (Int, Int)) extends UnOp
 case class Ord(x: Expr)(val pos: (Int, Int)) extends UnOp
 case class Chr(x: Expr)(val pos: (Int, Int)) extends UnOp
 
-
-
 ////////////////////////////////////////////////////////
 
 
-object IntType extends ParserBridge0[BaseType]
-object CharType extends ParserBridge0[BaseType]
-object BoolType extends ParserBridge0[BaseType]
-object StringType extends ParserBridge0[BaseType]
+object IntType extends ParserBridge0[BaseType] {
+    override def labels = List{"type"}
+}
+object CharType extends ParserBridge0[BaseType] {
+    override def labels = List{"type"}
+}
+object BoolType extends ParserBridge0[BaseType] {
+    override def labels = List{"type"}
+}
+object StringType extends ParserBridge0[BaseType] {
+    override def labels = List{"type"}
+}
 
 object ArrayType extends ParserBridge1[Type, Type]
 object PairType extends ParserBridge2[Type, Type, Type]
 object ErasedPair extends ParserBridge0[Type]
 
 object Prog extends ParserBridge2[List[Func], List[Stat], Prog]
-object Func extends ParserBridge4[Type, String, List[Param], List[Stat], Func]
+object Func extends ParserBridge3[(Type, String), List[Param], List[Stat], Func] {
+    def apply(tuple: (Type, String), params: List[Param], stats: List[Stat])(pos: (Int, Int) = (0, 0)) = tuple match {
+        case (retType, name) => Func(retType, name, params, stats)(pos)
+    }
+}
 object Param extends ParserBridge2[Type, String, Param]
 
 object Skip      extends ParserBridge0[Stat]
 object AssignNew extends ParserBridge3[Type, String, RValue, Stat]
-object Assign    extends ParserBridge2[LValue, RValue, Stat]
-object Read      extends ParserBridge1[LValue, Stat]
+object Assign    extends ParserBridge2[LValue, RValue, Stat] {
+    override def labels = List{"assignment"}
+}
+object Read      extends ParserBridge1[LValue, Stat]  {
+    override def labels = List{"read"}
+}
 object Free      extends ParserBridge1[Expr, Stat]
-object Return    extends ParserBridge1[Expr, Stat]
+object Return    extends ParserBridge1[Expr, Stat] {
+    override def labels = List{"return"}
+}
 object Exit      extends ParserBridge1[Expr, Stat]
 object Print     extends ParserBridge1[Expr, Stat]
 object Println   extends ParserBridge1[Expr, Stat]
-object If        extends ParserBridge3[Expr, List[Stat], List[Stat], Stat]
-object While     extends ParserBridge2[Expr, List[Stat], Stat]
-object Scope     extends ParserBridge1[List[Stat], Stat]
+object If        extends ParserBridge3[Expr, List[Stat], List[Stat], Stat] {
+    override def labels = List{"if"}
+}
+object While     extends ParserBridge2[Expr, List[Stat], Stat] {
+    override def labels = List{"while"}
+}
+object Scope     extends ParserBridge1[List[Stat], Stat] {
+    override def labels = List{"new scope"}
+    override def reason = Some("all program body and function declarations must be within `begin` and `end`")
+}
 
-object FstPair      extends ParserBridge1[LValue, PairElem]
-object SndPair      extends ParserBridge1[LValue, PairElem]
+object FstPair      extends ParserBridge1[LValue, PairElem] {
+    override def labels = List("value", "identifier")
+}
+object SndPair      extends ParserBridge1[LValue, PairElem] {
+    override def labels = List("value", "identifier")
+}
 object ArrayLiteral extends ParserBridge1[List[Expr], RValue]
-object PairCons     extends ParserBridge2[Expr, Expr, RValue]
-object FuncCall     extends ParserBridge2[String, List[Expr], RValue]
+object PairCons     extends ParserBridge2[Expr, Expr, RValue] {
+    override def labels = List("value", "identifier")
+}
+object FuncCall     extends ParserBridge2[String, List[Expr], RValue] {
+    override def labels = List("value", "identifier")
+}
 
-object PairVal extends ParserBridge0[Expr]
-object IntVal  extends ParserBridge1[BigInt, Expr]
-object CharVal extends ParserBridge1[Char, Expr]
-object BoolVal extends ParserBridge1[Boolean, Expr]
-object StrVal  extends ParserBridge1[String, Expr]
+object PairVal extends ParserBridge0[Expr] {
+    override def labels = List("value", "identifier")
+}
+object IntVal  extends ParserBridge1[BigInt, Expr] {
+    override def labels = List("value", "identifier")
+}
+object CharVal extends ParserBridge1[Char, Expr] {
+    override def labels = List("value", "identifier")
+}
+object BoolVal extends ParserBridge1[Boolean, Expr] {
+    override def labels = List("value", "identifier")
+}
+object StrVal  extends ParserBridge1[String, Expr] {
+    override def labels = List("value", "identifier")
+}
 object Var     extends ParserBridge1[String, Expr with LValue]
-object ArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue]
+object ArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue] {
+    override def labels = List("value", "identifier")
+}
 
 object Mul     extends ParserBridge2[Expr, Expr, Expr]
 object Div     extends ParserBridge2[Expr, Expr, Expr]
@@ -230,10 +274,27 @@ object NotEql  extends ParserBridge2[Expr, Expr, Expr]
 object And     extends ParserBridge2[Expr, Expr, Expr]
 object Or      extends ParserBridge2[Expr, Expr, Expr]
 
-object Not extends ParserBridge1[Expr, Expr]
-object Neg extends ParserBridge1[Expr, Expr]
-object Len extends ParserBridge1[Expr, Expr]
-object Ord extends ParserBridge1[Expr, Expr]
-object Chr extends ParserBridge1[Expr, Expr]
+object Not extends ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Neg extends ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Len extends ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Ord extends ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+object Chr extends ParserBridge1[Expr, Expr] {
+    override def labels = List("value", "identifier")
+}
+
+object VarOrArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue] {
+    def apply(_expr: String, exprs: List[Expr])(pos: (Int, Int) = (0, 0)): Expr with LValue = exprs match {
+        case head :: next => ArrayVal(_expr, exprs)(pos)
+        case Nil => Var(_expr)(pos)
+    }
+}
 
 }

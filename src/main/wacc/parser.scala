@@ -16,6 +16,7 @@ import parsley.expr.Prefix
 import parsley.expr.chain
 import parsley.expr.precedence
 import parsley.syntax.zipped._
+import parsley.errors.patterns.VerifiedErrors
 
 import Parsley._
 import lexer._
@@ -35,15 +36,17 @@ object parser {
 
     lazy val parser: Parsley[Node] = fully(prog)
 
+    val _semicheck = "end".verifiedExplain("semi-colons may not appear at the end of a block") 
+
     ////////// TYPE PARSER ///////////
     lazy val declType: Parsley[Type] = arrayType |
         pairType |
         baseType
 
-    lazy val baseType: Parsley[BaseType] = (IntType.from("int")) |
+    lazy val baseType: Parsley[BaseType] = ((IntType.from("int")) |
         (StringType.from("string")) |
         (CharType.from("char")) |
-        (BoolType.from("bool"))
+        (BoolType.from("bool")))
 
     lazy val arrayType: Parsley[Type]
     // = precedence(baseType, pairType)(Ops(Postfix)(ArrayType from "[" <~> "]"))
@@ -74,35 +77,37 @@ object parser {
 
     ////////// STAT PARSER ///////////
 
-    lazy val prog     = "begin" ~> Prog(funcList, stmtList) <~ "end"
+    lazy val prog     = "begin".explain(
+        "WACC programs must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
+        "WACC programs must finish with end")
     lazy val funcList = many(func)
-    lazy val func = atomic(Func(
-        declType,
-        ident,
-        "(" ~> paramList <~ ")",
-        "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"
-    ))
+    lazy val func = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end")
+    //   Func(
+    //     declType,
+    //     ident,
+    //     "(" ~> paramList <~ ")",
+    //     "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"
+    //   )
+    
 
     lazy val paramList = sepBy(param, ",")
     lazy val param     = Param(declType, ident)
-
-    lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt, ";")
+    lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt | _semicheck, ";")
 
     lazy val stmt = (Skip from "skip") |
         AssignNew(declType, ident <~ "=", rvalue) |
-        Assign(atomic(lvalue <~ "="), rvalue) |
+        (Assign(atomic(lvalue <~ "="), rvalue)) |
         Read("read" ~> lvalue) |
-        Free("free" ~> expr) |
+        Free("free" ~> expr).hide |
         Return("return" ~> expr) |
-        Exit("exit" ~> expr) |
-        Print("print" ~> expr) |
-        Println("println" ~> expr) |
-        If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi") |
-        While("while" ~> expr, "do" ~> stmtList <~ "done") |
+        Exit("exit" ~> expr).hide |
+        Print("print" ~> expr).hide |
+        Println("println" ~> expr).hide |
+        (If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")) |
+        (While("while" ~> expr, "do" ~> stmtList <~ "done")) |
         Scope("begin" ~> stmtList <~ "end")
 
-    lazy val lvalue: Parsley[LValue] = arrayElem |
-        Var(ident) |
+    lazy val lvalue: Parsley[LValue] = VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
         pairElem
 
     lazy val rvalue: Parsley[RValue] = expr |
@@ -115,7 +120,7 @@ object parser {
     lazy val pairElem: Parsley[PairElem] = FstPair("fst" ~> lvalue) |
         SndPair("snd" ~> lvalue)
 
-    lazy val arrayLiteral = ArrayLiteral("[" ~> sepBy(expr, ",") <~ "]")
+    lazy val arrayLiteral = ArrayLiteral("[".hide ~> sepBy(expr, ",") <~ "]")
 
     // private lazy val asgns = endBy(atomic(asgn), ";")
     // private lazy val asgn = Asgn(atomic(ident <~ "="), expr)
@@ -127,11 +132,12 @@ object parser {
         CharVal(charLiteral) |
         StrVal(stringLiteral) |
         (PairVal.from(pairLiteral)) |
-        atomic(arrayElem) |
-        Var(ident) |
-        ("(" ~> expr <~ ")")
+        VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
+        ("(".hide ~> expr <~ ")")
+        // Var(ident).debug("variable") |
+        
 
-    lazy val arrayElem = atomic(ArrayVal(ident, some("[" ~> expr <~ "]")))
+    lazy val arrayElem = VarOrArrayVal(ident, many("[" ~> expr <~ "]"))
 
     // todo: fix problem with parsing len/ord/chr
     lazy val expr: Parsley[Expr] =

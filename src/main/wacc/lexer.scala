@@ -111,7 +111,7 @@ object lexer {
     val charLiteral                 = lexer.lexeme.character.ascii
     val stringLiteral               = lexer.lexeme.string.ascii
     val pairLiteral                 = lexer.lexeme.symbol("null")
-    val boolLiteral                 = lexer.lexeme.symbol("true").as(true) | lexer.lexeme.symbol("false").as(false)
+    val boolLiteral                 = lexer.lexeme.symbol("false").as(false) | lexer.lexeme.symbol("true").as(true) 
 
     val implicits = lexer.lexeme.symbol.implicits
 }
