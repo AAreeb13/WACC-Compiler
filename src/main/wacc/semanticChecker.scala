@@ -39,7 +39,7 @@ class Analyser(val prog: Prog) {
         if (expected.exists(actual reducesTo _))
             actual
         else {
-            errList.addOne(s"Type error: Expected: ${expected.mkString(", ")} but received $actual instead")
+            errList.addOne(s"Type error: Expected ${expected.mkString(", ")} but received $actual instead")
             SemNone
         }
 
@@ -77,7 +77,13 @@ class Analyser(val prog: Prog) {
 
             case Free(expr) => checkExpression(expr) match {
                     case SemArray(_) | SemNull | SemPair(_, _) =>
-                    case other => errList.addOne(s"Type error: Expected an array or pair type but got $other instead")
+                    case other => errList.addOne(s"Type error: Expected at least a 1-dimensional array or pair type but got $other instead")
+                    // case SemNone => errList.addOne(s"Type error: Expected at least a 1-dimensional array or pair type but got $SemNone instead")
+                    // case other => expr match {
+                    //     case ArrayVal(_, es) => errList.addOne(s"Type error: Expected at least a ${es.size + 1}-dimensional array or pair${"[]" * es.size} type but got $other instead")
+                    //     case _ => errList.addOne(s"Type error: Expected at least a 1-dimensional array or pair type but got $other instead")
+                    // }
+                        
                 }
 
             case Print(expr) => checkExpression(expr)
