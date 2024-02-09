@@ -15,8 +15,8 @@ case class SemanticError(position: (Int, Int), fileName: String, lines: Error, c
             case argSizeFunc : ArgSizeFunc => formatStr.append("Function call error")
             case specialError: SpecialError => formatStr.append(specialError.errType)
         }
-        formatStr.append(s" in ${fileName} ${position}")
-        formatStr.append(lines.formatError())
+        formatStr.append(s" in ${fileName} ${position}\n")
+        formatStr.append(lines.formatError() + "\n")
         for (codeline: String <- codeSnippet) {
             formatStr.append(s"${codeline}\n")
         }
@@ -101,7 +101,7 @@ class SemanticErrorCollector(fileName : String, input : String) {
 
     def formatErrors : String = {
         val builder = new StringBuilder
-        builder.append("Errors detected during compilation! Exit code 200 returned.")
+        builder.append("Errors detected during compilation! Exit code 200 returned. ")
         for (errorLine <- getSemanticErrors) {
             builder.append(errorLine.formatFullError() + "\n\n")
         }
