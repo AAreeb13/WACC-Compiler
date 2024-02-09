@@ -15,6 +15,7 @@ import parsley.token.predicate
 
 class parserStatementTest extends AnyFlatSpec {
     val statParser = lexer.fully(parser.stmt)
+    val funcParser = lexer.fully(parser.func)
 
     "\'skip\'" should "match stmt" in {
         statParser.parse("skip") shouldBe Success(Skip)
