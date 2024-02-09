@@ -227,38 +227,44 @@ object Scope     extends ParserBridge1[List[Stat], Stat] {
 }
 
 object FstPair      extends ParserBridge1[LValue, PairElem] {
-    override def labels = List("value", "identifier")
+    override def labels = List("fst")
 }
 object SndPair      extends ParserBridge1[LValue, PairElem] {
-    override def labels = List("value", "identifier")
+    override def labels = List("snd")
 }
-object ArrayLiteral extends ParserBridge1[List[Expr], RValue]
-object PairCons     extends ParserBridge2[Expr, Expr, RValue] {
-    override def labels = List("value", "identifier")
+object ArrayLiteral extends ParserBridge1[List[Expr], RValue] {
+    override def labels = List{"array literal"}
 }
+object PairCons     extends ParserBridge2[Expr, Expr, RValue] 
 object FuncCall     extends ParserBridge2[String, List[Expr], RValue] {
-    override def labels = List("value", "identifier")
+    override def labels = List{"function call"}
 }
 
 object PairVal extends ParserBridge0[Expr] {
-    override def labels = List("value", "identifier")
+    override def labels = List("pair literal")
 }
 object IntVal  extends ParserBridge1[BigInt, Expr] {
-    override def labels = List("value", "identifier")
+    override def labels = List("expression")
+    override def reason = Some("expressions may start with integer, string, character or boolean literals; identifiers; unary operators; null; or parentheses\n" +
+      "in addition, expressions may contain array indexing operations; and comparison, logical, and arithmetic operators")
 }
 object CharVal extends ParserBridge1[Char, Expr] {
-    override def labels = List("value", "identifier")
+    override def labels = List("expression")
+    override def reason = Some("expressions may start with integer, string, character or boolean literals; identifiers; unary operators; null; or parentheses\n" +
+      "in addition, expressions may contain array indexing operations; and comparison, logical, and arithmetic operators")
 }
 object BoolVal extends ParserBridge1[Boolean, Expr] {
-    override def labels = List("value", "identifier")
+    override def labels = List("expression")
+    override def reason = Some("expressions may start with integer, string, character or boolean literals; identifiers; unary operators; null; or parentheses\n" +
+      "in addition, expressions may contain array indexing operations; and comparison, logical, and arithmetic operators")
 }
 object StrVal  extends ParserBridge1[String, Expr] {
-    override def labels = List("value", "identifier")
+    override def labels = List("expression")
+    override def reason = Some("expressions may start with integer, string, character or boolean literals; identifiers; unary operators; null; or parentheses\n" +
+      "in addition, expressions may contain array indexing operations; and comparison, logical, and arithmetic operators")
 }
 object Var     extends ParserBridge1[String, Expr with LValue]
-object ArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue] {
-    override def labels = List("value", "identifier")
-}
+object ArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue]
 
 object Mul     extends ParserBridge2[Expr, Expr, Expr]
 object Div     extends ParserBridge2[Expr, Expr, Expr]
@@ -272,29 +278,20 @@ object LessEql extends ParserBridge2[Expr, Expr, Expr]
 object Eql     extends ParserBridge2[Expr, Expr, Expr]
 object NotEql  extends ParserBridge2[Expr, Expr, Expr]
 object And     extends ParserBridge2[Expr, Expr, Expr]
-object Or      extends ParserBridge2[Expr, Expr, Expr]
+object Or      extends ParserBridge2[Expr, Expr, Expr]  
 
-object Not extends ParserBridge1[Expr, Expr] {
-    override def labels = List("value", "identifier")
-}
-object Neg extends ParserBridge1[Expr, Expr] {
-    override def labels = List("value", "identifier")
-}
-object Len extends ParserBridge1[Expr, Expr] {
-    override def labels = List("value", "identifier")
-}
-object Ord extends ParserBridge1[Expr, Expr] {
-    override def labels = List("value", "identifier")
-}
-object Chr extends ParserBridge1[Expr, Expr] {
-    override def labels = List("value", "identifier")
-}
+object Not extends ParserBridge1[Expr, Expr] 
+object Neg extends ParserBridge1[Expr, Expr] 
+object Len extends ParserBridge1[Expr, Expr]
+object Ord extends ParserBridge1[Expr, Expr]
+object Chr extends ParserBridge1[Expr, Expr]
 
 object VarOrArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue] {
     def apply(_expr: String, exprs: List[Expr])(pos: (Int, Int) = (0, 0)): Expr with LValue = exprs match {
         case head :: next => ArrayVal(_expr, exprs)(pos)
         case Nil => Var(_expr)(pos)
     }
+    override def labels = List{"array literal"}
 }
 
 }
