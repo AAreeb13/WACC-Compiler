@@ -5,20 +5,17 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
 
 class  SemanticErrorTest extends AnyFlatSpec  {
-  def main(args: Array[String]): Unit = {
-    // Create a SemanticErrorCollector instance
-    val errorCollector = new SemanticErrorCollector("testFile", "")
+    val errorCollector = new SemanticErrorCollector("testFile.wacc", "")
 
     // Add some sample errors
-    errorCollector.addError((5, 10), ScopeError("variable", "redec", 3))
-    errorCollector.addError((8, 20), UndefFunc("foo"))
-    errorCollector.addError((10, 5), RedefFunc("bar", 7))
-    errorCollector.addError((12, 15), ArgSizeFunc("baz", 3, 2))
-
     // Get the collected errors and format them
-    val formattedErrors = errorCollector.formatErrors
 
-    // Print the formatted errors
-    println(formattedErrors)
-  }
+
+    "ScopeError class with redeclared variable" should " display correct error type, variable name, and error location in a message" in {
+       ScopeError("variable", "redec", 3).formatError() shouldBe "illegal redeclaration of variable \"variable\"\npreviously declared on line 3"
+    }
+    "ScopeError class with undeclared variable" should " display correct error type, variable name, and error location in a message" in {
+       ScopeError("variable", "undec", 3).formatError() shouldBe "variable \"variable\" has not been declared in this scope\n"
+    }
+
 }

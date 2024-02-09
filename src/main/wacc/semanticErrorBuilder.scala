@@ -34,7 +34,7 @@ case class TypeError(unexpected: String, expected: String) extends Error {
     override def formatError(): String = s"unexpected ${unexpected}\nexpected ${expected} \n"   
 }
 
-case class ScopeError(variable: String, errType: String, lineNum : Int) extends Error {
+case class ScopeError(variable: String, errType: String, lineNum : Int = 0) extends Error {
     // errType = redec | undec
     override def formatError(): String = {
         errType match {
