@@ -4,7 +4,7 @@ import parsley.errors.ErrorBuilder
 import scala.collection.mutable.ListBuffer
 import parsley.position
 
-case class SemanticError(position: (Int, Int), fileName: String, lines: Error, codeSnippet : Seq[String]) {
+case class SemanticError(position: (Int, Int), fileName: String, lines: Error, codeSnippet : Seq[String], msg : String = "") {
     def formatFullError() : String = {
         val formatStr = new StringBuilder
         lines match {
@@ -17,6 +17,7 @@ case class SemanticError(position: (Int, Int), fileName: String, lines: Error, c
         }
         formatStr.append(s" in ${fileName} ${position}\n")
         formatStr.append(lines.formatError() + "\n")
+        formatStr.append(msg + "\n")
         for (codeline: String <- codeSnippet) {
             formatStr.append(s"${codeline}\n")
         }
@@ -37,17 +38,13 @@ case class ScopeError(variable: String, errType: String, lineNum : Int) extends 
     // errType = redec | undec
     override def formatError(): String = {
         errType match {
-            case "redec" => (s"illegal redeclaration of variable ${variable}" +
+            case "redec" => (s"illegal redeclaration of variable \"${variable}\"" +
               s"\npreviously declared on line ${lineNum}")
-            case "undec" => (s"variable ${variable} has not been declared in this scope\n")
+            case "undec" => (s"variable \"${variable}\" has not been declared in this scope\n")
         }
     }
 }
 
-
-sealed trait SpecialError extends Error {
-    val errType: String
-}
 
 trait FunctionError extends Error 
 case class UndefFunc(funName: String) extends FunctionError {
@@ -70,7 +67,9 @@ case class ArgSizeFunc(funName: String, unexpected : Int, expected : Int) extend
 
 }
 
-
+sealed trait SpecialError extends Error {
+    val errType: String
+}
 
 
 case class PairExchange() extends SpecialError {
