@@ -1,14 +1,17 @@
 
 // import parsley.errors.ErrorBuilder
 // import scala.collection.mutable.ListBuffer
+// import parsley.position
 
 // case class SemanticError(position: (Int, Int), fileName: String, lines: Error, codeSnippet : Seq[String]) {
 //     def formatFullError() : String = {
 //         val formatStr = new StringBuilder
-//         formatStr.append("Exit code 200 returned.\n")
 //         lines match {
-//             case typeError: TypeError => formatStr.append(s"Type error")
-//             case scopeError: ScopeError => formatStr.append(s"Scope error")
+//             case typeError: TypeError => formatStr.append("Type error")
+//             case scopeError: ScopeError => formatStr.append("Scope error")
+//             case undefFunc : UndefFunc => formatStr.append("Undefined function error")
+//             case redefFunc : RedefFunc => formatStr.append("Function Scope Error")
+//             case argSizeFunc : ArgSizeFunc => formatStr.append("Function call error")
 //             case specialError: SpecialError => formatStr.append(specialError.errType)
 //         }
 //         formatStr.append(s" in ${fileName} ${position}")
@@ -40,7 +43,7 @@
 //     }
 // }
 
-// // Function Errors: Redefining function, Undefined function
+
 // sealed trait SpecialError extends Error {
 //     val errType: String
 // }
@@ -61,8 +64,8 @@
 
 // case class ArgSizeFunc(funName: String, unexpected : Int, expected : Int) extends FunctionError {
 
-//   override def formatError(): String = s"Wrong number of arguments provided to function ${funName}\n"
-//   + s"unexpected ${unexpected} arguments\nexpected ${expected} arguments"
+//   override def formatError(): String = s"Wrong number of arguments provided to function ${funName}\n" +
+//   s"unexpected ${unexpected} arguments\nexpected ${expected} arguments"
 
 // }
 
@@ -77,18 +80,19 @@
 
 // }
 
-// sealed trait ErrorItem
-// case class SemanticRaw(item: String) extends ErrorItem
-// case class SemanticNamed(item: String) extends ErrorItem
-// case object SemanticEndOfInput extends  ErrorItem
+// // sealed trait ErrorItem
+// // case class SemanticRaw(item: String) extends ErrorItem
+// // case class SemanticNamed(item: String) extends ErrorItem
+// // case object SemanticEndOfInput extends  ErrorItem
 
-// class SemanticErrorCollector(builder: SemanticErrorBuilder, fileName: String ) {
+// class SemanticErrorCollector(fileName : String, input : String) {
 //     // Mutable list buffer to store semantic errors
 //     private val semanticErrors: ListBuffer[SemanticError] = ListBuffer.empty
+//     private val wholeCodeArray : Array[String] = input.split("(?<=\n)")
     
 //     // Method to add a new semantic error
 //     def addError(position: (Int, Int), lines: Error): Unit = {
-//         semanticErrors += builder.format(position, "Dummy fileName", lines)
+//         semanticErrors += new SemanticError(position, fileName, lines, getCodeSnippet(position))
 //     }
     
 //     // Method to get the collected semantic errors
@@ -96,16 +100,27 @@
 
 //     def formatErrors : String = {
 //         val builder = new StringBuilder
-//         builder.append(s"Semantic Errors in ${fileName}\n")
+//         builder.append("Errors detected during compilation! Exit code 200 returned.")
 //         for (errorLine <- getSemanticErrors) {
-//             builder.append(errorLine.formatFullError())
+//             builder.append(errorLine.formatFullError() + "\n\n")
 //         }
 //         return builder.toString()
 //     }
+
+//     def getCodeSnippet (position:(Int, Int), linesAbove: Int = 2, linesBelow: Int = 2): Seq[String] = {
+//       var codelines: ListBuffer[String] = ListBuffer.empty
+//       for (lineNo <- position._1 - linesAbove to position._1 + linesBelow) {
+//                   if (lineNo >= 1 && lineNo <= wholeCodeArray.length) {
+//                 codelines.append(s"|${lineNo}     ${wholeCodeArray(lineNo - 1)}")
+//             }
+//         }
+//         return codelines.toSeq
+
+//     }
 // }
 
-// // input hold
-// class SemanticErrorBuilder(implicit val input: String) {
+// input hold
+// class SemanticErrorBuilder(implicit val input: String, fileName: String) {
     
 
 //     // THe whole code file line by line.
@@ -113,7 +128,7 @@
 
 //     def format(pos: (Int, Int), source: String, lines: ErrorInfoLines): SemanticError = {
 //         val codeSnippet = getCodeSnippet(pos)
-//         SemanticError(position = pos, fileName = "Dummy file name", lines = UndefinedFunc("Nothing"), codeSnippet = codeSnippet)
+//         SemanticError(position = pos, fileName = fileName, lines = UndefinedFunc("Nothing"), codeSnippet = codeSnippet)
 //     }
 
 //     type Position = (Int, Int)
@@ -142,16 +157,7 @@
 //     // def reason(reason: String): Message = reason
 //     // def message(msg: String): Message = msg
 
-//     def getCodeSnippet (position:(Int, Int), linesAbove: Int = 2, linesBelow: Int = 2): Seq[String] = {
-//         var codelines: ListBuffer[String] = ListBuffer.empty
-//         for (lineNo <- position._1 - linesAbove to position._1 + linesBelow) {
-//             if (lineNo >= 1 && lineNo <= wholeCodeArray.length) {
-//                 codelines.append(s"|${lineNo}     ${wholeCodeArray(lineNo - 1)}")
-//             }
-//         }
-//         return codelines.toSeq
 
-//     }
 // }
 
 
