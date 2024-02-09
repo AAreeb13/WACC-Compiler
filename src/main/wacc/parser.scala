@@ -103,8 +103,7 @@ object parser {
         (While("while" ~> expr, "do" ~> stmtList <~ "done")).label("while loop") |
         Scope("begin" ~> stmtList <~ "end").hide
 
-    lazy val lvalue: Parsley[LValue] = arrayElem |
-        Var(ident) |
+    lazy val lvalue: Parsley[LValue] = VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
         pairElem
 
     lazy val rvalue: Parsley[RValue] = expr |
@@ -124,14 +123,15 @@ object parser {
 
     ////////// EXPR PARSER ///////////
 
-    lazy val atom = IntVal(intLiteral).debug("int") |
+    lazy val atom = IntVal(intLiteral) |
         BoolVal(boolLiteral) |
         CharVal(charLiteral) |
         StrVal(stringLiteral) |
         (PairVal.from(pairLiteral)) |
-        arrayElem.debug("arrayyyyy") |
-        Var(ident).debug("variable") |
+        VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
         ("(".hide ~> expr <~ ")")
+        // Var(ident).debug("variable") |
+        
 
     lazy val arrayElem = VarOrArrayVal(ident, many("[" ~> expr <~ "]"))
 
@@ -139,7 +139,7 @@ object parser {
     lazy val expr: Parsley[Expr] =
         precedence(atom)(
             Ops(Prefix)(
-                Not.from("!").debug("not"),
+                Not.from("!"),
                 Neg.from(atomic("-" <~ notFollowedBy(digit))),
                 Len.from(atomic("len")),
                 Ord.from(atomic("ord")),
@@ -150,6 +150,6 @@ object parser {
             Ops(InfixN)(Grt.from(">"), GrtEql.from(">="), Less.from("<"), LessEql.from("<=")),
             Ops(InfixN)(Eql.from("=="), NotEql.from("!=")),
             Ops(InfixR)(And.from("&&")),
-            Ops(InfixR)(Or.from("||").debug("or"))
+            Ops(InfixR)(Or.from("||"))
         )
 }

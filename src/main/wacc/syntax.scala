@@ -138,8 +138,8 @@ object ArrayVal                                   extends generic.ParserBridge2[
     override def labels = List("value", "identifier")
 }
 
-object VarOrArrayVal extends ParserBridge2[Expr, List[Expr], Expr] {
-    def apply(_expr: Expr, exprs: List[Expr]): Expr = exprs match {
+object VarOrArrayVal extends generic.ParserBridge2[String, List[Expr], Expr with LValue] {
+    def apply(_expr: String, exprs: List[Expr]): Expr with LValue = exprs match {
         case head :: next => ArrayVal(_expr, exprs)
         case Nil => Var(_expr)
     }
