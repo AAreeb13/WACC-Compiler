@@ -16,13 +16,15 @@ import parsley.expr.Prefix
 import parsley.expr.chain
 import parsley.expr.precedence
 import parsley.syntax.zipped._
+import java.io.File
 import parsley.errors.patterns.VerifiedErrors
 
 import Parsley._
 import lexer._
 import lexer.implicits.implicitSymbol
-
+import scala.util
 import ast._
+import scala.util
 
 object parser {
     // the Err: ErrorBuilder here is saying that the compiler must be able to find a value
@@ -31,8 +33,11 @@ object parser {
     // it differently
     // If you like, you can think of it as having type:
     // def parse(input: String): Either[String, Prog]
-    def parse[Err: ErrorBuilder](input: String): Result[Err, Node] = parser.parse(input)
-    // def parse[Err: ErrorBuilder](input: String) = parser.parse(input)
+    def parseFile(path: String): Result[String, Node] = parser.parseFile(new File(path)) match {
+        case util.Success(v) => v
+        case util.Failure(_) => parsley.Failure("IO Exception")
+    }
+    def parse(input: String) = parser.parse(input)
 
     lazy val parser: Parsley[Node] = fully(prog)
 
