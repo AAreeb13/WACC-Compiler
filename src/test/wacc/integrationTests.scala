@@ -66,12 +66,13 @@ class IntegrationTest extends AnyFlatSpec {
         val input = Source.fromFile(path).mkString
 
         var result = parser.parse(input).toEither
+        val ec = new SemanticErrorCollector(Some(path), input)
         result match {
             case Left(err) =>
                 return (path, input ++ aBunchOfDashes(path) ++ err, exitSyntaxErr)
 
             case Right(_) =>
-                result = semanticChecker.verify(result)
+                result = semanticChecker.verify(result, Some(ec))
         }
 
         result match {

@@ -8,35 +8,40 @@ object Main {
     val exitSemanticErr = 200;
 
     def main(args: Array[String]): Unit = {
-        val input = args.headOption match {
-            case None =>
-            println("Command line input not found, defaulting to file input (in.txt)")
-            Source.fromFile("in.txt").mkString
-            case Some(path) =>
-                Source.fromFile(path).mkString
-        }
+        val path = args.headOption.getOrElse("in.txt")
+
+        // val input = args.headOption match {
+        //     case None =>
+        //     println("Command line input not found, defaulting to file input (in.txt)")
+        //     Source.fromFile("in.txt").mkString
+        //     case Some(path) =>
+        //         Source.fromFile(path).mkString
+        // }
 
         // Syntax Analysis
 
+        //var result = parser.parseFile(path).toEither
+        val input = Source.fromFile(path).mkString
         var result = parser.parse(input).toEither
+        val ec = new SemanticErrorCollector(Some(path), input)
         result match {
             case Left(err) =>
                 println(err)
                 sys.exit(exitSyntaxErr)
 
             case Right(_) =>
-                result = semanticChecker.verify(result)
+                result = semanticChecker.verify(result, Some(ec))
         }
-
+        
         // Semantic Analysis
 
         result match {
             case Left(err) =>
-                println(s"$input\n$err")
+                println(s"$err")
                 sys.exit(exitSemanticErr)
 
             case Right(output) =>
-                println(s"$input => $output")
+                println(s"$output")
                 sys.exit(exitSuccess)
         }
 
