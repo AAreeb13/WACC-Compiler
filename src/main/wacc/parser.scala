@@ -2,7 +2,7 @@ package wacc
 
 import parsley.Parsley
 import parsley.Result
-import parsley.character.digit
+import parsley.character._
 import parsley.combinator._
 import parsley.debug._
 import parsley.errors.ErrorBuilder
@@ -26,24 +26,27 @@ import scala.util
 import ast._
 import scala.util
 
+/**
+  * File which handles parsing input and generating an AST from it
+  */
+
 object parser {
-    // the Err: ErrorBuilder here is saying that the compiler must be able to find a value
-    // of type ErrorBuilder[Err] to provide implicitly to this function. When you use this
-    // in the REPL, it will default to ErrorBuilder[String]. In part 3, the tests will instantiate
-    // it differently
-    // If you like, you can think of it as having type:
-    // def parse(input: String): Either[String, Prog]
     def parseFile(path: String): Result[String, Node] = parser.parseFile(new File(path)) match {
-        case util.Success(v) => v
+        case util.Success(result) => result
         case util.Failure(_) => parsley.Failure("IO Exception")
     }
+
     def parse(input: String) = parser.parse(input)
 
     lazy val parser: Parsley[Node] = fully(prog)
 
-    val _semicheck = "end".verifiedExplain("semi-colons may not appear at the end of a block") 
+    // verified explains for additional clarity
+    val _semicheck = "end".verifiedExplain("semi-colons may not appear at the end of a block")
+    val _equalscheck = "=".label("assignment")
+    val _opensqbrcheck = "[".label("array index") /* open square bracket check */
 
-    ////////// TYPE PARSER ///////////
+/*--------------------------------------- Type Parsers ---------------------------------------*/
+
     lazy val declType: Parsley[Type] = arrayType |
         pairType |
         baseType
@@ -54,10 +57,9 @@ object parser {
         (BoolType.from("bool")))
 
     lazy val arrayType: Parsley[Type]
-    // = precedence(baseType, pairType)(Ops(Postfix)(ArrayType from "[" <~> "]"))
-    = atomic(chain.postfix1(baseType | pairType)(ArrayType.from("[" <~> "]")))
+        = atomic(chain.postfix1(baseType | pairType)(ArrayType.from("[" <~> "]")))
 
-    lazy val pairType = PairType(atomic("pair" ~> "(") ~> pairElemType, "," ~> pairElemType <~ ")")
+    lazy val pairType = PairType("pair" ~> "(" ~> pairElemType, "," ~> pairElemType <~ ")")
 
     lazy val pairElemType = arrayType |
         baseType |
@@ -80,28 +82,20 @@ object parser {
             }
     }
 
-    ////////// STAT PARSER ///////////
+ /*--------------------------------------- Statement Parsers ---------------------------------------*/
 
-    lazy val prog     = "begin".explain(
-        "WACC programs must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
-        "WACC programs must finish with end")
+    lazy val prog = "begin".explain("A valid wacc program must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
+        "A valid wacc program must finish with end")
     lazy val funcList = many(func)
     lazy val func = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end")
-    //   Func(
-    //     declType,
-    //     ident,
-    //     "(" ~> paramList <~ ")",
-    //     "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end"
-    //   )
     
-
     lazy val paramList = sepBy(param, ",")
     lazy val param     = Param(declType, ident)
     lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt | _semicheck, ";")
 
     lazy val stmt = (Skip from "skip") |
         AssignNew(declType, ident <~ "=", rvalue) |
-        (Assign(atomic(lvalue <~ "="), rvalue)) |
+        (Assign(lvalue <~  _equalscheck, rvalue)) |
         Read("read" ~> lvalue) |
         Free("free" ~> expr).hide |
         Return("return" ~> expr) |
@@ -112,7 +106,7 @@ object parser {
         (While("while" ~> expr, "do" ~> stmtList <~ "done")) |
         Scope("begin" ~> stmtList <~ "end")
 
-    lazy val lvalue: Parsley[LValue] = VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
+    lazy val lvalue: Parsley[LValue] = VarOrArrayVal(ident, many(_opensqbrcheck ~> expr <~ "]")) |
         pairElem
 
     lazy val rvalue: Parsley[RValue] = expr |
@@ -127,10 +121,7 @@ object parser {
 
     lazy val arrayLiteral = ArrayLiteral("[".hide ~> sepBy(expr, ",") <~ "]")
 
-    // private lazy val asgns = endBy(atomic(asgn), ";")
-    // private lazy val asgn = Asgn(atomic(ident <~ "="), expr)
-
-    ////////// EXPR PARSER ///////////
+/*--------------------------------------- Expression Parsers ---------------------------------------*/
 
     lazy val atom = IntVal(intLiteral) |
         BoolVal(boolLiteral) |
@@ -139,20 +130,18 @@ object parser {
         (PairVal.from(pairLiteral)) |
         VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
         ("(".hide ~> expr <~ ")")
-        // Var(ident).debug("variable") |
-        
 
     lazy val arrayElem = VarOrArrayVal(ident, many("[" ~> expr <~ "]"))
 
-    // todo: fix problem with parsing len/ord/chr
+    // expression parsing using precedence
     lazy val expr: Parsley[Expr] =
         precedence(atom)(
             Ops(Prefix)(
                 Not.from("!"),
-                Neg.from(atomic("-" <~ notFollowedBy(digit))),
-                Len.from(atomic("len")),
-                Ord.from(atomic("ord")),
-                Chr.from(atomic("chr"))
+                Neg.from(atomic("-" <~ notFollowedBy(digit))), // so that negative integer literals can be parsed properly
+                Len.from("len"),
+                Ord.from("ord"),
+                Chr.from("chr")
             ),
             Ops(InfixL)(Mul.from("*"), Mod.from("%"), Div.from("/")),
             Ops(InfixL)(Add.from("+"), Sub.from("-")),

@@ -3,13 +3,24 @@ package wacc
 
 import bridges._
 
+/**
+  * This file is concerned with the literal syntactical AST types. They are
+  * generated during syntax analysis and then piped in semantic analysis and thus
+  * the rest of the pipeline
+  */
+
 object ast {
 
+/**
+  * AST Node superclass. Everything is a node and thus has some form of position
+  * information and also a reference to its current scope (symbol table)
+  */
 sealed trait Node {
     val pos: (Int, Int)
+    var scope: SymbolTable = null
 }
 
-////////// TYPES ///////////
+/*--------------------------------------- Types ---------------------------------------*/
 
 sealed trait Type extends Node
 
@@ -33,7 +44,7 @@ case class ErasedPair()(val pos: (Int, Int)) extends Type {
     override def toString = "ErasedPair"
 }
 
-////////// STATEMENTS ///////////
+/*--------------------------------------- Statements ---------------------------------------*/
 
 case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node
 
@@ -85,11 +96,11 @@ case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extend
     override def toString = s"FuncCall(\"$ident\",$args)"
 }
 
-////////// EXPRESSIONS ///////////
+/*--------------------------------------- Expressions ---------------------------------------*/
 
 sealed trait Expr extends RValue
 
-// literals
+    /*----------------------------------- Literals -----------------------------------*/
 
 case class IntVal(x: BigInt)(val pos: (Int, Int)) extends Expr
 case class CharVal(x: Char)(val pos: (Int, Int)) extends Expr {
@@ -110,7 +121,7 @@ case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends E
     override def toString = s"ArrayVal(\"$v\",$exprs)"
 }
 
-// binary operators
+    /*------------------------------- Binary Operators -------------------------------*/
 
 sealed trait BinOp extends Expr {
     val x: Expr
@@ -157,7 +168,7 @@ case class NotEql(x: Expr, y: Expr)(val pos: (Int, Int))  extends EqualityOp
 case class And(x: Expr, y: Expr)(val pos: (Int, Int))     extends LogicalOp
 case class Or(x: Expr, y: Expr)(val pos: (Int, Int))      extends LogicalOp
 
-// unary operators
+    /*-------------------------------- Unary Operators --------------------------------*/
 
 sealed trait UnOp extends Expr {
     val x: Expr
@@ -172,8 +183,12 @@ case class Len(x: Expr)(val pos: (Int, Int)) extends UnOp
 case class Ord(x: Expr)(val pos: (Int, Int)) extends UnOp
 case class Chr(x: Expr)(val pos: (Int, Int)) extends UnOp
 
-////////////////////////////////////////////////////////
+/*--------------------------------------- Companion Objects for above case classes ---------------------------------------*/
 
+/**
+  * These are all the companion objects for all AST nodes, this allows position
+  * information to be hooked in and also override the labels for errors
+  */
 
 object IntType extends ParserBridge0[BaseType] {
     override def labels = List{"type"}
@@ -292,7 +307,10 @@ object Len extends ParserBridge1[Expr, Expr]
 object Ord extends ParserBridge1[Expr, Expr]
 object Chr extends ParserBridge1[Expr, Expr]
 
+/* Disambiguation bridge for variables and array literals */
+
 object VarOrArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue] {
+    /* If exprs is a non-empty list then we parse an array literal, otherwise it's a variable */
     def apply(_expr: String, exprs: List[Expr])(pos: (Int, Int) = (0, 0)): Expr with LValue = exprs match {
         case head :: next => ArrayVal(_expr, exprs)(pos)
         case Nil => Var(_expr)(pos)

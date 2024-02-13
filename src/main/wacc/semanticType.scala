@@ -3,7 +3,16 @@ package wacc
 import scala.language.implicitConversions
 import ast._
 
+/**
+  * This file involves using semantic types for semantic analysis
+  */
+
+
 object Implicits {
+    /**
+     * Implicit conversions of syntactic types to semantic
+     * There is also one for convert semantic to their string representation (which are nice for tests)
+     */
     implicit def syntaxToSemanticType(t: Type): SemType = t match {
         case IntType() => SemInt
         case CharType() => SemChar
@@ -14,11 +23,19 @@ object Implicits {
         case PairType(t1, t2) => SemPair(syntaxToSemanticType(t1), syntaxToSemanticType(t2))
         case _ => SemNone
     }
+
+    implicit def semanticToString(t: SemType): String = t.toString()
 }
 
 sealed trait SemNode
 
 sealed trait SemType extends SemNode {
+    /**
+      * This function handles reductions and type weakening
+      *
+      * @param otherType The type that `this` will be reduced to
+      * @return Boolean if the reduction was successful
+      */
     def reducesTo(otherType: SemType): Boolean = (this, otherType) match {
         // (rhs, lhs)
 
@@ -63,30 +80,6 @@ sealed trait SemType extends SemNode {
              (SemErasedPair, SemErasedPair) => true
             
         case _ => false
-
-        // case (SemNone, _) | (_, NoneType) => false
-        // case (AnyType, _) | (_, AnyType) => true
-        // case (IntType, IntType) | 
-        //      (CharType, CharType) | 
-        //      (BoolType, BoolType) | 
-        //      (StringType, StringType) => true
-
-        // case (ArrayType(a1), ArrayType(a2)) => a1 == a2
-        // case (ArrayType(CharType), StringType) => true
-
-        // case (PairType(AnyType, AnyType), PairType(l1, r1)) => true
-        // case (PairType(AnyType, r1), PairType(l2, r2)) => r1 == r2
-        // case (PairType(l1, AnyType), PairType(l2, r2)) => l1 == l2
-
-        // case (PairType(l1, r1), PairType(AnyType, AnyType)) => true
-        // case (PairType(l1, r1), PairType(AnyType, r2)) => r1 == r2
-        // case (PairType(l1, r1), PairType(l2, AnyType)) => l1 == l2
-
-        // case (PairType(l1, r1), PairType(l2, r2)) => (l1 == l2) && (r1 == r2)
-        // case (ErasedPair, PairType(_, _)) | (PairType(_, _), ErasedPair) => true
-
-        // case (ErasedPair, ErasedPair) => false  // last bullet point on pair coercion
-        // case _ => false
     }
 }
 
@@ -136,11 +129,18 @@ case object SemErasedPair extends SemType {
 case class SemArray(t: SemType) extends SemType  {
     override def toString = s"${t.toString}[]"
 
+    /**
+      * Returns the dimensions of an array
+      */
     def dimensions: Int = t match {
         case arrType: SemArray => 1 + arrType.dimensions
         case _ => 1
     }
 
+    /**
+      * Unwraps an n-dimensional array to n-k dimensions where k is input
+      * if k > n then None is returned (error)
+      */
     def unfold(levels: Int): Option[SemType] = (levels, t) match {
         case (1, t) => Some(t)
         case (n, arr: SemArray) => arr.unfold(n-1)

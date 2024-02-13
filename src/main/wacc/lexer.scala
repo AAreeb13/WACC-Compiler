@@ -7,6 +7,11 @@ import parsley.token.errors.ErrorConfig
 import parsley.token.errors.Label
 import parsley.token.errors.LabelConfig
 import parsley.token.predicate
+import parsley.token.errors.LabelWithExplainConfig
+
+/**
+  * Lexer which converts characters in input text to tokens
+  */
 
 object lexer {
     private val escapedLiterals = Set('\\', '\"', '\'')
@@ -81,8 +86,10 @@ object lexer {
         ),
         textDesc = text.TextDesc.plain.copy(
             escapeSequences = text.EscapeDesc.plain.copy(
+                // all escaped characters begin with a backslash
                 escBegin = '\\',
                 literals = escapedLiterals,
+                // the specified escape characters from the spec
                 mapping = Map(
                     "0" -> 0x0,
                     "b" -> 0x8,
@@ -92,6 +99,7 @@ object lexer {
                     "r" -> 0xd
                 )
             ),
+            // Any ASCII character except any of {', ", \}
             graphicCharacter = predicate.Basic(c => c >= ' '.toInt && !escapedLiterals.contains(c))
         )
     )
@@ -101,6 +109,10 @@ object lexer {
 
         override def labelIntegerUnsignedNumber: LabelConfig =
             Label("number")
+
+        override def labelEscapeEnd: LabelWithExplainConfig = 
+            Label("valid escape sequences are " ++ 
+            (desc.textDesc.escapeSequences.mapping.keySet ++ escapedLiterals).mkString("\\", ", \\", "")) /* \0, \n, \t, \b, \f, \r, \", \' or \\" */
     }
     private val lexer = new Lexer(desc, errConfig)
 
@@ -114,4 +126,6 @@ object lexer {
     val boolLiteral                 = lexer.lexeme.symbol("false").as(false) | lexer.lexeme.symbol("true").as(true) 
 
     val implicits = lexer.lexeme.symbol.implicits
+
+
 }

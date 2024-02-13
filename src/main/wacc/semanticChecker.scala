@@ -7,174 +7,229 @@ import wacc.Implicits._
 import ast._
 import scala.io.Source.fromFile
 
-
+/**
+  * Takes an AST and optionally a semanticError collector and performs semantic analysis on it
+  */
 object semanticChecker {
-    
+    /**
+      * 
+      *
+      * @param result The AST that should be tested. Should be a syntactically valid AST with Prog as the top-level node
+      * @param errorCollector Semantic error builder that contains file info if passed.
+      * @return Either a success if semantically valid or errors as string otherwise
+      */
     def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, Node] = result.flatMap(_ match {
         case prog: Prog => new Analyser(prog, errorCollector).getResult
         case _ => Left("Invalid AST type for semantic verification")
     })
 }
 
+/**
+  * The class that performs semantic analysis on each node in the AST
+  *
+  * @param prog The AST itself
+  * @param errorCollectorOption The error collector from verify. Creates a new one if not provided
+  */
 class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollector]) {
-    var errList: ListBuffer[String] = ListBuffer.empty
+    // Provides formatted errors, a new instance is created if one doesn't exist
     val errorCollector = errorCollectorOption.getOrElse(new SemanticErrorCollector)
-    var globalTable = new SymbolTable();
-    var funcTable: HashMap[String, (SemType, List[SemType], Func)] = HashMap.empty
+
+    // Global symbol table
+    var globalTable = new SymbolTable()
+    var scopeList: ListBuffer[SymbolTable] = ListBuffer(globalTable)
+
+    // Function Table 
+    //      := (return type, parameter types, node itself)
+    type FuncInfo = (SemType, List[SemType], Func)
+    var funcTable: HashMap[String, FuncInfo] = HashMap.empty
 
     checkProgram()
 
-    def checkProgram() = {
+    /**
+      * Additional Constructor which generates function map and adds to statements to global symbol table
+      */
+    def checkProgram(): Unit = {
+        // Maps each function to an entry in funcTable
         prog.funcs.foreach { func =>
+            // Throw an error if two function with same names exist
             if (funcTable.contains(func.name)) {
-                errList.addOne(s"${func.name} already exists, no support for overloaded functions.")
                 val prevFunc = funcTable.get(func.name).get._3
-                errorCollector.addError(func, RedefinedFuncError(func, Some(prevFunc)))
+                errorCollector.addError(func, RedefinedFuncError(func, Some(prevFunc)), "No support for overloaded functions")
             }
+            // Add latest entry to table
             funcTable.addOne((func.name, (func.retType, func.params.map(_.declType), func)))
         }
 
+        // Checks each statment in global scope and also in each statement
         prog.funcs.foreach(checkFunction(_))
         prog.stats.foreach(checkStatement(_, SemNone)(globalTable))
     }
 
+    /**
+      * Matches type given type with expected and checks for a "reduction"
+      * i.e. if the expected can be reduced to the actual type
+      * This method matches against a single type
+      */
     def matchesType(actual: SemType, expected: SemType)(implicit node: Node): SemType = 
         matchesType(actual, List(expected))
 
+    /**
+      * Matches the actual against a range of types
+      * An implicit node is taken for error information
+      */
     def matchesType(actual: SemType, expected: List[SemType])(implicit node: Node): SemType = 
         if (expected.exists(actual reducesTo _))
             actual
         else {
-            //val error = TypeError()
             if (actual != SemNone) {
-                errList.addOne(s"Type error: Expected ${expected.mkString(", ")} but received $actual instead")
-                errorCollector.addError(node, TypeError(expected.mkString(", "), actual.toString))
+                errorCollector.addError(node, TypeError(actual.toString, expected.mkString(", ")))
             }
             SemNone
         }
 
+    /**
+      * Semantic checking for a function
+      */
     def checkFunction(func: Func): Unit = {
-        // create new child table
+        // A new symbol table for the function is created and added to the list
         val funcArgSymbolTable = new SymbolTable()
+        scopeList.addOne(funcArgSymbolTable)
 
-        // add parameters to the table
+
+        // Parameters are added to the table, also making sure duplicates are not created
         func.params.foreach{ param =>
             if (!funcArgSymbolTable.contains(param.name)) 
                 funcArgSymbolTable.addOne(param.name, param.declType)(param)
             else {
                 errorCollector.addError(param, RedeclaredVarError(param, funcArgSymbolTable.nodeof(param.name)))
-                errList.addOne(s"Scope error: Parameter ${param.name} has already been declared in function")
             }
-                
-        
         }
         
+        // Function body can declare new variables with same name as args
+        // so a new scope is needed
         val funcBodySymbolTable = new SymbolTable(Some(funcArgSymbolTable))
 
+        // Each statement in the function is semantically checked
+        // The return type is passed in so that the "Return" statment can match against its expected type
         func.stats.foreach(checkStatement(_, func.retType)(funcBodySymbolTable))
     }
 
+    /**
+      * Semantic verification for statements
+      *
+      * @param stat Statement that is to be checked
+      * @param expectedType Expected return type
+      * @param currentScope Symbol Table for current scope
+      */
     def checkStatement(stat: Stat, expectedType: SemType)(implicit currentScope: SymbolTable): Unit = {
+        // To pass implicitly into error statements
         implicit val node: Node = stat
         stat match {
             case While(cond, stats) => 
-                matchesType(checkExpression(cond), SemBool)
+                // Checks that condition is a boolean type
+                matchesType(checkExpression(cond), SemBool)(cond)
                 val childScope = new SymbolTable(Some(currentScope))
                 stats.foreach(checkStatement(_, expectedType)(childScope))
 
             case Assign(lvalue, rvalue) => 
-                // im really sorry this is super bad way of doing it but only 1 more test case left
+                // Checks if rvalue can be reduced to the lvalue
                 (checkLValue(lvalue), checkRValue(rvalue)) match {
+                    // Although matchesType handles this, we want to provide explicity specialised error
                     case (SemUnknown, SemUnknown) => 
-                        errList.addOne(s"Attempting to exchange values between pairs of unknown types. Pair exchange is only legal when the type of at least one of the sides is known or specified")
                         errorCollector.addError(stat, SpecialError("Type Error", "Attempting to exchange values between pairs of unknown types\n" +
                           "Pair exchange is only legal when the type of at least one of the sides is known or specified"))
                     case (lvalType, rvalType) => matchesType(lvalType, rvalType)
                 }
 
             case Free(expr) => checkExpression(expr) match {
+                    // Expression must be any of "null", array or pair
                     case SemArray(_) | SemNull | SemPair(_, _) =>
                     case other =>
-                        errorCollector.addError(stat, TypeError(s"$other", "1-dimensional array or pair type") )
-                        errList.addOne(s"Type error: Expected at least a 1-dimensional array or pair type but got $other instead")
-                    
-                    // case SemNone => errList.addOne(s"Type error: Expected at least a 1-dimensional array or pair type but got $SemNone instead")
-                    // case other => expr match {
-                    //     case ArrayVal(_, es) => errList.addOne(s"Type error: Expected at least a ${es.size + 1}-dimensional array or pair${"[]" * es.size} type but got $other instead")
-                    //     case _ => errList.addOne(s"Type error: Expected at least a 1-dimensional array or pair type but got $other instead")
-                    // }
-                        
+                        errorCollector.addError(expr, TypeError(s"$other", "1-dimensional array or pair type"))
                 }
 
             case Print(expr) => checkExpression(expr)
+            case Println(expr) => checkExpression(expr)
+            case Skip() => // do nothing
 
-            case Exit(expr) => matchesType(checkExpression(expr), SemInt)
+            // Exit must be an integer
+            case Exit(expr) => matchesType(checkExpression(expr), SemInt)(expr)
 
             case Scope(stats) =>
                 val childScope = new SymbolTable(Some(currentScope))
                 stats.foreach(checkStatement(_, expectedType)(childScope))
 
-            case Skip() =>
+            
 
             case If(cond, ifStats, elseStats) =>
                 matchesType(checkExpression(cond), SemBool)
             
                 val ifChild = new SymbolTable(Some(currentScope))
                 ifStats.foreach(checkStatement(_, expectedType)(ifChild))
+
                 val elseChild = new SymbolTable(Some(currentScope))
                 elseStats.foreach(checkStatement(_, expectedType)(elseChild))
 
-            case Println(expr) => checkExpression(expr)
             case Return(expr) => expectedType match {
                 case SemNone => 
+                    // If no expected type is provided we know that it cannot have been in a function
                     errorCollector.addError(stat, SpecialError("Return placement error", "Return outside function is not allowed" ))
-                    errList.addOne(s"Return placement error: Return outside function is not allowed")
                 case retType => matchesType(checkExpression(expr), retType)
             }
                 
             case Read(lvalue) => checkLValue(lvalue) match {
                 case SemUnknown => 
-                    errorCollector.addError(stat, SpecialError("Type Error", "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure"))
-                    errList.addOne(s"Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure")
+                    errorCollector.addError(lvalue, SpecialError("Type Error", "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure"))
                 case other => matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
             }
 
-            case a@AssignNew(declType, ident, rvalue) =>
-                matchesType(checkRValue(rvalue), declType)
+            case assignNew@AssignNew(declType, ident, rvalue) =>
+                // Checks for type matching and also that it is not already contained in current scope of symbol table
+                matchesType(checkRValue(rvalue), declType)(rvalue)
                 if (!currentScope.containsInCurrent(ident))
                     currentScope.addOne(ident, declType)
                 else {
-                    errList.addOne(s"Scope error: Variable $ident has already been declared in this scope")
-                    errorCollector.addError(stat, RedeclaredVarError(a, currentScope.nodeof(ident)))
+                    errorCollector.addError(stat, RedeclaredVarError(assignNew, currentScope.nodeof(ident)))
                 }
         }
     }
 
+    /**
+      * Semantic checks for lvalues
+      * @return The type of the lvalue (SemNone if it doesn't exist)
+      */
     def checkLValue(lvalue: LValue)(implicit currentScope: SymbolTable): SemType = lvalue match {
         case arrayElem: ArrayVal => checkArray(arrayElem)
         case pairElem: PairElem => checkPair(pairElem)
         case variable: Var => checkVar(variable)
     }
     
+    /**
+      * Semantic checks for rvalues
+      * @return The type of the lvalue (SemNone if it doesn't exist)
+      */
     def checkRValue(rvalue: RValue)(implicit currentScope: SymbolTable): SemType = {
         implicit val node: Node = rvalue
         rvalue match {
             case ArrayLiteral(exprs) => 
+                // Semantic check each expression then perform a fold to gain type ancestor
                 exprs.map(checkExpression(_)).fold(SemAny) {
                     case (acc, expType) if (acc reducesTo expType) => expType
                     case (acc, expType) if (expType reducesTo acc) => acc
                     case (acc, other) if (acc != SemNone) => 
-                        errList.addOne(s"")
                         errorCollector.addError(rvalue, TypeError(other.toString, acc.toString))
                         SemNone
                     case _ => SemNone
                 } match {
+                    // In case of an error, return SemNone to signify otherwise return array type
                     case SemNone => SemNone
                     case other => SemArray(other)
                 }
                 
             case pairElem: PairElem => checkPair(pairElem)
-            case PairCons(fst, snd) => 
+
+            case PairCons(fst, snd) =>
+                // If a nested pair type is made, pair erasure is performed (may not be best idea)
                 val fstType = checkExpression(fst) match {
                     case SemPair(_, _) => SemErasedPair
                     case other => other
@@ -188,102 +243,113 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
 
             case FuncCall(ident, args) => funcTable.get(ident) match {
                 case None =>
-                    // errorCollector.addError(rValue, )
-                    errList.addOne(s"Undefined function error: Function $ident has not been defined")
+                    // If function doesn't exist then create error and perform scope check on arguments
                     errorCollector.addError(rvalue, UndefinedFuncError(ident))
-                    args.foreach(checkExpression(_)) // scope check only
+                    args.foreach(checkExpression(_))
                     SemNone
                 case Some((retType, paramTypes, func)) =>
+                    // Check that argument size is the same
                     if (paramTypes.size != args.size) {
-                        errList.addOne(s"Function call error: Wrong number of arguments provided to function $ident." + s"unexpected ${args.size}. expected ${paramTypes.size}")
                         errorCollector.addError(rvalue, FuncArgumentSizeError(ident, args.size, paramTypes.size))
                         args.foreach(checkExpression(_))
                         SemNone
                     } else { 
+                        // Check that types match for the arguments and parameters
                         args.zip(paramTypes).foreach{ case (arg, paramType) => 
                             matchesType(checkExpression(arg), paramType)
                         }
                         retType
                     }
                 }
+
             case expr: Expr => checkExpression(expr)
         }
     }
-
+    /**
+      * Semantic checks for variables
+      * @return The type of the variable (SemNone if it doesn't exist)
+      */
     def checkVar(v: Var)(implicit currentScope: SymbolTable) = 
+        // Return the type of the variable if it exists, otherwise throw an error
         currentScope.typeof(v.v).getOrElse {
-            errList.addOne(s"Scope error: Variable ${v.v} has not been declared in this scope")
             errorCollector.addError(v, UndeclaredVarError(v))
             SemNone
         }
-
+    
+    /**
+      * Semantic checks for pair elems
+      * @return The type of the pair elem (SemNone if it doesn't exist)
+      */
     def checkPair(pairElem: PairElem)(implicit currentScope: SymbolTable): SemType = {
         // maybe propagate SemPair up instead of SemNone?
         pairElem.lvalue match {
-            case variable: Var => checkVar(variable) match {
-                case SemNone => SemNone // inner error, do nothing
-                //case SemErasedPair => SemAny // shouldn't happen since variables always have full type info
-                case SemPair(t1, t2) => pairElem match {
-                    case fst: FstPair => t1
-                    case snd: SndPair => t2
-                }
-                case other =>
-                    errList.addOne(s"Type error: Variable ${variable.v} has type $other when a pair was expected")
-                    errorCollector.addError(pairElem, TypeError(other.toString, "a pair"))
-                    SemNone
-            }
-
-            case arrayVal: ArrayVal => checkArray(arrayVal) match {
-                case SemNone => SemNone // inner error, do nothing
-                //case SemErasedPair => SemAny // again shouldn't happen
-                case SemPair(t1, t2) => pairElem match {
-                    case fst: FstPair => t1
-                    case snd: SndPair => t2
-                }
-                case other =>
-                    errList.addOne(s"Type error: Variable ${arrayVal.v} has type $other when a pair was expected")
-                    errorCollector.addError(pairElem, TypeError(other.toString, "a pair"))
-                    SemNone
-            }
-
             case pairElem: PairElem => checkPair(pairElem) match {
-                //case innerPair: SemPair => SemErasedPair // pair erasure?
-                //case other => other
-                case SemPair(_, _) => SemErasedPair
+                // Checks that a nested pair elem matches the type requirements
+                case SemPair(_, _) => SemErasedPair // this probably shouldn't happen either
                 case SemErasedPair => SemUnknown
+                case SemUnknown => SemUnknown
                 case SemNone => SemNone // inner error
                 case other =>
-                    errList.addOne(s"Type error: Nested pair has type $other when an inner pair was expected")
                     errorCollector.addError(pairElem, TypeError(other.toString, "an inner pair"))
                     SemNone
+            }
+
+            case nonPairElem => {
+                // Get the type of the lvalue
+                val innerType = nonPairElem match {
+                    case variable: Var => checkVar(variable)
+                    case arrayVal: ArrayVal => checkArray(arrayVal)
+                    case _ => ??? // shutup metals
+                }
+                
+                // Check that the type of the inner expression is a pair, otherwise report an error
+                innerType match {
+                    case SemNone => SemNone // inner error, do nothing
+                    //case SemErasedPair => SemAny // shouldn't happen since variables always have full type info
+                    case SemPair(t1, t2) => pairElem match {
+                        case fst: FstPair => t1
+                        case snd: SndPair => t2
+                    }
+                    case other =>
+                        errorCollector.addError(pairElem, TypeError(other.toString, "a pair"))
+                        SemNone
+                }
             }
         } 
     }
 
+    /**
+      * Semantic checks for array elems
+      * @return The type of the array elem (SemNone if it doesn't exist)
+      */
     def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): SemType = {
+        // Checks each array element index has overall type integer
         arrayElem.exprs.foreach(e => matchesType(checkExpression(e), SemInt)(e))
         currentScope.typeof(arrayElem.v) match {
             case None => 
-                errList.addOne(s"Scope error: Variable ${arrayElem.v} has not been declared in this scope")
                 errorCollector.addError(arrayElem, UndeclaredVarError(arrayElem))
                 SemNone
             case Some(declType) => declType match {
+                // Check provided dimensions are not greater than that of the actual array type (using arrayType.unfold)
                 case arrType: SemArray => arrType.unfold(arrayElem.exprs.size) match {
                     case None =>
-                        errList.addOne(s"Type error: array ${arrayElem.v} has type $arrType with dimension ${arrType.dimensions} but dimenesion ${arrayElem.exprs.size} was provided")
                         errorCollector.addError(arrayElem, TypeError(s"dimenesion ${arrayElem.exprs.size}", s"dimension ${arrType.dimensions}"))
                         SemNone
                     case Some(innerType) =>
                         innerType
                 }
                 case other => 
-                    errList.addOne(s"Type error: Variable ${arrayElem.v} has type $other when an array was expected")
+                    // Check that the variable is actually of type array
                     errorCollector.addError(arrayElem, TypeError(other.toString, "array type"))
                     SemNone
             }
         }
     }
 
+    /**
+      * Semantic checks for expressions
+      * @return The type of the expression (SemNone if it doesn't exist)
+      */
     def checkExpression(expr: Expr)(implicit currentScope: SymbolTable): SemType = {
         implicit val node: Node = expr
         expr match {
@@ -291,22 +357,29 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
             case variable: Var => checkVar(variable)
 
             case Ord(x) =>
+                // Takes in a char and returns an int
                 matchesType(checkExpression(x), SemChar)
                 SemInt
 
             case ArithmeticOp(x, y) =>
+                // Takes in two ints and returns an int
                 matchesType(checkExpression(x), SemInt)
                 matchesType(checkExpression(y), SemInt)
                 SemInt
 
             case ComparisonOp(x, y) =>
+                // Takes in either a char or int and returns bool
                 val lhsType = checkExpression(x)
                 matchesType(lhsType, List(SemInt, SemChar))
+                // rhsType must match lhs
                 matchesType(checkExpression(y), lhsType)
                 SemBool
 
-            case EqualityOp(x, y) =>
-                matchesType(checkExpression(x), checkExpression(y))
+            case EqualityOp(x, y) => (checkExpression(x), checkExpression(y)) match {
+                // mainly for case where a is char[] and b is string and vice versa etc.
+                case (a, b) if ((a reducesTo b) || (b reducesTo a))  =>
+                case (a, b) => matchesType(a, b) // technically redundant but does error stuff for us
+            }
                 SemBool
 
             case LogicalOp(x, y) =>
@@ -323,10 +396,10 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                 SemBool
             
             case Len(x) => 
+                // Takes in an array and returns int
                 checkExpression(x) match {
                     case arr: SemArray => SemInt
                     case other =>
-                        errList.addOne(s"Type error: Len can only take in an array type but $other was given")
                         errorCollector.addError(expr, TypeError(other.toString, "array type"))
                         SemNone
                 }
@@ -341,48 +414,60 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
             case PairVal() => SemNull
             case IntVal(x) => SemInt
 
-            case _ => errList.addOne("unknown error"); SemNone // should not happen, metals is bugging
+            case _ => SemNone // should not happen, metals is bugging
         }
     }
 
     def getResult: Either[String, Node] = {
-        //Right(prog) // :)
-        if (errList.isEmpty) {
+        if (errorCollector.containsError) {
             Right(prog)
         } else {
-            Left(generateErrors)
+            Left(errorCollector.formatErrors)
         }
-    }
-
-    def generateErrors: String = {
-        //s"Semantic check failed:\n${errList.mkString("\n")}"
-        errorCollector.formatErrors ++
-        s"\nFull errors:\n${errList.mkString("\n")}"
     }
 }
 
+/**
+  * Doubly linked symbol table class that keeps track of parent and child nodes 
+  *
+  * @param parent Optional ST for parent scopes
+  */
 class SymbolTable(val parent: Option[SymbolTable] = None) {
+    //  (ident, (semantic type, reference to original node))
     var table: HashMap[String, (SemType, Node)] = HashMap()
+    var children: ListBuffer[SymbolTable] = ListBuffer.empty
 
-    def addOne(name: String, declType: SemType)(implicit node: Node): Unit =
+    // add child to parent so we don't need to explictly do this
+    if (parent.isDefined) parent.get.addChild(this)
+
+    private def addChild(childTable: SymbolTable) =
+        children.addOne(childTable)
+
+    // Add an entry to the symbol table
+    def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {
         table.addOne(name, (declType, node))
+        node.scope = this
+    }
 
+    // Check for existence in this and all parent scopes
     def contains(name: String): Boolean =
         table.contains(name) || parent.exists(_.contains(name))
 
+    // Check for existence only in the current scope
     def containsInCurrent(name: String): Boolean =
         table.contains(name)
 
+    // Gets the type of the identifier (if it exists) in this scope
+    // or parent scopes
     def typeof(name: String): Option[SemType] = table
         .get(name)
         .map(_._1)
         .orElse(parent.flatMap(_.typeof(name)))
 
+    // Gets the node of the identifier (if it exists) in this scope
+    // or parent scopes
     def nodeof(name: String): Option[Node] = table
         .get(name)
         .map(_._2)
         .orElse(parent.flatMap(_.nodeof(name)))
-
-    // maybe add some flatten method so we can easily get all the info
-    // in the global symbol table
 }

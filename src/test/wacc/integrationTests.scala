@@ -8,12 +8,10 @@ import astFactory._
 import java.io.File
 import java.nio.file.Files
 import scala.io.Source
+import globals._
 
 
 class IntegrationTest extends AnyFlatSpec {
-    val exitSuccess     = 0
-    val exitSyntaxErr   = 100
-    val exitSemanticErr = 200
     val syntaxCheckOnly = false
 
     "Valid examples" should "compile successfully" in {
