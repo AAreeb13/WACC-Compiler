@@ -1,55 +1,144 @@
-// package wacc.unit.errors
+package wacc.unit.errors
 
-// import wacc._
-// import org.scalactic.Bool
-// import org.scalatest.flatspec.AnyFlatSpec
-// import org.scalatest.matchers.should.Matchers._
+import wacc.astFactory._
+import wacc._
+import wacc.Implicits._
 
-// class  SemanticErrorTest extends AnyFlatSpec  {
-//     val errorCollector = new SemanticErrorCollector("testFile.wacc", "")
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers._
+import org.scalatest.Inside._
 
-//     // Add some sample errors
-//     // Get the collected errors and format them
+class SemanticErrorTest extends AnyFlatSpec {
 
-//     // Error Tests
-//     "ScopeError class with redeclared variable" should " display correct error type, variable name, and error location in a message" in {
-//       ScopeError("variable", "redec", 3).formatError() shouldBe "illegal redeclaration of variable \"variable\"\npreviously declared on line 3"
-//     }
-//     "ScopeError class with undeclared variable" should " display correct error type, variable name, and error location in a message" in {
-//       ScopeError("variable", "undec", 3).formatError() shouldBe "variable \"variable\" has not been declared in this scope\n"
-//     }
+    /*
+    begin
+        while (1) do
+            skip
+        done
+    end
+    */
+    "Type errors" should "match the expected type" in {
+        val exampleAST = Prog(List(),List(While(IntVal(1),List(Skip))))
+        inside(semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (TypeError(SemInt, SemBool).formatError)
+        }
+    }
 
-//     "TypeError class" should "display correct error message for unexpected and expected types" in {
-//       TypeError("int", "bool").formatError() shouldBe "unexpected int\nexpected bool \n"
-//     }
+    /*
+    begin
+        int x = 1;
+        int x = 2
+    end
+    */
+    "Scope Errors" should "catch redeclared variable errors" in {
+        val exampleAST = Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), AssignNew(IntType,"x",IntVal(2))))
+        inside(semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (RedeclaredVarError(IntType, Some(IntType)).formatError)
+        }
+    }
 
-//     "UndefFunc class" should "display correct error message for an undefined function" in {
-//       UndefFunc("foo").formatError() shouldBe "foo has not been defined"
-//     }
+    /*
+    begin
+        int x = 1 ;
+        y = 2
+    end 
+   */   
+    it should "catch undeclared variable errors" in {
+        val exampleAST = Prog(List(),List(AssignNew(IntType,"x",IntVal(1)), Assign(Var("y"),IntVal(2))))
+        inside(semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (UndeclaredVarError(Var("y")).formatError)
+        }
+    }
 
-//     "RedefFunc class" should "display correct error message for a redefined function" in {
-//       RedefFunc("foo", 5).formatError() shouldBe "Illegal redefinition of function foo\nPreviously declared on line 5"
-//     }
+    /*
+    begin
+        int x = call f()
+    end
+   */
+    "FunctionError" should "catch undefined function errors" in {
+        val exampleAST = Prog(List(),List(AssignNew(IntType,"x",FuncCall("f",List()))))
+        inside (semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (UndefinedFuncError("f").formatError)
+        }
+    }
+    /*
+    begin
+        int f(int x) is
+            return 0
+        end
+        int f(int x) is
+            return 1
+        end
+        skip
+    end
+    */
+    it should "catch redefinitions of functions" in {
+        val exampleAST = Prog(List(Func(IntType,"f",List(Param(IntType,"x")),List(Return(IntVal(0)))),
+                                Func(IntType,"f",List(Param(IntType,"x")),List(Return(IntVal(1))))),
+                                    List(Skip))
+        inside (semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (RedefinedFuncError(Func(IntType, "f", List(Param(IntType,"x")),
+             List(Return(IntVal(0)))), 
+             Some(Func(IntType,"f",List(Param(IntType,"x")),
+             List(Return(IntVal(1)))))).formatError)
+        }
+    }
 
-//     "ArgSizeFunc class" should "display correct error message for incorrect number of arguments" in {
-//       ArgSizeFunc("foo", 3, 2).formatError() shouldBe "Wrong number of arguments provided to function foo\nunexpected 3 arguments\nexpected 2 arguments"
-//     }
+    /*
+    begin
+        int f(int x) is
+            return 0
+        end
+        int x = call f() ;
+        skip
+    end
+    */
+    it should "catch calls to functions with incorrect number of arguments" in {
+        val exampleAST = Prog(List(Func(IntType,"f",List(Param(IntType,"x")),List(Return(IntVal(0))))),
+                                List(AssignNew(IntType,"x",FuncCall("f",List())),
+                                    Skip))
+        inside (semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (FuncArgumentSizeError("f", 0, 1).formatError)
+        }
+    }
 
-//     "SpecialError class" should "display the provided error message" in {
-//       SpecialError("CustomError", "This is a custom error message").formatError() shouldBe "This is a custom error message"
-//     }
+    /*
+    begin
+        int f(int x) is
+            return 0
+        end
+        return 'c' ;
+        skip
+    end
+    */
+    "Specialised Errors" should "catch return statements outside functions" in {
+        val exampleAST = Prog(List(Func(IntType,"f",List(Param(IntType,"x")),List(Return(IntVal(0))))),
+                            List(Return(CharVal('c')),
+                                 Skip))
 
+        inside (semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (SpecialError("Return placement error", "Return outside function is not allowed" ).formatError)
+        }
+    }
 
-
-//     Semantic Error Test
-//     SemanticError(position: (Int, Int), fileName: String, lines: Error, codeSnippet : Seq[String], msg : String = "")
-//     "SemanticError class" should "display the provided error message" in {
-//       val error = ScopeError("variable", "redec", 3)
-//       SemanticError((1,2), "wacky.wacc", error, Seq("|  int x = 1", "|  int y = 2")).formatFullError() shouldBe "Scope Error in wacky.wacc (1,2)\n" +
-//       "illegal redeclaration of variable \"variable\"" +
-//       "previously declared on line 3\n" +
-//       "|  int x = 1\n" +
-//       "|  int y = 2"
-//     }
-    
-// }
+    /*
+    begin
+        int f(int x) is
+            return 0
+        end
+        pair(pair, int) x = newpair (null, 3) ;
+        read fst fst x ;
+        skip
+    end
+    */
+    it should "catch reading from unknown types" in {
+        val exampleAST = Prog(List(),
+                                List(AssignNew(PairType(ErasedPair,IntType),"x",PairCons(PairVal,IntVal(3))),
+                                    Read(FstPair(FstPair(Var("x")))),
+                                        Skip))
+        inside (semanticChecker.verify(Right(exampleAST))) {
+            case Left(err) => err should include (SpecialError("Type Error",
+                     "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure").formatError)
+        }
+    }
+}

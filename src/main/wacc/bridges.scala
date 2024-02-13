@@ -4,9 +4,13 @@ import parsley.generic
 import parsley.Parsley
 import parsley.ap._
 import parsley.position.pos
+import parsley.position.withWidth
+
+/**
+  * Parser bridges for the AST nodes which also preserves position information
+  */
 
 object bridges {
-
     trait ParserSingletonBridgePos[+A] extends generic.ErrorBridge {
         protected def con(pos: (Int, Int) = (0, 0)): A
         def from(op: Parsley[_]): Parsley[A] = error(pos.map(this.con(_)) <~ op)
