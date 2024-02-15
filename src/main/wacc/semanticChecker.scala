@@ -329,7 +329,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
             case None => 
                 errorCollector.addError(arrayElem, UndeclaredVarError(arrayElem))
                 SemNone
-            case Some(declType) => declType match {
+            case Some(declType) => declType match { // how to do efficient arity check? calling dimensions before would still do the same, does it need to be stored?
                 // Check provided dimensions are not greater than that of the actual array type (using arrayType.unfold)
                 case arrType: SemArray => arrType.unfold(arrayElem.exprs.size) match {
                     case None =>

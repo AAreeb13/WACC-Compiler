@@ -65,29 +65,12 @@ object parser {
         baseType |
         (ErasedPair.from("pair"))
 
-    // probably don't need the lastOption since grammar guarantees that
-    // all filtered stmtLists are valid and contains at least one valid during filter
-    // but just to be on the safe side
-    private def containsReturn(stmtOption: Option[Stat]): Boolean = stmtOption match {
-        case None => false
-        case Some(stmt) =>
-            stmt match {
-                case Return(expr) => true
-                case Exit(expr)   => true
-                case If(cond, ifstmts, elsestmts) =>
-                    containsReturn(ifstmts.lastOption) && containsReturn(elsestmts.lastOption)
-                case While(cond, stmts) => containsReturn(stmts.lastOption)
-                case Scope(stmts)       => containsReturn(stmts.lastOption)
-                case _                  => false
-            }
-    }
-
  /*--------------------------------------- Statement Parsers ---------------------------------------*/
 
     lazy val prog = "begin".explain("A valid wacc program must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
         "A valid wacc program must finish with end")
     lazy val funcList = many(func)
-    lazy val func = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(stmts => containsReturn(stmts.lastOption)) <~ "end")
+    lazy val func = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(containsReturn(_)) <~ "end")
     
     lazy val paramList = sepBy(param, ",")
     lazy val param     = Param(declType, ident)
