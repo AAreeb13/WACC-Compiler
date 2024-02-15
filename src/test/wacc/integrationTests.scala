@@ -12,8 +12,6 @@ import globals._
 
 
 class IntegrationTest extends AnyFlatSpec {
-    val syntaxCheckOnly = false
-
     "Valid examples" should "compile successfully" in {
         runTests("wacc_examples/valid", exitSuccess) 
     }
@@ -42,7 +40,7 @@ class IntegrationTest extends AnyFlatSpec {
             sb.append("\n\n")
         }
 
-        if (!(failed.isEmpty || ((expected == exitSemanticErr) && syntaxCheckOnly))) {
+        if (!(failed.isEmpty || ((expected == exitSemanticErr) && !fullTypeCheck))) {
             fail(sb.toString())
         }
 
