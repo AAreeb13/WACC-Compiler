@@ -6,7 +6,25 @@ import wacc.asmIR._
 import scala.collection.mutable.HashMap
 
 object translator {
-    def translateProgram(prog: Prog)(implicit symbolTable: SymbolTable): List[ASMItem] = {
+    def translate(ast: Node, symbolTable: SymbolTable): Either[String, String] = {
+        ast match {
+            case prog: Prog => Right(new Translator(prog, symbolTable).toAssembly)
+            case _ => Left("Invalid AST type for error generation")
+        }
+    }
+
+    // def translate(ast: Node) = ast match {
+    //     case Add(op1, op2) => op1 match {
+            
+    //     }
+    // }
+}
+
+class Translator(prog: Prog, val symbolTable: SymbolTable) {
+    val labelMap: HashMap[String, List[ASMItem]] = HashMap.empty
+    val asmList: List[ASMItem] = translateProgram(prog)
+
+    def translateProgram(prog: Prog): List[ASMItem] = {
         val programHeader = List(
             Global,
             Readonly,
@@ -22,25 +40,42 @@ object translator {
             Ret
         )
 
-        programHeader ::: programBody ::: programFooter
+        programHeader ::: programBody ::: programFooter ::: generateLabels
     }
 
-    def translateStatement(stat: Stat)(implicit symbolTable: SymbolTable): List[ASMItem] = {
+    def translateStatement(stat: Stat): List[ASMItem] = {
         stat match {
             case Skip() => List.empty
             case Exit(expr) =>
-                addLabel("_exit")
-                translateExpression(expr)
+                val exitLabel = Label("_exit")
+                val mask = -16
+
+                addLabel(exitLabel, List(
+                    Push(Rbp),
+                    Mov(Rsp, Rbp),
+                    asmIR.And(ImmVal(mask), Rsp),
+                    Call(LibFunc.Exit),
+                    Mov(Rbp, Rsp),
+                    Pop(Rbp),
+                    Ret
+                ))
+
+                translateExpression(expr) :::
                 List(
-                    
+                    Mov(Rax, Rdi),
+                    Call(exitLabel)
                 )
             case _ => List.empty
         }
     }
 
-    def addLabel(name: String, asmList: List[ASMItem]) = ???
+    def addLabel(label: Label, asmList: List[ASMItem]) = 
+        labelMap.addOne(label.ident, label :: asmList)
+    
+    def generateLabels: List[ASMItem] =
+        labelMap.flatMap(_._2).toList
 
-    def translateExpression(expr: Expr, targetReg: Operand = Rax)(implicit symbolTable: SymbolTable): List[ASMItem] = {
+    def translateExpression(expr: Expr, targetReg: Operand = Rax): List[ASMItem] = {
         expr match {
             case IntVal(num) => 
                 List(
@@ -50,31 +85,13 @@ object translator {
         }
     }
 
-    def translate(ast: Node)(implicit symbolTable: SymbolTable): Either[String, String] = {
-        ast match {
-            case prog: Prog =>
-                Right(new Translator(prog, symbolTable).toAssembly)
-                Right(toAssembly(translateProgram(prog)))
-            case _ => Left("Invalid AST type for error generation")
-        }
+    def toAssembly: String = {
+        asmList.map { asm => 
+            asm match {
+                case section: Section => section.toString()
+                case label: Label => label.toString() + ":"
+                case other => "\t" + other.toString()
+            }
+        }.mkString("\n")
     }
-
-    // def translate(ast: Node) = ast match {
-    //     case Add(op1, op2) => op1 match {
-            
-    //     }
-    // }
-
-    def toAssembly(asmList: List[ASMItem]): String = asmList.map { 
-        asm => asm match {
-            case section: Section => section.toString()
-            case label: Label => label.toString()
-            case other => "\t" + other.toString()
-        }
-    }.mkString("\n")
-}
-
-class Translator() {
-    val labels: Map[Label, List[ASMItem]] = HashMap.empty
-    val asmList: List[ASMItem]
 }

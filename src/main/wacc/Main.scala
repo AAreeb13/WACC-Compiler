@@ -66,7 +66,7 @@ object Main {
                             sys.exit(exitSemanticErr) 
                         case Right((ast, st)) =>
                             if (compile) {
-                                translator.translate(ast)(st) match {
+                                translator.translate(ast, st) match {
                                     case Left(err) =>
                                         println(err)
                                         sys.exit(exitRuntimeErr) 
