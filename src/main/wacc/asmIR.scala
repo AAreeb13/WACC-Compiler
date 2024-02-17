@@ -103,10 +103,10 @@ case object Ret extends Instr {
     override def toString() = "ret"
 }
 case class Mov(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
-    override def toString() = s"mov${size} ${src} ${dst}"
+    override def toString() = s"mov${size} ${src}, ${dst}"
 }
 case class Movs(src: Operand, dst: Operand, sizeFrom: InstrSize.Size, sizeTo: InstrSize.Size) extends Instr {
-    override def toString() = s"mov${sizeFrom}${sizeTo} ${src} ${dst}"
+    override def toString() = s"mov${sizeFrom}${sizeTo} ${src}, ${dst}"
 }
 
 case class Pop(reg: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
@@ -121,7 +121,7 @@ case class Set(reg: Operand) {
 }
 
 case class CMov(src: Operand, dst: Operand, flag: ComparisonType.Flag) extends Instr {
-    override def toString() = s"cmov${flag} ${src} ${dst}"
+    override def toString() = s"cmov${flag} ${src}, ${dst}"
 }
 case class J(label: Label, flag: ComparisonType.Flag) extends Instr {
     override def toString() = s"j${flag} ${label}"
@@ -135,20 +135,20 @@ case class Jmp(label: Label) extends Instr {
 }
 
 case class Cmp(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
-    override def toString() = s"cmp${size} ${src} ${dst}"
+    override def toString() = s"cmp${size} ${src}, ${dst}"
 }
 case class Lea(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
-    override def toString() = s"lea${size} ${src} ${dst}"
+    override def toString() = s"lea${size} ${src}, ${dst}"
 }
 
 case class Add(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
-    override def toString() = s"add${size} ${src} ${dst}"
+    override def toString() = s"add${size} ${src}, ${dst}"
 }
 case class Sub(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
-    override def toString() = s"sub${size} ${src} ${dst}"
+    override def toString() = s"sub${size} ${src}, ${dst}"
 }
 case class And(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
-    override def toString() = s"and${size} ${src} ${dst}"
+    override def toString() = s"and${size} ${src}, ${dst}"
 }
 case class IDiv(op: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = "cltd\n" + s"idiv${size} ${op}"

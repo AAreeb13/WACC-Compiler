@@ -5,7 +5,7 @@ import scala.collection.mutable.ListBuffer
 import wacc.asmIR._
 import scala.collection.mutable.HashMap
 
-object translator {
+object codeGenerator {
     def translate(ast: Node, symbolTable: SymbolTable): Either[String, String] = {
         ast match {
             case prog: Prog => Right(new Translator(prog, symbolTable).toAssembly)
