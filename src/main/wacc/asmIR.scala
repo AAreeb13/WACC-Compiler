@@ -2,8 +2,6 @@ package wacc
 
 object asmIR {
 
-case class Label(ident: String)
-
 object ComparisonType extends Enumeration {
     type Flag = Value
     val Greater = Value("g")
@@ -27,6 +25,10 @@ sealed trait ASMItem {
     def format: String = ???
 }
 
+case class Label(ident: String) extends ASMItem {
+    override def toString() = s"$ident:"
+}
+
 sealed trait Section extends ASMItem
 
 case object Readonly extends Section {
@@ -40,10 +42,10 @@ case object Global extends Section {
 }
 
 case class StringDecl(strVal: String, labelName: String) extends Section {
-    override def toString() 
-        = s".int ${strVal.length}\n"
-        + labelName + "\n"
-        + s".asciz \"${strVal}\"\n"
+    override def toString() =
+        s"\t.int ${strVal.length}\n" + 
+        labelName + ": \n" + 
+        s"\t.asciz \"${strVal}\""
 }
 
 sealed trait Sign extends ASMItem
@@ -57,24 +59,25 @@ case object Negative extends Sign {
 sealed trait Operand extends ASMItem
 
 case class ImmVal(value: Int) extends Operand {
-    override def toString() = s"\$$value"
+    override def toString() = s"$$$value"
 }
 
 case class Mem(reg: Operand, offset: Option[(Sign, Option[Int], Operand)]) extends Operand {
     override def toString() = {
         val sb = new StringBuilder
         sb ++= "["
-        sb ++= reg
+        sb ++= reg.toString()
         offset match {
             case None =>
             case Some((sign, mul, op)) =>
-                sb ++= sign
+                sb ++= sign.toString()
                 if (mul.isDefined) {
-                    sb ++= mul.get + "*"
+                    sb ++= s"${mul.get}*"
                 }
-                sb ++= op
+                sb ++= op.toString()
         }
         sb ++= "]"
+        sb.toString()
     }
 }
 
