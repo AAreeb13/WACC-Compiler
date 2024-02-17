@@ -58,7 +58,7 @@ case object Negative extends Sign {
 
 sealed trait Operand extends ASMItem
 
-case class ImmVal(value: Int) extends Operand {
+case class ImmVal(value: BigInt) extends Operand {
     override def toString() = s"$$$value"
 }
 
@@ -86,17 +86,17 @@ sealed trait Instr extends ASMItem
 case object Ret extends Instr {
     override def toString() = "ret"
 }
-case class Mov(dst: Operand, src: Operand, size: InstrSize.Size) extends Instr {
+case class Mov(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"mov${size} ${src} ${dst}"
 }
-case class Movs(dst: Operand, src: Operand, sizeFrom: InstrSize.Size, sizeTo: InstrSize.Size) extends Instr {
+case class Movs(src: Operand, dst: Operand, sizeFrom: InstrSize.Size, sizeTo: InstrSize.Size) extends Instr {
     override def toString() = s"mov${sizeFrom}${sizeTo} ${src} ${dst}"
 }
 
-case class Pop(reg: Operand, size: InstrSize.Size) extends Instr {
+case class Pop(reg: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"pop${size} ${reg}"
 }
-case class Push(reg: Operand, size: InstrSize.Size) extends Instr {
+case class Push(reg: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"push${size} ${reg}"
 }
 
@@ -104,7 +104,7 @@ case class Set(reg: Operand) {
     override def toString() = s"set ${reg}"
 }
 
-case class CMov(dst: Operand, src: Operand, flag: ComparisonType.Flag) extends Instr {
+case class CMov(src: Operand, dst: Operand, flag: ComparisonType.Flag) extends Instr {
     override def toString() = s"cmov${flag} ${src} ${dst}"
 }
 case class J(label: Label, flag: ComparisonType.Flag) extends Instr {
@@ -118,23 +118,23 @@ case class Jmp(label: Label) extends Instr {
     override def toString() = s"jmp ${label}"
 }
 
-case class Cmp(dst: Operand, src: Operand, size: InstrSize.Size) extends Instr {
+case class Cmp(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"cmp${size} ${src} ${dst}"
 }
-case class Lea(dst: Operand, src: Operand, size: InstrSize.Size) extends Instr {
+case class Lea(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"lea${size} ${src} ${dst}"
 }
 
-case class Add(dst: Operand, src: Operand, size: InstrSize.Size) extends Instr {
+case class Add(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"add${size} ${src} ${dst}"
 }
-case class Sub(dst: Operand, src: Operand, size: InstrSize.Size) extends Instr {
+case class Sub(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"sub${size} ${src} ${dst}"
 }
-case class And(dst: Operand, src: Operand, size: InstrSize.Size) extends Instr {
+case class And(src: Operand, dst: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = s"and${size} ${src} ${dst}"
 }
-case class IDiv(op: Operand, size: InstrSize.Size) extends Instr {
+case class IDiv(op: Operand, size: InstrSize.Size = InstrSize.QWord) extends Instr {
     override def toString() = "cltd\n" + s"idiv${size} ${op}"
 }
 
