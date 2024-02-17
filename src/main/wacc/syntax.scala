@@ -57,6 +57,18 @@ case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node
     override def toString = s"Param($declType,\"$name\")"
 }
 
+/**
+  * Used to filter out statements that don't end in a return, used for functions 
+  */
+def containsReturn(statList: List[Stat]): Boolean = statList.lastOption match {
+    case None => false
+    case Some(Return(_)) | Some(Exit(_)) => true
+    case Some(If(_, ifStats, elseStats)) => containsReturn(ifStats) && containsReturn(elseStats)
+    case Some(While(_, stats)) => containsReturn(stats)
+    case Some(Scope(stats)) => containsReturn(stats)
+    case _ => false
+}
+
 sealed trait Stat                                                   extends Node
 case class Skip()(val pos: (Int, Int))                                                   extends Stat {
     override def toString = "Skip"

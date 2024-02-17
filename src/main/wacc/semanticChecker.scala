@@ -18,7 +18,7 @@ object semanticChecker {
       * @param errorCollector Semantic error builder that contains file info if passed.
       * @return Either a success if semantically valid or errors as string otherwise
       */
-    def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, Node] = result.flatMap(_ match {
+    def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, (Node, SymbolTable)] = result.flatMap(_ match {
         case prog: Prog => new Analyser(prog, errorCollector).getResult
         case _ => Left("Invalid AST type for semantic verification")
     })
@@ -329,7 +329,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
             case None => 
                 errorCollector.addError(arrayElem, UndeclaredVarError(arrayElem))
                 SemNone
-            case Some(declType) => declType match {
+            case Some(declType) => declType match { // how to do efficient arity check? calling dimensions before would still do the same, does it need to be stored?
                 // Check provided dimensions are not greater than that of the actual array type (using arrayType.unfold)
                 case arrType: SemArray => arrType.unfold(arrayElem.exprs.size) match {
                     case None =>
@@ -418,9 +418,9 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
         }
     }
 
-    def getResult: Either[String, Node] = {
+    def getResult: Either[String, (Node, SymbolTable)] = {
         if (errorCollector.containsError) {
-            Right(prog)
+            Right((prog, globalTable))
         } else {
             Left(errorCollector.formatErrors)
         }
