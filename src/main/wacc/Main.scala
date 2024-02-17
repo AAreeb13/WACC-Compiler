@@ -53,27 +53,38 @@ object Main {
         var result = parser.parse(input).toEither
 
         // Create the semantic error collector for error generation
-        val ec = new SemanticErrorCollector(Some(path), input)
         result match {
             case Left(err) =>
                 println(err)
                 sys.exit(exitSyntaxErr)
-
-            case Right(_) =>
-                if (fullTypeCheck)
-                    result = semanticChecker.verify(result, Some(ec))
+            case Right(ast) =>
+                if (fullTypeCheck) {
+                    val ec = new SemanticErrorCollector(Some(path), input)
+                    semanticChecker.verify(result, Some(ec)) match {
+                        case Left(err) =>
+                            println(err)
+                            sys.exit(exitSemanticErr) 
+                        case Right((ast, st)) =>
+                            if (compile) {
+                                translator.translate(ast)(st) match {
+                                    case Left(err) =>
+                                        println(err)
+                                        sys.exit(exitRuntimeErr) 
+                                    case Right(asm) =>
+                                        println(asm)
+                                        sys.exit(exitSuccess)
+                                }
+                            } else {
+                                println(ast)
+                                sys.exit(exitSuccess)
+                            }
+                    }
+                } else {
+                    println(ast)
+                    sys.exit(exitSuccess)
+                }
         }
-        
-        // Semantic Analysis
-        result match {
-            case Left(err) =>
-                println(s"$err")
-                sys.exit(exitSemanticErr)
 
-            case Right(output) =>
-                println(s"$output")
-                sys.exit(exitSuccess)
-        }
 
     }
 }

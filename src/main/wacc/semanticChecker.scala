@@ -18,7 +18,7 @@ object semanticChecker {
       * @param errorCollector Semantic error builder that contains file info if passed.
       * @return Either a success if semantically valid or errors as string otherwise
       */
-    def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, Node] = result.flatMap(_ match {
+    def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, (Node, SymbolTable)] = result.flatMap(_ match {
         case prog: Prog => new Analyser(prog, errorCollector).getResult
         case _ => Left("Invalid AST type for semantic verification")
     })
@@ -418,9 +418,9 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
         }
     }
 
-    def getResult: Either[String, Node] = {
+    def getResult: Either[String, (Node, SymbolTable)] = {
         if (errorCollector.containsError) {
-            Right(prog)
+            Right((prog, globalTable))
         } else {
             Left(errorCollector.formatErrors)
         }
