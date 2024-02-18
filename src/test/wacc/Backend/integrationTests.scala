@@ -13,8 +13,22 @@ import scala.concurrent.blocking
 import java.io.ByteArrayOutputStream
 import java.io.PrintWriter
 
+/**
+Steps:
+    Generate the assembly code locally for all the wacc file listed in the directory specified
+    Copy the assembly code into the docker working directory
+    Docker compiles the assembly and then produces the output files.
+    
+  */
 
 class BackendTests extends AnyFlatSpec {
+    type Path = String
+    type FileContents = List[String]
+    type Input = Option[String]
+    type Output = List[String]
+    type ExitCode = Int
+    type FileInfo = (Path, File, Input, Output, ExitCode)
+
 
     // def getExitValue(path: String): Option[Int] = {
     //     try {
@@ -39,7 +53,7 @@ class BackendTests extends AnyFlatSpec {
     // }
 
     "Valid examples" should "match assembler output and exit code" in {
-        runTests("wacc_examples/valid/IO/read") 
+        runTests("wacc_examples/valid/basic/exit") 
     }
 
     
@@ -59,8 +73,6 @@ class BackendTests extends AnyFlatSpec {
             val writer = new PrintWriter(new File("out.s"))
             writer.write(asm)
             writer.close()
-            System.out.println(input)
-
             val out = new ByteArrayOutputStream
             run(List("./run.sh"), input.getOrElse("").getBytes(), out) // super duper bad
             (out.toString(), info, path)
@@ -68,16 +80,17 @@ class BackendTests extends AnyFlatSpec {
 
         // todo: improve this, if output contains required exit code then this will fail 
         // should be better than that
-        val failed = results.filter { case (asm, info@(_, output, exit), _) =>
-            !((asm contains output.mkString("\n")) && (asm contains exit.getOrElse(0)))
-        }
+        val failed = results.filter { case (asm, info@(_, output, exit), _) => {
+            val asmLines = asm.split("\n").toList
+            !((asmLines.last.toInt == exit) && (asmLines.init.equals(output)))
+        }}
 
         val sb = new StringBuilder
         failed.foreach { case (asm, (_, output, exit), path) => 
             sb.append(s"\n======= FAILED: $path =======")
             sb.append(s"\nResult: $asm")
-            sb.append(s"\nExpected output: $output\n")
-            sb.append(s"\nExpected exit: $exit\n")
+            sb.append(s"\nExpected output: ${output.mkString("\n")}\n")
+            sb.append(s"\nExpected exit: ${exit}\n")
             sb.append("\n")
         }
 
@@ -112,7 +125,7 @@ class BackendTests extends AnyFlatSpec {
         filesInCurrent ++ filesInCurrent.filter(_.isDirectory).flatMap(getAllFiles)
     }
 
-    type StdInfo = (Option[String], List[String], Option[Int])
+    type StdInfo = (Option[String], List[String], Int)
                             //      in/out/exit
     def getFields(path: String): StdInfo = {
         try {
@@ -151,7 +164,7 @@ class BackendTests extends AnyFlatSpec {
                 }
             }
             
-            (inputField, outputField.toList, exitField.map(_.toInt))
+            (inputField, outputField.toList, exitField.map(_.toInt).getOrElse(0))
         } catch {
             case ex: Exception =>
                 println(s"Error occurred: ${ex.getMessage}")
