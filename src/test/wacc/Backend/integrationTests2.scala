@@ -23,95 +23,79 @@ class Tests extends AnyFlatSpec {
     type ResultInfo = (Input, Output, ExitCode)
     type FileInfo = (Path, FileContents, ResultInfo)
 
-    val examplesDir = "wacc_examples/valid/basic"
+    val examplesDir = "wacc_examples/valid/basic/exit"
     val asmDir = "backend_output"
     val useDocker = true
 
     /**
       * Compiles all the files in a given path
       */
-    
     "Valid examples" should "match assembler output and exit code" in {
         performTests(examplesDir) 
     }
 
-    // def dockerCommand(command: Seq[String])(implicit containerID: String = "") =
-    //     Seq("docker", "exec", "--rm", "-i", "gumjoe/wacc-ci-scala:slim") ++ command
-
     def performTests(dir: Path) = {
-        println("Starting asm generation")
-
         val assembledFiles = assembleAll(dir)
 
-        println("Generated asm files")
-        
         if (useDocker) {
-            println("Generating docker container")
-            val outputStream = new ByteArrayOutputStream
-            runCommand(Seq("docker", "create", "-i", "--platform", "linux/amd64", "gumjoe/wacc-ci-scala:x86"),
-                       Array.emptyByteArray,
-                       outputStream)
-            implicit val containerID = outputStream.toString().trim()
-            println("Created docker container")
-
-            val failed = assembledFiles.map { case fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)) =>
-                runCommand(Seq("docker", "exec", containerID, "gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
-                val outStream = new ByteArrayOutputStream
-                runCommand(Seq("docker", "exec", containerID, "./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
-                runCommand(Seq("docker", "exec", containerID, "echo $?"), Array.emptyByteArray, outStream)
-                val rawOut = outStream.toString().split("\n").toList
-                val actualOut = rawOut.init
-                val actualExit = rawOut.last.toIntOption.getOrElse(0)
-                (fileInfo, actualOut, actualExit)
-            }.filter { case ((_, _, (_, expectedOut, expectedExit)), actualOut, actualExit) =>
-                !((actualExit == expectedExit) && (actualOut.equals(expectedOut))) 
-            }
-
-            runCommand(Seq("docker", "rm", "-f", containerID))
-
-            println("Removed docker container")
-
-            printResults(assembledFiles.length, failed)
-        } else {
-            //gcc -o out -z noexecstack out.s
-            val failed = assembledFiles.map { case fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)) =>
-                val outStream = new ByteArrayOutputStream
-                runCommand(Seq("./temp.sh"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
-                val rawOut = outStream.toString().split("\n").toList
-                val actualOut = rawOut.init
-                val actualExit = rawOut.last.toIntOption.getOrElse(0)
-                (fileInfo, actualOut, actualExit)
-            }.filter { case ((_, _, (_, expectedOut, expectedExit)), actualOut, actualExit) =>
-                !((actualExit == expectedExit) && (actualOut.equals(expectedOut))) 
-            }
-
-            printResults(assembledFiles.length, failed)
+            //runCommand(Seq("docker", "buildx", "build", "--platform", "linux/amd64", "-t",  "my-x86-image", "."))
+            runCommand(Seq("docker", "run", "-di", "--platform", "linux/amd64", "--name", "my-container", "my-x86-image"))
         }
 
-    }
+        val failed = assembledFiles.map { case fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)) =>
+            // gcc -x assembler - -z noexecstack -o out (input is piped so no need to create .s file)
+            runCommandWithDocker(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
 
-    def printResults(total: Int, failed: List[(FileInfo, Output, ExitCode)]) = {
+            val outStream = new ByteArrayOutputStream 
+            val actualExit = runCommandWithDocker(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()))
+            val actualOut: Output = outStream.toString().split("\\R").toList.init // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
+
+            (examplePath, asmOutput, in, expectedOut, expectedExit, actualOut, actualExit)
+        }.filter { case (_, _, _, expectedOut, expectedExit, actualOut, actualExit) =>
+            !((actualExit == expectedExit) && (actualOut.equals(expectedOut))) 
+        }
+
+
+        // Cleanup artifacts, in the case of docker it is the container otherwise remove the ./out executable
+        if (useDocker) {
+            runCommand(Seq("docker", "rm", "-f", "my-container"))
+        } else {
+            runCommand(Seq("rm", "-f", "./out"))
+        }
+
+        // Format errors
         val sb = new StringBuilder
-        failed.foreach { case ((path, asmRaw, (in, expectedOut, expectedExit)), actualOut, actualExit) => 
+        failed.foreach { case (path, asmRaw, in, expectedOut, expectedExit, actualOut, actualExit) => 
             sb.append(s"\n======= FAILED: $path =======")
-            sb.append(s"\nActual output:\n${actualOut.mkString("\n")}")
-            sb.append(s"\nExpected output:\n${expectedOut.mkString("\n")}")
+            sb.append(s"\nActual output: ${actualOut}")
+            sb.append(s"\nExpected output: ${expectedOut}")
             sb.append(s"\nActual exit: ${actualExit}")
             sb.append(s"\nExpected exit: ${expectedExit}")
-            sb.append(s"\nSupplied Input: \"${in.getOrElse("")}\"")
-            sb.append(s"\nAssembler Output:\n$asmRaw\n")
-            sb.append("\n")
+            sb.append(s"\nSupplied Input: ${in}")
+            sb.append(s"\nAssembler Output:\n${asmRaw}\n")
         }
 
         if (!(failed.isEmpty)) {
-            sb.append(s"${total - failed.size}/${total} tests passed")
+            sb.append(s"\n${assembledFiles.size - failed.size}/${assembledFiles.size} tests passed")
             fail(sb.toString())
+        } else {
+            info(message=s"${assembledFiles.size - failed.size}/${assembledFiles.size} tests passed")
         }
-
-        info(message=s"${total - failed.size}/${total} tests passed")
     }
 
-    def runCommand(command: Seq[String], inp: Array[Byte] = Array.emptyByteArray, pout: ByteArrayOutputStream = new ByteArrayOutputStream): Int = {
+    def runCommandWithDocker(command: Seq[String],
+                             inp: Array[Byte] = Array.emptyByteArray,
+                             pout: ByteArrayOutputStream = new ByteArrayOutputStream): Int = {
+        if (useDocker) {
+            runCommand(Seq("docker", "exec", "-i", "my-container") ++ command, inp, pout)
+        } else {
+            runCommand(command, inp, pout)
+        }
+    }
+
+    def runCommand(command: Seq[String],
+                   inp: Array[Byte] = Array.emptyByteArray,
+                   pout: ByteArrayOutputStream = new ByteArrayOutputStream): Int = {
         val p = new java.lang.ProcessBuilder(java.util.Arrays.asList(command: _*)).start()
         blocking(p.getOutputStream.write(inp))
         p.getOutputStream.close()
@@ -197,7 +181,7 @@ class Tests extends AnyFlatSpec {
                 } else if (line.startsWith("# Output:")) {
                     nextLineOutput = true
                 } else if (nextLineExit) {
-                    exitRegex.findFirstIn(line).map(_.drop(2))
+                    exitField = exitRegex.findFirstIn(line).map(_.drop(2))
                     nextLineExit = false
                 } else if (nextLineOutput) {
                     outputRegex.findFirstIn(line) match {
