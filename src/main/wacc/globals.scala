@@ -10,8 +10,11 @@ object globals {
     val exitRuntimeErr = 300;
     val exitInvalidOptions = 2;
 
-    var fullTypeCheck = true
-    var compile = true
-    var optimise = false
-    var enableColours = true
+    var onlySyntaxCheck = false
+    var onlyTypeCheck = false
+    var fullCompile = true
+    var fullOptimise = false
+    var execute = false
+    var enableColours = false
+    var useDocker = false
 }

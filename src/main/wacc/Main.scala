@@ -26,11 +26,17 @@ object Main {
             if (arg.startsWith("-")) {
                 arg.tail match {
                     case "p" | "-only-parse" =>
-                        fullTypeCheck = false
+                        onlySyntaxCheck = true
                     case "s" | "-only-typecheck" =>
-                        compile = false
+                        onlyTypeCheck = true
                     case "l" | "-colour" =>
                         enableColours = true
+                    case "d" | "-docker" =>
+                        useDocker = true
+                    case "c" | "-full-compile" =>
+                        fullCompile = true
+                    case "x" | "-execute" =>
+                        execute = true
                     case _ => printErrAndLeave
                 }
             } else if (i != args.length - 1) {
@@ -58,14 +64,14 @@ object Main {
                 println(err)
                 sys.exit(exitSyntaxErr)
             case Right(ast) =>
-                if (fullTypeCheck) {
+                if (!onlySyntaxCheck) {
                     val ec = new SemanticErrorCollector(Some(path), input)
                     semanticChecker.verify(result, Some(ec)) match {
                         case Left(err) =>
                             println(err)
                             sys.exit(exitSemanticErr) 
                         case Right((ast, st)) =>
-                            if (compile) {
+                            if (!onlyTypeCheck) {
                                 codeGenerator.translate(ast, st) match {
                                     case Left(err) =>
                                         println(err)
