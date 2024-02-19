@@ -6,3 +6,5 @@
 target/
 project/
 wacc-compiler
+Dockerfile
+in.txt
