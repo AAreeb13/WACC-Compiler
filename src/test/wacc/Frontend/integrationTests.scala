@@ -40,7 +40,7 @@ class IntegrationTest extends AnyFlatSpec {
             sb.append("\n\n")
         }
 
-        if (!(failed.isEmpty || ((expected == exitSemanticErr) && !fullTypeCheck))) {
+        if (!(failed.isEmpty || ((expected == exitSemanticErr) && onlyTypeCheck))) {
             fail(sb.toString())
         }
 
