@@ -11,7 +11,7 @@ build-job:
   stage: build
   script:
     - echo "Building..."
-    - scala-cli clean . && rm -f wacc-compiler -o wacc-compiler # i.e make clean
+    - scala-cli clean . && rm -f wacc-compiler # i.e make clean
     - scala-cli --power package . -o wacc-compiler --server=false --jvm system --force # i.e make
     - echo "Build complete."
 

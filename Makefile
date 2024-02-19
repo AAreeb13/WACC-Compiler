@@ -8,6 +8,6 @@ all:
 	scala-cli --power package . -o wacc-compiler --server=false --jvm system --force
 
 clean:
-	scala-cli clean . && rm -f wacc-compiler -o wacc-compiler
+	scala-cli clean . && rm -f wacc-compiler
 
 .PHONY: all clean
