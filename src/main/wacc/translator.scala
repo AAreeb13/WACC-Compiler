@@ -29,12 +29,12 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     val topLevelTable = symbolTables.head
     val functionTables = symbolTables.tail
 
+    val readOnlyList: ListBuffer[ASMItem] = ListBuffer.empty
+
     val asmList: List[ASMItem] = translateProgram(prog)
 
     def translateProgram(prog: Prog): List[ASMItem] = {
         val programHeader = List(
-            Global,
-            Readonly,
             Text,
             Label("main"),
             Push(Rbp),
@@ -50,7 +50,13 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             Ret
         )
 
-        programHeader ::: programBody ::: popVariablesInScope ::: programFooter ::: generateLabels
+        List(Global, Readonly) ::: 
+        readOnlyList.toList :::
+        programHeader :::
+        programBody :::
+        popVariablesInScope :::
+        programFooter :::
+        generateLabels
     }
 
     def translateStatement(stat: Stat): List[ASMItem] = {

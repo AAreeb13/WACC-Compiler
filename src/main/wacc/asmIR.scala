@@ -78,24 +78,22 @@ case class ImmVal(value: BigInt) extends Operand {
     override def toString() = s"$$$value"
 }
 
-case class Mem(reg: Operand, offset: Option[(Sign, Option[Int], Operand)]) extends Operand {
-    override def toString() = {
-        val sb = new StringBuilder
-        sb ++= "["
-        sb ++= reg.toString()
-        offset match {
-            case None =>
-            case Some((sign, mul, op)) =>
-                sb ++= sign.toString()
-                if (mul.isDefined) {
-                    sb ++= s"${mul.get}*"
-                }
-                sb ++= op.toString()
-        }
-        sb ++= "]"
-        sb.toString()
+case class Mem(reg: Reg, offset: Option[(Operand, Option[Int])]) extends Operand {
+    override def toString: String = offset match {
+        case None                               => s"($reg)"
+        case Some((ImmVal(value), None))        => s"$value($reg)"
+        case Some((offsetReg: Reg, None))       => s"($reg, $offsetReg)"
+        case Some((offsetReg: Reg, Some(mul)))  => s"($reg, $offsetReg, $mul)"
+        case _ => "error"
     }
 }
+
+object Mem {
+    def apply(reg: Reg): Mem = Mem(reg, None)
+    def apply(reg: Reg, offsetOp: Operand): Mem = Mem(reg, Some((offsetOp, None)))
+    def apply(reg: Reg, offsetOp: Operand, multiplier: Int): Mem = Mem(reg, Some((offsetOp, Some(multiplier))))
+}
+
 
 sealed trait Instr extends ASMItem
 
