@@ -1,8 +1,12 @@
 package wacc
 
 import wacc.ast._
-import scala.collection.mutable.ListBuffer
 import wacc.asmIR._
+import wacc.asmIR.ComparisonType._
+import wacc.asmIR.InstructionSize._
+import wacc.asmIR.RegisterNames._
+
+import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import scala.language.implicitConversions
 
@@ -37,16 +41,16 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         val programHeader = List(
             Text,
             Label("main"),
-            Push(Rbp),
-            Mov(Rsp, Rbp),
+            Push(Reg(RegisterNames.Rbp)),
+            Mov(Reg(Rsp), Reg(Rbp)),
         )
         val programBody = prog.stats.flatMap(translateStatement(_))
 
-        val popVariablesInScope = topLevelTable.table.map(_ => Pop(Rax)).toList
+        val popVariablesInScope = topLevelTable.table.map(_ => Pop(Reg(Rax))).toList
 
         val programFooter = List(
-            Mov(ImmVal(0), Rax),
-            Pop(Rbp),
+            Mov(ImmVal(0), Reg(Rax)),
+            Pop(Reg(Rbp)),
             Ret
         )
 
@@ -67,40 +71,79 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 val mask = -16
 
                 addLabel(exitLabel, List(
-                    Push(Rbp),
-                    Mov(Rsp, Rbp),
-                    asmIR.And(ImmVal(mask), Rsp),
+                    Push(Reg(Rbp)),
+                    Mov(Reg(Rsp), Reg(Rbp)),
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
                     Call(LibFunc.Exit),
-                    Mov(Rbp, Rsp),
-                    Pop(Rbp),
+                    Mov(Reg(Rbp), Reg(Rsp)),
+                    Pop(Reg(Rbp)),
                     Ret
                 ))
 
                 translateExpression(expr) :::
                 List(
-                    Mov(Rax, Rdi),
+                    Mov(Reg(Rax), Reg(Rdi)),
                     Call(exitLabel)
                 )
+
             case AssignNew(declType, _, rvalue) =>
                 translateRValue(rvalue) :::
                 List(
-                    Push(Rax, InstrSize.QWord)
+                    Push(Reg(Rax), QWord)
+                )
+            
+            case p@Print(expr) => 
+                translateExpression(expr) :::
+                List(
+                    Mov(Reg(Rax), Reg(Rdi))
+                ) :::
+                handlePrint(p.enclosingType)
+                
+            case _ => List.empty
+        }
+    }
+
+    def handlePrint(format: SemType): List[ASMItem] = {
+        format match {
+            case SemInt =>
+                val printIntLabel = Label("_printi")
+                val printIntStringLabel = Label(".L._printi_str0")
+
+                readOnlyList.addOne(StringDecl("%d", printIntStringLabel))
+
+                addLabel(printIntLabel, List(
+                    Push(Reg(Rbp)),
+                    Mov(Reg(Rsp), Reg(Rbp)),
+                    asmIR.And(ImmVal(-16), Reg(Rsp)),
+                    Mov(Reg(Rsi, DWord), Reg(Rsi, DWord), DWord),
+                    Lea(Mem(Reg(Rip), printIntStringLabel), Reg(Rdi)),
+                    Mov(ImmVal(0), Reg(Rax, Byte), Byte),
+                    Call(LibFunc.Printf),
+                    Mov(ImmVal(0), Reg(Rdi)),
+                    Call(LibFunc.Flush),
+                    Mov(Reg(Rbp), Reg(Rsp)),
+                    Pop(Reg(Rbp)),
+                    Ret
+                ))
+
+                List(
+                    Call(printIntLabel)
                 )
             case _ => List.empty
         }
     }
 
-    implicit def typeToSize(declType: Type): InstrSize.Size = declType match {
-        case ArrayType(_) => InstrSize.QWord
-        case BoolType() => InstrSize.Byte
-        case CharType() => InstrSize.Byte
-        case IntType() => InstrSize.DWord
-        case StringType() => InstrSize.QWord
-        case ErasedPair() => InstrSize.QWord
-        case PairType(_, _) => InstrSize.QWord
+    implicit def typeToSize(declType: Type): Size = declType match {
+        case ArrayType(_) => QWord
+        case BoolType() => Byte
+        case CharType() => Byte
+        case IntType() => DWord
+        case StringType() => QWord
+        case ErasedPair() => QWord
+        case PairType(_, _) => QWord
     }
 
-    def translateRValue(rvalue: RValue, targetReg: Operand = Rax): List[ASMItem] = rvalue match {
+    def translateRValue(rvalue: RValue, targetReg: Operand = Reg(Rax)): List[ASMItem] = rvalue match {
         case expr: Expr => translateExpression(expr, targetReg)
         case _ => List.empty
     }
@@ -111,7 +154,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def generateLabels: List[ASMItem] =
         labelMap.flatMap(_._2).toList
 
-    def translateExpression(expr: Expr, targetReg: Operand = Rax): List[ASMItem] = {
+    def translateExpression(expr: Expr, targetReg: Operand = Reg(Rax)): List[ASMItem] = {
         expr match {
             case IntVal(num) => 
                 List(

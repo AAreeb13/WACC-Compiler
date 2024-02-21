@@ -148,8 +148,8 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                         errorCollector.addError(expr, TypeError(s"$other", "1-dimensional array or pair type"))
                 }
 
-            case Print(expr) => checkExpression(expr)
-            case Println(expr) => checkExpression(expr)
+            case p@Printable(expr) => p.enclosingType = checkExpression(expr)
+
             case Skip() => // do nothing
 
             // Exit must be an integer
@@ -191,6 +191,8 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                 else {
                     errorCollector.addError(stat, RedeclaredVarError(assignNew, currentScope.nodeof(ident)))
                 }
+            
+            case _ =>
         }
     }
 
