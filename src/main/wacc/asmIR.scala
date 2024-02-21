@@ -11,6 +11,7 @@ object ComparisonType extends Enumeration {
     val Less = Value("l")
     val LessEqual = Value("le")
     val Overflow = Value("o")
+    val Unconditional = Value
 }
 
 object InstructionSize extends Enumeration {
@@ -117,15 +118,15 @@ case class Set(reg: Operand) {
 case class CMov(src: Operand, dst: Operand, flag: Flag) extends Instr {
     override def toString() = s"cmov${flag} ${src}, ${dst}"
 }
-case class J(label: Label, flag: Flag) extends Instr {
-    override def toString() = s"j${flag} ${label}"
+case class Jmp(label: Label, flag: Flag = Unconditional) extends Instr {
+    override def toString() = flag match {
+        case Unconditional => s"jmp ${label}"
+        case other => s"j$flag ${label}"
+    }
 }
 
 case class Call(callable: Callable) extends Instr {
     override def toString() = s"call ${callable}"
-}
-case class Jmp(label: Label) extends Instr {
-    override def toString() = s"jmp ${label}"
 }
 
 case class Cmp(src: Operand, dst: Operand, size: Size = QWord) extends Instr {

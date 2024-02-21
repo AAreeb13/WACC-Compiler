@@ -35,6 +35,8 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     val readOnlyList: ListBuffer[ASMItem] = ListBuffer.empty
 
+    var stringCounter = 0;
+
     val asmList: List[ASMItem] = translateProgram(prog)
 
     def translateProgram(prog: Prog): List[ASMItem] = {
@@ -92,31 +94,32 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Push(Reg(Rax), QWord)
                 )
             
-            case p@Print(expr) => 
+            case p@Printable(expr) => 
                 translateExpression(expr) :::
                 List(
                     Mov(Reg(Rax), Reg(Rdi))
                 ) :::
-                handlePrint(p.enclosingType)
+                handlePrint(p)
                 
             case _ => List.empty
         }
     }
 
-    def handlePrint(format: SemType): List[ASMItem] = {
-        format match {
-            case SemInt =>
-                val printIntLabel = Label("_printi")
-                val printIntStringLabel = Label(".L._printi_str0")
+    def handlePrint(printStatment: Printable): List[ASMItem] = {
+        val printString = printStatment.enclosingType match {
+            case SemInt => // SemInt and SemChar are repeated code, except for label names and format specifier -> factor common code
+                val printLabel = Label("_printi")
+                val printStringLabel = Label(".L._printi_str0")
+                val mask = -16
 
-                readOnlyList.addOne(StringDecl("%d", printIntStringLabel))
+                readOnlyList.addOne(StringDecl("%d", printStringLabel))
 
-                addLabel(printIntLabel, List(
+                addLabel(printLabel, List(
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(-16), Reg(Rsp)),
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
                     Mov(Reg(Rdi, DWord), Reg(Rsi, DWord), DWord),
-                    Lea(Mem(Reg(Rip), printIntStringLabel), Reg(Rdi)),
+                    Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
                     Mov(ImmVal(0), Reg(Rax, Byte), Byte),
                     Call(LibFunc.Printf),
                     Mov(ImmVal(0), Reg(Rdi)),
@@ -127,9 +130,129 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 ))
 
                 List(
-                    Call(printIntLabel)
+                    Call(printLabel)
+                )
+            case SemChar =>
+                val printLabel = Label("_printc")
+                val printStringLabel = Label(".L._printc_str0")
+                val mask = -16
+
+                readOnlyList.addOne(StringDecl("%c", printStringLabel))
+
+                addLabel(printLabel, List(
+                    Push(Reg(Rbp)),
+                    Mov(Reg(Rsp), Reg(Rbp)),
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    Mov(Reg(Rdi, Byte), Reg(Rsi, Byte), Byte),
+                    Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
+                    Mov(ImmVal(0), Reg(Rax, Byte), Byte),
+                    Call(LibFunc.Printf),
+                    Mov(ImmVal(0), Reg(Rdi)),
+                    Call(LibFunc.Flush),
+                    Mov(Reg(Rbp), Reg(Rsp)),
+                    Pop(Reg(Rbp)),
+                    Ret
+                ))
+
+                List(
+                    Call(printLabel)
+                )
+            
+            case SemString =>
+                val printLabel = Label("_prints")
+                val printStringLabel = Label(".L._prints_str0")
+                val mask = -16
+
+                readOnlyList.addOne(StringDecl("%.*s", printStringLabel))
+
+                addLabel(printLabel, List(
+                    Push(Reg(Rbp)),
+                    Mov(Reg(Rsp), Reg(Rbp)),
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    Mov(Reg(Rdi), Reg(Rdx)),
+                    Mov(Mem(Reg(Rdi), ImmVal(-4)), Reg(Rsi, DWord), DWord),
+                    Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
+                    Mov(ImmVal(0), Reg(Rax, Byte), Byte),
+                    Call(LibFunc.Printf),
+                    Mov(ImmVal(0), Reg(Rdi)),
+                    Call(LibFunc.Flush),
+                    Mov(Reg(Rbp), Reg(Rsp)),
+                    Pop(Reg(Rbp)),
+                    Ret
+                ))
+
+                List(
+                    Call(printLabel)
+                )
+            
+            case SemBool =>
+                val printLabel = Label("_printb")
+                val printFalseLabel = Label(".L._printb_str0")
+                val printTrueLabel = Label(".L._printb_str1")
+                val printStringLabel = Label(".L._printb_str2")
+
+                val falseLabel = Label(".L_printb0")
+                val trueLabel = Label(".L_printb1")
+
+                val mask = -16
+
+                readOnlyList.addOne(StringDecl("false", printFalseLabel))
+                readOnlyList.addOne(StringDecl("true", printTrueLabel))
+                readOnlyList.addOne(StringDecl("%.*s", printStringLabel))
+
+                addLabel(printLabel, List(
+                    Push(Reg(Rbp)),
+                    Mov(Reg(Rsp), Reg(Rbp)),
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    Cmp(ImmVal(0), Reg(Rdi, Byte), Byte),
+                    Jmp(falseLabel, NotEqual),
+                    Lea(Mem(Reg(Rip), printFalseLabel), Reg(Rdx)),
+                    Jmp(trueLabel),
+                    falseLabel,
+                    Lea(Mem(Reg(Rip), printTrueLabel), Reg(Rdx)),
+                    trueLabel,
+                    Mov(Mem(Reg(Rdx), ImmVal(-4)), Reg(Rsi, DWord), DWord),
+                    Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
+                    Mov(ImmVal(0), Reg(Rax, Byte), Byte),
+                    Call(LibFunc.Printf),
+                    Mov(ImmVal(0), Reg(Rdi)),
+                    Call(LibFunc.Flush),
+                    Mov(Reg(Rbp), Reg(Rsp)),
+                    Pop(Reg(Rbp)),
+                    Ret
+                ))
+
+                List(
+                    Call(printLabel)
                 )
             case _ => List.empty
+        }
+        printStatment match {
+            case Println(_) => printString ::: {
+                val printLabel = Label("_println")
+                val printStringLabel = Label(".L._println_str0")
+                val mask = -16
+
+                readOnlyList.addOne(StringDecl("", printStringLabel))
+
+                addLabel(printLabel, List(
+                    Push(Reg(Rbp)),
+                    Mov(Reg(Rsp), Reg(Rbp)),
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
+                    Call(LibFunc.Puts),
+                    Mov(ImmVal(0), Reg(Rdi)),
+                    Call(LibFunc.Flush),
+                    Mov(Reg(Rbp), Reg(Rsp)),
+                    Pop(Reg(Rbp)),
+                    Ret
+                ))
+
+                List(
+                    Call(printLabel)
+                )
+            }
+            case Print(_) => printString
         }
     }
 
@@ -156,13 +279,24 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def translateExpression(expr: Expr, targetReg: Operand = Reg(Rax)): List[ASMItem] = {
         expr match {
-            case IntVal(num) => 
+            case IntVal(int) => 
                 List(
-                    Mov(ImmVal(num), targetReg)
+                    Mov(ImmVal(int), targetReg)
                 )
-            case CharVal(x) => 
+            case CharVal(char) => 
                 List(
-                    Mov(ImmVal(x.toInt), targetReg)
+                    Mov(ImmVal(char.toInt), targetReg)
+                )
+            case BoolVal(bool) =>
+                List(
+                    Mov(ImmVal(if (bool) 1 else 0), targetReg)
+                )
+            case StrVal(str) => 
+                val strLabel = Label(s".L.str${stringCounter}")
+                readOnlyList.addOne(StringDecl(str, strLabel))
+                stringCounter += 1
+                List(
+                    Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
             case _ => List.empty
         }
