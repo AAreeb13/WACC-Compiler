@@ -115,7 +115,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
                     asmIR.And(ImmVal(-16), Reg(Rsp)),
-                    Mov(Reg(Rsi, DWord), Reg(Rsi, DWord), DWord),
+                    Mov(Reg(Rdi, DWord), Reg(Rsi, DWord), DWord),
                     Lea(Mem(Reg(Rip), printIntStringLabel), Reg(Rdi)),
                     Mov(ImmVal(0), Reg(Rax, Byte), Byte),
                     Call(LibFunc.Printf),

@@ -17,7 +17,7 @@ object InstructionSize extends Enumeration {
     type Size = Value
     val Byte = Value("b")
     val Word = Value("")
-    val DWord = Value("d")
+    val DWord = Value("l")
     val QWord = Value("q")
 }
 
@@ -77,7 +77,7 @@ case class Mem(reg: Reg, offset: Option[(ASMItem, Option[Int])]) extends Operand
     override def toString: String = offset match {
         case None                               => s"($reg)"
         case Some((ImmVal(value), None))        => s"$value($reg)"
-        case Some((Label(ident), None))        => s"$ident($reg)"
+        case Some((Label(ident), None))         => s"$ident($reg)"
         case Some((offsetReg: Reg, None))       => s"($reg, $offsetReg)"
         case Some((offsetReg: Reg, Some(mul)))  => s"($reg, $offsetReg, $mul)"
         case _ => "error"
