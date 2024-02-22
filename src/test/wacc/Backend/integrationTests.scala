@@ -24,7 +24,7 @@ class Tests extends AnyFlatSpec {
     type ResultInfo = (Input, Output, ExitCode)
     type FileInfo = (Path, FileContents, ResultInfo)
 
-    val examplesDir = "wacc_examples/valid/"
+    val examplesDir = "wacc_examples/valid"
     val asmDir = "backend_output"
 
     /**
@@ -53,8 +53,8 @@ class Tests extends AnyFlatSpec {
             runCommandWithDocker(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
 
             val outStream = new ByteArrayOutputStream 
-            val actualExit = runCommandWithDocker(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()))
-            val actualOut: Output = outStream.toString().split("\\R").toList.init // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
+            val actualExit = runCommandWithDocker(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
+            val actualOut: Output = outStream.toString().split("\n").toList.filter(!_.isEmpty()) // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
 
             (examplePath, asmOutput, in, expectedOut, expectedExit, actualOut, actualExit)
         }.filter { case (_, _, _, expectedOut, expectedExit, actualOut, actualExit) =>
