@@ -49,6 +49,10 @@ object LibFunc extends Enumeration {
     val Puts = LibFuncValue("puts@plt")
 }
 
+case class Comment(contents: String) extends ASMItem {
+    override def toString() = s"# $contents\n"
+}
+
 sealed trait Section extends ASMItem
 
 case object Readonly extends Section {
@@ -63,6 +67,7 @@ case object Global extends Section {
 
 case class StringDecl(strVal: String, label: Label) extends Section {
     override def toString() =
+        Comment(s"length of ${label.toString}").toString() +
         s"\t.int ${strVal.length}\n" + 
         label.toString + ": \n" + 
         s"\t.asciz \"${strVal}\""

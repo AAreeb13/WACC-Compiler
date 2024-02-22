@@ -42,6 +42,8 @@ class Tests extends AnyFlatSpec {
         }
 
         if (useDocker) {
+            // docker buildx build --platform linux/amd64 -t my-x86-image .
+            // docker run -di --platform linux/amd64 --name my-container my-x86-image
             //runCommand(Seq("docker", "buildx", "build", "--platform", "linux/amd64", "-t",  "my-x86-image", "."))
             runCommand(Seq("docker", "run", "-di", "--platform", "linux/amd64", "--name", "my-container", "my-x86-image"))
         }

@@ -28,12 +28,12 @@ object codeGenerator {
 }
 
 class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
-    val labelMap: HashMap[String, List[ASMItem]] = HashMap.empty
+    val labelMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
     val topLevelTable = symbolTables.head
     val functionTables = symbolTables.tail
 
-    val readOnlyList: ListBuffer[ASMItem] = ListBuffer.empty
+    val readOnlyMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
     var stringCounter = 0;
 
@@ -56,8 +56,8 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             Ret
         )
 
-        List(Global, Readonly) ::: 
-        readOnlyList.toList :::
+        List(Global) ::: 
+        generateReadOnlys :::
         programHeader :::
         programBody :::
         popVariablesInScope :::
@@ -99,20 +99,20 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Mov(Reg(Rax), Reg(Rdi))
                 ) :::
-                handlePrint(p)
+                generatePrint(p)
                 
             case _ => List.empty
         }
     }
 
-    def handlePrint(printStatment: Printable): List[ASMItem] = {
+    def generatePrint(printStatment: Printable): List[ASMItem] = {
         val printString = printStatment.enclosingType match {
             case SemInt => // SemInt and SemChar are repeated code, except for label names and format specifier -> factor common code
                 val printLabel = Label("_printi")
                 val printStringLabel = Label(".L._printi_str0")
                 val mask = -16
 
-                readOnlyList.addOne(StringDecl("%d", printStringLabel))
+                addReadOnly(printStringLabel, StringDecl("%d", printStringLabel))
 
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
@@ -137,7 +137,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 val printStringLabel = Label(".L._printc_str0")
                 val mask = -16
 
-                readOnlyList.addOne(StringDecl("%c", printStringLabel))
+                addReadOnly(printStringLabel, StringDecl("%c", printStringLabel))
 
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
@@ -163,7 +163,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 val printStringLabel = Label(".L._prints_str0")
                 val mask = -16
 
-                readOnlyList.addOne(StringDecl("%.*s", printStringLabel))
+                addReadOnly(printStringLabel, StringDecl("%.*s", printStringLabel))
 
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
@@ -196,9 +196,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
                 val mask = -16
 
-                readOnlyList.addOne(StringDecl("false", printFalseLabel))
-                readOnlyList.addOne(StringDecl("true", printTrueLabel))
-                readOnlyList.addOne(StringDecl("%.*s", printStringLabel))
+                addReadOnly(printFalseLabel, StringDecl("false", printFalseLabel))
+                addReadOnly(printTrueLabel, StringDecl("true", printTrueLabel))
+                addReadOnly(printStringLabel, StringDecl("%.*s", printStringLabel))
 
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
@@ -228,32 +228,34 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case _ => List.empty
         }
         printStatment match {
-            case Println(_) => printString ::: {
-                val printLabel = Label("_println")
-                val printStringLabel = Label(".L._println_str0")
-                val mask = -16
-
-                readOnlyList.addOne(StringDecl("", printStringLabel))
-
-                addLabel(printLabel, List(
-                    Push(Reg(Rbp)),
-                    Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
-                    Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
-                    Call(LibFunc.Puts),
-                    Mov(ImmVal(0), Reg(Rdi)),
-                    Call(LibFunc.Flush),
-                    Mov(Reg(Rbp), Reg(Rsp)),
-                    Pop(Reg(Rbp)),
-                    Ret
-                ))
-
-                List(
-                    Call(printLabel)
-                )
-            }
+            case Println(_) => printString ::: generateNewLine()
             case Print(_) => printString
         }
+    }
+
+    def generateNewLine(): List[ASMItem] = {
+        val printLabel = Label("_println")
+        val printStringLabel = Label(".L._println_str0")
+        val mask = -16
+
+        addReadOnly(printStringLabel, StringDecl("", printStringLabel))
+
+        addLabel(printLabel, List(
+            Push(Reg(Rbp)),
+            Mov(Reg(Rsp), Reg(Rbp)),
+            asmIR.And(ImmVal(mask), Reg(Rsp)),
+            Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
+            Call(LibFunc.Puts),
+            Mov(ImmVal(0), Reg(Rdi)),
+            Call(LibFunc.Flush),
+            Mov(Reg(Rbp), Reg(Rsp)),
+            Pop(Reg(Rbp)),
+            Ret
+        ))
+
+        List(
+            Call(printLabel)
+        )
     }
 
     implicit def typeToSize(declType: Type): Size = declType match {
@@ -271,8 +273,20 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         case _ => List.empty
     }
 
-    def addLabel(label: Label, asmList: List[ASMItem]) = 
-        labelMap.addOne(label.ident, label :: asmList)
+    def addLabel(label: Label, asmList: =>List[ASMItem]) = {
+        if (!labelMap.contains(label)) {
+            labelMap.addOne(label, label :: asmList)
+        }
+    }
+    
+    def addReadOnly(label: Label, readOnly: =>StringDecl) = {
+        if (!readOnlyMap.contains(label)) {
+            readOnlyMap.addOne(label, readOnly :: Nil)
+        }
+    }
+
+    def generateReadOnlys: List[ASMItem] =
+        Readonly :: readOnlyMap.flatMap(_._2).toList
     
     def generateLabels: List[ASMItem] =
         labelMap.flatMap(_._2).toList
@@ -293,7 +307,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 )
             case StrVal(str) => 
                 val strLabel = Label(s".L.str${stringCounter}")
-                readOnlyList.addOne(StringDecl(str, strLabel))
+                addReadOnly(strLabel, StringDecl(str, strLabel))
                 stringCounter += 1
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
