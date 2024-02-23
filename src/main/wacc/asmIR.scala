@@ -105,8 +105,8 @@ case object Ret extends Instr {
 case class Mov(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"mov${size} ${src}, ${dst}"
 }
-case class Movs(src: Operand, dst: Operand, sizeFrom: Size, sizeTo: Size) extends Instr {
-    override def toString() = s"mov${sizeFrom}${sizeTo} ${src}, ${dst}"
+case class Movs(src: Operand, dst: Operand, sizeFrom: Size, sizeTo: Size = QWord) extends Instr {
+    override def toString() = s"movs${sizeFrom}${sizeTo} ${src}, ${dst}"
 }
 
 case class Pop(reg: Operand, size: Size = QWord) extends Instr {

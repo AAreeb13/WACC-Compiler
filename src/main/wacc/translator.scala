@@ -151,7 +151,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         val memLocation: Option[Operand] = declType match {
             case BoolType() | CharType() | IntType() =>
-                val retVal = Some(ImmVal(stackOffset -  currentScope.currentScopeOffset))
+                val retVal = Some(Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)))
                 currentScope.updateStackLocation(ident, retVal)
                 retVal
             case _ => None
@@ -160,13 +160,13 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         val retVal: List[ASMItem] = declType match {
             case BoolType() =>
                 asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
-                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), memLocation.get), Byte) :: Nil
+                Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
             case CharType() =>
                 asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
-                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), memLocation.get), Byte) :: Nil
+                Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
             case IntType() =>
                 asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
-                Mov(Reg(Rax, DWord), Mem(Reg(Rbp), memLocation.get), DWord) :: Nil
+                Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
             case _ => Nil
         }
 
@@ -380,12 +380,11 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case Var(ident) =>
                 val (declType, _, location) = currentScope.table.get(ident).get
                 declType match {
-                    case SemBool =>
-                    case SemChar => 
-                    case SemInt =>
-                    case _ =>
+                    case SemBool => Movs(location.get, targetReg, Byte) :: Nil
+                    case SemChar => Movs(location.get, targetReg, Byte) :: Nil
+                    case SemInt => Movs(location.get, targetReg, DWord) :: Nil
+                    case _ => Nil
                 }
-                List.empty
             case _ => List.empty
         }
     }
