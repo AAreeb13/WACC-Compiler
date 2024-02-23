@@ -178,10 +178,10 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                 case retType => matchesType(checkExpression(expr), retType)
             }
                 
-            case Read(lvalue) => checkLValue(lvalue) match {
+            case r@Read(lvalue) => checkLValue(lvalue) match {
                 case SemUnknown => 
                     errorCollector.addError(lvalue, SpecialError("Type Error", "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure"))
-                case other => matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
+                case other => r.enclosingType = matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
             }
 
             case assignNew@AssignNew(declType, ident, rvalue) =>

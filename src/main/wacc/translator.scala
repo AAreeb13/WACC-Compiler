@@ -136,6 +136,11 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(Mov(Reg(Rax), Reg(Rdi))) :::
                 translatePrint(p.enclosingType) :::
                 translateNewline()
+
+            case r@Read(lvalue) =>
+                translateLValue(lvalue) :::
+                List(Mov(Reg(Rax), Reg(Rdi))) :::
+                translateRead(r.enclosingType)
                 
             case _ => List.empty
         }
@@ -387,6 +392,36 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 }
             case _ => List.empty
         }
+    }
+
+    def translateLValue(lvalue: LValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        lvalue match {
+            case Var(ident) =>
+                val (declType, _, location) = currentScope.table.get(ident).get
+                Mov(location.get, targetReg, QWord) :: Nil
+            case _ => List.empty
+
+        }
+    }
+
+    def translateRead(innerType: SemType): List[ASMItem] = innerType match {
+        case SemInt => 
+            val readLabel = Label("_readi")
+            val readStringLabel = Label(".L._readi_str0")
+            val mask = -16
+
+            addReadOnly(readStringLabel, StringDecl("%d", readStringLabel))
+            
+            addLabel(readLabel, List(
+                Push(Reg(Rbp)),
+                Mov(Reg(Rsp), Reg(Rbp)),
+                asmIR.And(ImmVal(mask), Reg(Rsp))
+            ))
+
+            List(
+                Call(readLabel)
+            )
+        case _ => List.empty
     }
 
     def toAssembly: String = {
