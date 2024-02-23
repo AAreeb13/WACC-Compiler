@@ -122,6 +122,12 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Call(exitLabel)
                 )
 
+            case Assign(lvalue, rvalue) =>
+                translateRValue(rvalue, Reg(Rax)) :::
+                translateLValue(lvalue, Reg(Rbx)) :::
+                List(Mov(Reg(Rax), Reg(Rbx)))
+                
+
             case AssignNew(declType, ident, rvalue) =>
                 translateRValue(rvalue) :::
                 nextStackLocation(ident, declType)
@@ -382,25 +388,26 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
-            case Var(ident) =>
-                val (declType, _, location) = currentScope.table.get(ident).get
-                declType match {
-                    case SemBool => Movs(location.get, targetReg, Byte) :: Nil
-                    case SemChar => Movs(location.get, targetReg, Byte) :: Nil
-                    case SemInt => Movs(location.get, targetReg, DWord) :: Nil
-                    case _ => Nil
-                }
+            case variable: Var => translateVar(variable)
             case _ => List.empty
         }
     }
 
     def translateLValue(lvalue: LValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         lvalue match {
-            case Var(ident) =>
-                val (declType, _, location) = currentScope.table.get(ident).get
-                Mov(location.get, targetReg, QWord) :: Nil
+            case variable: Var => translateVar(variable, targetReg)
             case _ => List.empty
 
+        }
+    }
+
+    def translateVar(v: Var, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val (declType, _, location) = currentScope.table.get(v.v).get
+        declType match {
+            case SemBool => Movs(location.get, targetReg, Byte) :: Nil
+            case SemChar => Movs(location.get, targetReg, Byte) :: Nil
+            case SemInt  => Movs(location.get, targetReg, DWord) :: Nil
+            case _ => Nil
         }
     }
 
