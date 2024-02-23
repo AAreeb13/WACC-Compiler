@@ -69,8 +69,11 @@ def containsReturn(statList: List[Stat]): Boolean = statList.lastOption match {
     case _ => false
 }
 
-sealed trait Printable {
+sealed trait TypeCapture {
     var enclosingType: SemType = null
+}
+
+sealed trait Printable extends TypeCapture {
     val expr: Expr
 }
 
@@ -87,7 +90,7 @@ case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int)
     override def toString = s"AssignNew($t,\"$ident\",$rvalue)"
 }
 case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
-case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat
+case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat with TypeCapture
 case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
 case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
 case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat

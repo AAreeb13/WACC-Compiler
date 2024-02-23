@@ -122,22 +122,26 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Call(exitLabel)
                 )
 
-            case AssignNew(declType, _, rvalue) =>
+            case AssignNew(declType, ident, rvalue) =>
                 translateRValue(rvalue) :::
-                nextStackLocation(declType)
+                nextStackLocation(ident, declType)
             
-            case p@Printable(expr) => 
+            case p@Print(expr) =>
                 translateExpression(expr) :::
-                List(
-                    Mov(Reg(Rax), Reg(Rdi))
-                ) :::
-                generatePrint(p)
+                List(Mov(Reg(Rax), Reg(Rdi))) :::
+                translatePrint(p.enclosingType)
+            
+            case p@Println(expr) =>
+                translateExpression(expr) :::
+                List(Mov(Reg(Rax), Reg(Rdi))) :::
+                translatePrint(p.enclosingType) :::
+                translateNewline()
                 
             case _ => List.empty
         }
     }
 
-    def nextStackLocation(declType: Type)(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def nextStackLocation(ident: String, declType: Type)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val size = declType match {
             case BoolType() => 1
             case CharType() => 1
@@ -145,16 +149,24 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case _ => 0
         }
 
+        val memLocation: Option[Operand] = declType match {
+            case BoolType() | CharType() | IntType() =>
+                val retVal = Some(ImmVal(stackOffset -  currentScope.currentScopeOffset))
+                currentScope.updateStackLocation(ident, retVal)
+                retVal
+            case _ => None
+        }
+
         val retVal: List[ASMItem] = declType match {
             case BoolType() =>
                 asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
-                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)), Byte) :: Nil
+                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), memLocation.get), Byte) :: Nil
             case CharType() =>
                 asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
-                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)), Byte) :: Nil
+                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), memLocation.get), Byte) :: Nil
             case IntType() =>
                 asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
-                Mov(Reg(Rax, DWord), Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)), DWord) :: Nil
+                Mov(Reg(Rax, DWord), Mem(Reg(Rbp), memLocation.get), DWord) :: Nil
             case _ => Nil
         }
 
@@ -162,8 +174,8 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         retVal
     }
 
-    def generatePrint(printStatment: Printable): List[ASMItem] = {
-        val printString = printStatment.enclosingType match {
+    def translatePrint(innerType: SemType): List[ASMItem] = {
+        innerType match {
             case SemInt => // SemInt and SemChar are repeated code, except for label names and format specifier -> factor common code
                 val printLabel = Label("_printi")
                 val printStringLabel = Label(".L._printi_str0")
@@ -284,13 +296,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 )
             case _ => List.empty
         }
-        printStatment match {
-            case Println(_) => printString ::: generateNewLine()
-            case Print(_) => printString
-        }
     }
 
-    def generateNewLine(): List[ASMItem] = {
+    def translateNewline(): List[ASMItem] = {
         val printLabel = Label("_println")
         val printStringLabel = Label(".L._println_str0")
         val mask = -16
@@ -369,7 +377,15 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
-            case Var(ident) => List.empty
+            case Var(ident) =>
+                val (declType, _, location) = currentScope.table.get(ident).get
+                declType match {
+                    case SemBool =>
+                    case SemChar => 
+                    case SemInt =>
+                    case _ =>
+                }
+                List.empty
             case _ => List.empty
         }
     }
