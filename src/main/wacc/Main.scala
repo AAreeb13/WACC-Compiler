@@ -3,6 +3,7 @@ package wacc
 import scala.io.Source
 import globals._
 import scala.annotation.switch
+import java.io._
 
 object Main {
     /**
@@ -77,7 +78,19 @@ object Main {
                                         println(err)
                                         sys.exit(exitRuntimeErr) 
                                     case Right(asm) =>
-                                        println(asm)
+                                        //
+                                        if (path.equals("in.txt")) {
+                                            println(asm)
+                                        } else {
+                                            val outputFileName = path.split("/").last.replace("wacc","s")
+                                            val outputFile = new File(outputFileName)
+                                            val writer = new BufferedWriter(new FileWriter(outputFile))
+                                            writer.write(asm)
+                                            writer.newLine()
+                                            writer.close()
+                                        //
+                                            //println(asm)
+                                        }
                                         sys.exit(exitSuccess)
                                 }
                             } else {
