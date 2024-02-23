@@ -35,7 +35,8 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     val readOnlyMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
-    var stringCounter = 0;
+    var stringCounter = 0
+    var stackOffset = 0
 
     val asmList: List[ASMItem] = translateProgram(prog)
 
@@ -43,10 +44,13 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         val programHeader = List(
             Text,
             Label("main"),
-            Push(Reg(RegisterNames.Rbp)),
+            Push(Reg(Rbp)),
             Mov(Reg(Rsp), Reg(Rbp)),
         )
-        val programBody = prog.stats.flatMap(translateStatement(_))
+
+        // for all the variables we need to 
+        // make stacks 
+        val programBody = prog.stats.flatMap(translateStatement(_)(topLevelTable))
 
         val popVariablesInScope = topLevelTable.table.map(_ => Pop(Reg(Rax))).toList
 
@@ -59,13 +63,43 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         List(Global) ::: 
         generateReadOnlys :::
         programHeader :::
+        // this can be abstracted out
+        //allocateStackVariables(topLevelTable) :::
         programBody :::
-        popVariablesInScope :::
+        popStackVariables(topLevelTable) :::
+        // upto here
         programFooter :::
         generateLabels
     }
 
-    def translateStatement(stat: Stat): List[ASMItem] = {
+    // def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
+    //     // generate add instruction with the sizes
+    //     //val allocationSize = 0
+    //     var currentOffset = 0
+    //     val allocatedVariables = scopeTable.table.toSeq.flatMap { case (ident, (sizeType, _, loc)) => {
+    //         sizeType match {
+    //             case SemChar =>
+
+    //             case SemInt =>
+    //                 Sub(ImmVal(4), )
+    //             case SemBool => 1
+    //             case SemString =>
+    //             case _ =>
+    //         }
+    //         Sub(ImmVal())
+    //         scopeTable.table(ident).get._3 =
+    //     }}
+    //     Sub(ImmVal(), Reg(Rsp))
+    // }
+
+    def popStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
+        asmIR.Add(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp)) :: Nil
+        // scopeTable.table.flatMap(_ => List(
+        //     asmIR.Add(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp))
+        // )).toList
+    }
+
+    def translateStatement(stat: Stat)(implicit currentScope: SymbolTable): List[ASMItem] = {
         stat match {
             case Skip() => List.empty
             case Exit(expr) =>
@@ -90,9 +124,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
             case AssignNew(declType, _, rvalue) =>
                 translateRValue(rvalue) :::
-                List(
-                    Push(Reg(Rax), QWord)
-                )
+                nextStackLocation(declType)
             
             case p@Printable(expr) => 
                 translateExpression(expr) :::
@@ -103,6 +135,31 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 
             case _ => List.empty
         }
+    }
+
+    def nextStackLocation(declType: Type)(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val size = declType match {
+            case BoolType() => 1
+            case CharType() => 1
+            case IntType() => 4
+            case _ => 0
+        }
+
+        val retVal: List[ASMItem] = declType match {
+            case BoolType() =>
+                asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
+                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)), Byte) :: Nil
+            case CharType() =>
+                asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
+                Mov(Reg(Rax, Byte), Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)), Byte) :: Nil
+            case IntType() =>
+                asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
+                Mov(Reg(Rax, DWord), Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)), DWord) :: Nil
+            case _ => Nil
+        }
+
+        stackOffset += size
+        retVal
     }
 
     def generatePrint(printStatment: Printable): List[ASMItem] = {
@@ -268,7 +325,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         case PairType(_, _) => QWord
     }
 
-    def translateRValue(rvalue: RValue, targetReg: Operand = Reg(Rax)): List[ASMItem] = rvalue match {
+    def translateRValue(rvalue: RValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
         case expr: Expr => translateExpression(expr, targetReg)
         case _ => List.empty
     }
@@ -291,7 +348,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def generateLabels: List[ASMItem] =
         labelMap.flatMap(_._2).toList
 
-    def translateExpression(expr: Expr, targetReg: Operand = Reg(Rax)): List[ASMItem] = {
+    def translateExpression(expr: Expr, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
             case IntVal(int) => 
                 List(
@@ -312,6 +369,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
+            case Var(ident) => List.empty
             case _ => List.empty
         }
     }

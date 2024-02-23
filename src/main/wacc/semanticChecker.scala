@@ -6,6 +6,7 @@ import scala.language.implicitConversions
 import wacc.Implicits._
 import ast._
 import scala.io.Source.fromFile
+import asmIR.Operand
 
 /**
   * Takes an AST and optionally a semanticError collector and performs semantic analysis on it
@@ -436,8 +437,9 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
   */
 class SymbolTable(val parent: Option[SymbolTable] = None) {
     //  (ident, (semantic type, reference to original node))
-    var table: HashMap[String, (SemType, Node)] = HashMap()
+    var table: HashMap[String, (SemType, Node, Option[Operand])] = HashMap()
     var children: ListBuffer[SymbolTable] = ListBuffer.empty
+    var currentScopeOffset: Int = parent.map(_.currentScopeOffset).getOrElse(0)
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
@@ -447,8 +449,24 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
 
     // Add an entry to the symbol table
     def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {
-        table.addOne(name, (declType, node))
+        table.addOne(name, (declType, node, None))
+        updateScopeSize(declType)
         node.scope = this
+    }
+
+    private def updateScopeSize(declType: SemType): Unit = {
+        val size = declType match {
+            case SemInt => 4
+            case SemBool => 1
+            case SemChar => 1
+            case _ => 0
+        }
+        currentScopeOffset += size
+    }
+
+    def updateStackLocation(name: String, location: Option[Operand]): Unit = {
+        val oldEntry = table.get(name).get
+        table.addOne(name, (oldEntry._1, oldEntry._2, location))
     }
 
     // Check for existence in this and all parent scopes
