@@ -1,4 +1,4 @@
-package wacc.integration
+package wacc.backend.integration
 
 import org.scalatest.flatspec.AnyFlatSpec
 import java.io.File
