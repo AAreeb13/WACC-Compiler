@@ -69,6 +69,18 @@ def containsReturn(statList: List[Stat]): Boolean = statList.lastOption match {
     case _ => false
 }
 
+sealed trait TypeCapture {
+    var enclosingType: SemType = null
+}
+
+sealed trait Printable extends TypeCapture {
+    val expr: Expr
+}
+
+object Printable {
+    def unapply(p: Printable): Option[Expr] = Some(p.expr)
+}
+
 sealed trait Stat                                                   extends Node
 case class Skip()(val pos: (Int, Int))                                                   extends Stat {
     override def toString = "Skip"
@@ -78,12 +90,12 @@ case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int)
     override def toString = s"AssignNew($t,\"$ident\",$rvalue)"
 }
 case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
-case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat
+case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat with TypeCapture
 case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
 case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
 case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
-case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat
-case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat
+case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with Printable
+case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with Printable
 case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat
 case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat
 case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat

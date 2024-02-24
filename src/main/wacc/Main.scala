@@ -71,9 +71,9 @@ object Main {
                         case Left(err) =>
                             println(err)
                             sys.exit(exitSemanticErr) 
-                        case Right((ast, st)) =>
+                        case Right((ast, sts)) =>
                             if (!onlyTypeCheck) {
-                                codeGenerator.translate(ast, st) match {
+                                codeGenerator.translate(ast, sts) match {
                                     case Left(err) =>
                                         println(err)
                                         sys.exit(exitRuntimeErr) 

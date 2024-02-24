@@ -6,6 +6,7 @@ import scala.language.implicitConversions
 import wacc.Implicits._
 import ast._
 import scala.io.Source.fromFile
+import asmIR.Operand
 
 /**
   * Takes an AST and optionally a semanticError collector and performs semantic analysis on it
@@ -18,7 +19,7 @@ object semanticChecker {
       * @param errorCollector Semantic error builder that contains file info if passed.
       * @return Either a success if semantically valid or errors as string otherwise
       */
-    def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, (Node, SymbolTable)] = result.flatMap(_ match {
+    def verify(result: Either[String, Node], errorCollector: Option[SemanticErrorCollector] = None): Either[String, (Node, List[SymbolTable])] = result.flatMap(_ match {
         case prog: Prog => new Analyser(prog, errorCollector).getResult
         case _ => Left("Invalid AST type for semantic verification")
     })
@@ -148,8 +149,8 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                         errorCollector.addError(expr, TypeError(s"$other", "1-dimensional array or pair type"))
                 }
 
-            case Print(expr) => checkExpression(expr)
-            case Println(expr) => checkExpression(expr)
+            case p@Printable(expr) => p.enclosingType = checkExpression(expr)
+
             case Skip() => // do nothing
 
             // Exit must be an integer
@@ -177,10 +178,10 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                 case retType => matchesType(checkExpression(expr), retType)
             }
                 
-            case Read(lvalue) => checkLValue(lvalue) match {
+            case r@Read(lvalue) => checkLValue(lvalue) match {
                 case SemUnknown => 
                     errorCollector.addError(lvalue, SpecialError("Type Error", "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure"))
-                case other => matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
+                case other => r.enclosingType = matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
             }
 
             case assignNew@AssignNew(declType, ident, rvalue) =>
@@ -191,6 +192,8 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                 else {
                     errorCollector.addError(stat, RedeclaredVarError(assignNew, currentScope.nodeof(ident)))
                 }
+            
+            case _ =>
         }
     }
 
@@ -418,56 +421,12 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
         }
     }
 
-    def getResult: Either[String, (Node, SymbolTable)] = {
+    def getResult: Either[String, (Node, List[SymbolTable])] = {
         if (errorCollector.containsError) {
-            Right((prog, globalTable))
+            Right((prog, scopeList.toList))
         } else {
             Left(errorCollector.formatErrors)
         }
     }
 }
 
-/**
-  * Doubly linked symbol table class that keeps track of parent and child nodes 
-  *
-  * @param parent Optional ST for parent scopes
-  */
-class SymbolTable(val parent: Option[SymbolTable] = None) {
-    //  (ident, (semantic type, reference to original node))
-    var table: HashMap[String, (SemType, Node)] = HashMap()
-    var children: ListBuffer[SymbolTable] = ListBuffer.empty
-
-    // add child to parent so we don't need to explictly do this
-    if (parent.isDefined) parent.get.addChild(this)
-
-    private def addChild(childTable: SymbolTable) =
-        children.addOne(childTable)
-
-    // Add an entry to the symbol table
-    def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {
-        table.addOne(name, (declType, node))
-        node.scope = this
-    }
-
-    // Check for existence in this and all parent scopes
-    def contains(name: String): Boolean =
-        table.contains(name) || parent.exists(_.contains(name))
-
-    // Check for existence only in the current scope
-    def containsInCurrent(name: String): Boolean =
-        table.contains(name)
-
-    // Gets the type of the identifier (if it exists) in this scope
-    // or parent scopes
-    def typeof(name: String): Option[SemType] = table
-        .get(name)
-        .map(_._1)
-        .orElse(parent.flatMap(_.typeof(name)))
-
-    // Gets the node of the identifier (if it exists) in this scope
-    // or parent scopes
-    def nodeof(name: String): Option[Node] = table
-        .get(name)
-        .map(_._2)
-        .orElse(parent.flatMap(_.nodeof(name)))
-}
