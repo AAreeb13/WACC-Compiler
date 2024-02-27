@@ -24,14 +24,62 @@ class Tests extends AnyFlatSpec {
     type ResultInfo = (Input, Output, ExitCode)
     type FileInfo = (Path, FileContents, ResultInfo)
 
-    val examplesDir = "wacc_examples/valid"
+    val examplesDir = "wacc_examples/valid/"
     val asmDir = "backend_output"
 
     /**
       * Compiles all the files in a given path
       */
-    "Valid examples" should "match assembler output and exit code" in {
-        performTests(examplesDir) 
+    "Valid IO examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "IO") 
+    }
+
+    "Valid advanced examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "advanced") 
+    }
+
+    "Valid array examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "array") 
+    }
+
+    "Valid basic examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "basic") 
+    }
+
+    "Valid expressions examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "expressions") 
+    }
+
+    "Valid function examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "function") 
+    }
+
+    "Valid if examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "if") 
+    }
+
+    "Valid pairs examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "pairs") 
+    }
+
+    "Valid runtimeErr examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "runtimeErr") 
+    }
+
+    "Valid scope examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "scope") 
+    }
+
+    "Valid sequence examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "sequence") 
+    }
+
+    "Valid variables examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "variables") 
+    }
+
+    "Valid while examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "while") 
     }
 
     def performTests(dir: Path) = {

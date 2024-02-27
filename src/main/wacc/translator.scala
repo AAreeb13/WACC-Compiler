@@ -146,8 +146,8 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case r@Read(lvalue) =>
                 translateLValue(lvalue) :::
                 List(Mov(Reg(Rax), Reg(Rdi))) :::
-                translateRead(r.enclosingType)
-                
+                translateRead(r) 
+
             case _ => List.empty
         }
     }
@@ -411,23 +411,53 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
-    def translateRead(innerType: SemType): List[ASMItem] = innerType match {
-        case SemInt => 
-            val readLabel = Label("_readi")
-            val readStringLabel = Label(".L._readi_str0")
-            val mask = -16
+    def updateLValue(lvalue: LValue, source: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        lvalue match {
+            case v: Var => 
+                 val (declType, _, location) = currentScope.table.get(v.v).get
+                 declType match {
+                    case SemBool => Mov(source, location.get, Byte) :: Nil
+                    case SemChar => Mov(source, location.get, Byte) :: Nil
+                    case SemInt => Mov(source, location.get, DWord) :: Nil
+                    case _ => Nil
+                 }               
+            case _ => ???
+        }
+    }
 
-            addReadOnly(readStringLabel, StringDecl("%d", readStringLabel))
-            
-            addLabel(readLabel, List(
+    private def translateReadBuilder(readLabelIdent: String, escapeChar: String, size: Size): List[ASMItem] = {
+        val readLabel = Label(readLabelIdent)
+        val readStringLabel = Label(".L." + readLabelIdent + "_str0")
+        val mask = -16
+        
+        addReadOnly(readStringLabel, StringDecl(escapeChar, readStringLabel))
+
+        addLabel(readLabel, List(
                 Push(Reg(Rbp)),
                 Mov(Reg(Rsp), Reg(Rbp)),
-                asmIR.And(ImmVal(mask), Reg(Rsp))
-            ))
+                asmIR.And(ImmVal(mask), Reg(Rsp)),
+                asmIR.Sub(ImmVal(16), Reg(Rsp)),
+                Mov(Reg(Rdi, size), Mem(Reg(Rsp)), size),
+                Lea(Mem(Reg(Rsp)), Reg(Rsi)),
+                Lea(Mem(Reg(Rip), readStringLabel), Reg(Rdi)),
+                Mov(ImmVal(0), Reg(Rax, Byte), Byte),
+                Call(LibFunc.Scanf),
+                Movs(Mem(Reg(Rsp)), Reg(Rax), size),
+                asmIR.Add(ImmVal(16), Reg(Rsp)),
+                Mov(Reg(Rbp), Reg(Rsp)),
+                Pop(Reg(Rbp)),
+                Ret
+        ))
 
-            List(
-                Call(readLabel)
-            )
+        List(
+            Call(readLabel)
+        )
+    }
+
+/* generates the read label and updates the variable read into with the value provided from stdin */
+    def translateRead(r: Read)(implicit currentScope: SymbolTable): List[ASMItem] = r.enclosingType match {
+        case SemInt => translateReadBuilder("_readi", "%d", DWord) ::: updateLValue(r.lvalue, Reg(Rax, DWord))
+        case SemChar => translateReadBuilder("_readc", "%c", Byte) ::: updateLValue(r.lvalue, Reg(Rax, Byte))
         case _ => List.empty
     }
 
