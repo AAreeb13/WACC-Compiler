@@ -425,13 +425,14 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
-    private def translateReadBuilder(readLabel: String, escapeChar: String, size: Size): List[ASMItem] = {
-        val readStringLabel = Label(".L." + readLabel + "_str0")
+    private def translateReadBuilder(readLabelIdent: String, escapeChar: String, size: Size): List[ASMItem] = {
+        val readLabel = Label(readLabelIdent)
+        val readStringLabel = Label(".L." + readLabelIdent + "_str0")
         val mask = -16
         
         addReadOnly(readStringLabel, StringDecl(escapeChar, readStringLabel))
 
-        addLabel(Label(readLabel), List(
+        addLabel(readLabel, List(
                 Push(Reg(Rbp)),
                 Mov(Reg(Rsp), Reg(Rbp)),
                 asmIR.And(ImmVal(mask), Reg(Rsp)),
@@ -449,7 +450,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         ))
 
         List(
-            Call(Label(readLabel))
+            Call(readLabel)
         )
     }
 
