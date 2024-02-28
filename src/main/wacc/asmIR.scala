@@ -150,6 +150,9 @@ case class Sub(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
 case class And(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"and${size} ${src}, ${dst}"
 }
+case class IMul(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
+    override def toString() = s"imul${size} ${src}, ${dst}"
+}
 case class IDiv(op: Operand, size: Size = QWord) extends Instr {
     override def toString() = "cltd\n" + s"idiv${size} ${op}"
 }
