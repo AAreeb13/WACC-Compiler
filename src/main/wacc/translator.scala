@@ -406,19 +406,26 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case ast.Add(e1, e2) =>
 
                 List(
-                    asmIR.Add(Reg(R12, DWord), Reg(Rax, DWord), DWord), 
+                    asmIR.Add(Reg(R12, DWord), Reg(Rax, DWord), DWord) 
                     //ADD OVERFLOW ERROR CHECK
                 )
 
-            case ast.Sub(e1, e2) => List.empty
+            case ast.Sub(e1, e2) => 
+                List (
+                    asmIR.Sub(Reg(Rax, DWord), Reg(R12, DWord), DWord),
+                    Mov(Reg(R12, DWord), Reg(Rax, DWord), DWord)
+                    //ADD OVERFLOW ERROR CHECK
+                )
             case ast.And(e1, e2) => List.empty
+   
                 
             case _ =>
                 List.empty
         }
         val tail: List[ASMItem] =
-             Movs(Reg(Rax, DWord), Reg(Rax, QWord), DWord) ::
-                List.empty
+            Pop(Reg(R12)) ::
+            Movs(Reg(Rax, DWord), Reg(Rax, QWord), DWord) ::
+            List.empty
         header ::: body ::: tail
     }
     def translateLValue(lvalue: LValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
