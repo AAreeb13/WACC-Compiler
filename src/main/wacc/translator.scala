@@ -389,10 +389,38 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
             case variable: Var => translateVar(variable)
+            case expr: BinOp => 
+                translateBinaryOperationBuilder(expr)
             case _ => List.empty
         }
     }
+    def translateBinaryOperationBuilder(expr: BinOp, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable):List[ASMItem] = {
+        val header =
+                Push(Reg(R12)) :: 
+                translateExpression(expr.x) :::
+                List(Push(Reg(Rax))) :::
+                translateExpression(expr.y) :::
+                List(Pop(Reg(R12)))
+        val body: List[ASMItem] = 
+        expr match {
+            case ast.Add(e1, e2) =>
 
+                List(
+                    asmIR.Add(Reg(R12, DWord), Reg(Rax, DWord), DWord), 
+                    //ADD OVERFLOW ERROR CHECK
+                )
+
+            case ast.Sub(e1, e2) => List.empty
+            case ast.And(e1, e2) => List.empty
+                
+            case _ =>
+                List.empty
+        }
+        val tail: List[ASMItem] =
+             Movs(Reg(Rax, DWord), Reg(Rax, QWord), DWord) ::
+                List.empty
+        header ::: body ::: tail
+    }
     def translateLValue(lvalue: LValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         lvalue match {
             case variable: Var => translateVar(variable, targetReg)
