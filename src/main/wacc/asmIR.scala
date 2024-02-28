@@ -162,6 +162,9 @@ object RegisterNames extends Enumeration {
 import RegisterNames._
 
 case class Reg(name: Name, size: Size = QWord) extends Operand {
+  
+  def toSize(newSize: Size): Reg = Reg(name, newSize)
+
   override def toString: String = (name, size) match {
     case (Rip, QWord) => "%rip"
     case (Rip, DWord) => "%eip"
