@@ -408,9 +408,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case IntVal(int) => Mov(ImmVal(int), targetReg, DWord) :: Nil
             case variable: Var => translateVar(variable, targetReg, DWord)
             case expr: ArithmeticOp =>
-                List(
-                    Push(Reg(R12))
-                ) ::: 
+                Push(Reg(R12)) ::
                 transArithmeticOp(expr.x, targetReg) ::: 
                 transArithmeticOp(expr.y, Reg(R12, DWord)) ::: 
                 binOp(expr, Reg(R12, DWord), targetReg) :::
