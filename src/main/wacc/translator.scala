@@ -425,9 +425,10 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
             case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
             case ast.Mul(_, _) => asmIR.IMul(src, targetReg, DWord) :: Nil
-            case ast.Div(_, _) => asmIR.IDiv(src, DWord) :: Nil
+            case ast.Div(_, _) => asmIR.IDiv(src, DWord) ::
+                asmIR.Mov(Reg(Rax, DWord), targetReg, DWord)::  Nil
             case ast.Mod(_, _) => asmIR.IDiv(src, DWord) :: 
-                asmIR.Mov(Reg(Rdx, DWord), Reg(Rax, DWord), DWord) :: Nil
+                asmIR.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
             case _ => List.empty
         }
     }
