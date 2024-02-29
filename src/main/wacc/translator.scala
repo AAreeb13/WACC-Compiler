@@ -424,6 +424,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         op match {
             case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
             case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
+            case ast.Mul(_, _) => asmIR.IMul(src, targetReg, DWord) :: Nil
             case _ => List.empty
         }
     }
