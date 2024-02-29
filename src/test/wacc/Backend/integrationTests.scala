@@ -15,7 +15,7 @@ import java.io.ByteArrayOutputStream
 import wacc.globals._
 
 
-class Tests extends AnyFlatSpec {
+class BackendIntegrationTest extends AnyFlatSpec {
     type Path = String
     type FileContents = String
     type Input = Option[String]
