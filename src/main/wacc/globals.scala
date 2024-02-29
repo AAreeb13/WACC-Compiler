@@ -16,5 +16,7 @@ object globals {
     var fullOptimise = false
     var execute = false
     var enableColours = false
+
     var useDocker = false
+    var useWSL = false
 }
