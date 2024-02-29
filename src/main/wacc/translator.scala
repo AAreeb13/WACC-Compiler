@@ -409,7 +409,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case variable: Var => translateVar(variable, targetReg, DWord)
             case expr: ArithmeticOp =>
                 Push(Reg(R12)) ::
-                transArithmeticOp(expr.x, targetReg) ::: 
+                transArithmeticOp(expr.x, targetReg) ::: // movl x into %eax
                 transArithmeticOp(expr.y, Reg(R12, DWord)) ::: 
                 binOp(expr, Reg(R12, DWord), targetReg) :::
                 List(
@@ -425,6 +425,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
             case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
             case ast.Mul(_, _) => asmIR.IMul(src, targetReg, DWord) :: Nil
+            case ast.Div(_, _) => asmIR.IDiv(targetReg, DWord) :: Nil
+            case ast.Mod(_, _) => asmIR.IDiv(targetReg, DWord) :: 
+                asmIR.Mov(Reg(Rdx, DWord), Reg(Rax, DWord), DWord) :: Nil
             case _ => List.empty
         }
     }
