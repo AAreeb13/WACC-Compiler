@@ -389,6 +389,14 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     asmIR.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
                     Pop(Reg(R12))
                 )
+            case ast.Not(expr) => 
+                val trueVal = 1
+                translateExpression(expr, targetReg) :::
+                List(
+                    Cmp(ImmVal(trueVal), targetReg),
+                    Set(Reg(Rax, Byte), NotEqual),
+                    Movs(Reg(Rax, Byte), targetReg, Byte)
+                )
             case expr: ArithmeticOp => 
                 transArithmeticOp(expr, targetReg.toSize(DWord)) 
             
