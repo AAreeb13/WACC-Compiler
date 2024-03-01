@@ -373,4 +373,73 @@ case class Reg(name: Name, size: Size = QWord) extends Operand {
 //   }
 // }
 
+/*
+// package wacc
+
+// import scala.language.implicitConversions
+
+// object asm {
+//     sealed trait ASMNode 
+
+//     sealed trait Directive extends ASMNode
+
+//     case object Global extends Directive
+//     case object DotInt extends Directive
+//     case object DotAsciz extends Directive
+
+//     sealed trait Operand extends ASMNode
+//     case class Label(name: String) extends Operand
+
+//     sealed trait Location extends Operand
+
+//     sealed trait Register extends Location {
+//         val size: Size = QWord
+
+//         def as(_size: Size): Register = Register.getOrCreate(this, _size)
+//     }
+
+//     object Register {
+//         private var registry: Map[(Register, Size), Register] = Map.empty
+        
+//         def apply(_size: Size): Register = new Register {
+//             override val size: Size = _size
+//         }
+
+//         // Method to get or create a register instance with a specific size
+//         def getOrCreate(register: Register, _size: Size): Register = {
+//             registry.getOrElse((register, _size), {
+//                 val newRegister = Register(_size)
+//                 registry += ((register, _size) -> newRegister)
+//                 newRegister
+//             })
+//         }
+//     }
+    
+//     case object Rip        extends Register
+//     case object Rax        extends Register
+//     case object Rbx        extends Register
+//     case object Rcx        extends Register
+//     case object Rdx        extends Register
+//     case object Rsi        extends Register
+//     case object Rdi        extends Register
+//     case object Rbp        extends Register
+//     case object Rsp        extends Register
+//     case object R8         extends Register
+//     case object R9         extends Register
+//     case object R10        extends Register
+//     case object R11        extends Register
+//     case object R12        extends Register
+//     case object R13        extends Register
+//     case object R14        extends Register
+//     case object R15        extends Register
+
+//     sealed trait Size
+//     case object Byte extends Size
+//     case object Word extends Size
+//     case object DWord extends Size
+//     case object QWord extends Size
+    
+// }
+*/
+
 }

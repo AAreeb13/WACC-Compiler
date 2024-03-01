@@ -19,12 +19,6 @@ object codeGenerator {
             case _ => Left("Invalid AST type for error generation")
         }
     }
-
-    // def translate(ast: Node) = ast match {
-    //     case Add(op1, op2) => op1 match {
-            
-    //     }
-    // }
 }
 
 class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
@@ -63,40 +57,19 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         List(Global) ::: 
         generateReadOnlys :::
         programHeader :::
-        // this can be abstracted out
-        //allocateStackVariables(topLevelTable) :::
+        allocateStackVariables(topLevelTable) :::
         programBody :::
         popStackVariables(topLevelTable) :::
-        // upto here
         programFooter :::
         generateLabels
     }
 
-    // def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
-    //     // generate add instruction with the sizes
-    //     //val allocationSize = 0
-    //     var currentOffset = 0
-    //     val allocatedVariables = scopeTable.table.toSeq.flatMap { case (ident, (sizeType, _, loc)) => {
-    //         sizeType match {
-    //             case SemChar =>
-
-    //             case SemInt =>
-    //                 Sub(ImmVal(4), )
-    //             case SemBool => 1
-    //             case SemString =>
-    //             case _ =>
-    //         }
-    //         Sub(ImmVal())
-    //         scopeTable.table(ident).get._3 =
-    //     }}
-    //     Sub(ImmVal(), Reg(Rsp))
-    // }
+    def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
+        asmIR.Sub(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp)) :: Nil
+    }
 
     def popStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
         asmIR.Add(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp)) :: Nil
-        // scopeTable.table.flatMap(_ => List(
-        //     asmIR.Add(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp))
-        // )).toList
     }
 
     def translateStatement(stat: Stat)(implicit currentScope: SymbolTable): List[ASMItem] = {
@@ -170,13 +143,10 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         val retVal: List[ASMItem] = declType match {
             case BoolType() =>
-                asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
                 Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
             case CharType() =>
-                asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
                 Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
             case IntType() =>
-                asmIR.Sub(ImmVal(size), Reg(Rsp)) ::
                 Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
             case _ => Nil
         }
@@ -496,6 +466,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         val readLabel = Label(readLabelIdent)
         val readStringLabel = Label(".L." + readLabelIdent + "_str0")
         val mask = -16
+        val readOffset = 16
         
         addReadOnly(readStringLabel, StringDecl(escapeChar, readStringLabel))
 
@@ -503,14 +474,14 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 Push(Reg(Rbp)),
                 Mov(Reg(Rsp), Reg(Rbp)),
                 asmIR.And(ImmVal(mask), Reg(Rsp)),
-                asmIR.Sub(ImmVal(16), Reg(Rsp)),
+                asmIR.Sub(ImmVal(readOffset), Reg(Rsp)),
                 Mov(Reg(Rdi, size), Mem(Reg(Rsp)), size),
                 Lea(Mem(Reg(Rsp)), Reg(Rsi)),
                 Lea(Mem(Reg(Rip), readStringLabel), Reg(Rdi)),
                 Mov(ImmVal(0), Reg(Rax, Byte), Byte),
                 Call(LibFunc.Scanf),
                 Movs(Mem(Reg(Rsp)), Reg(Rax), size),
-                asmIR.Add(ImmVal(16), Reg(Rsp)),
+                asmIR.Add(ImmVal(readOffset), Reg(Rsp)),
                 Mov(Reg(Rbp), Reg(Rsp)),
                 Pop(Reg(Rbp)),
                 Ret
