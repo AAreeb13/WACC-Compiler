@@ -100,6 +100,10 @@ case class Test(op1: Operand, op2: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"test${size} ${op1}, ${op2}"
 }
 
+case class Not(src: Operand, size: Size = QWord) extends Instr {
+    override def toString() = s"not${size} ${src}"
+}
+
 sealed trait Instr extends ASMItem
 
 case object Ret extends Instr {
@@ -119,8 +123,8 @@ case class Push(reg: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"push${size} ${reg}"
 }
 
-case class Set(reg: Operand) {
-    override def toString() = s"set ${reg}"
+case class Set(reg: Operand, flag: Flag) extends Instr {
+    override def toString() = s"set${flag} ${reg}"
 }
 
 case class CMov(src: Operand, dst: Operand, flag: Flag) extends Instr {
