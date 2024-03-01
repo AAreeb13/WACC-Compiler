@@ -97,8 +97,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
             case Assign(lvalue, rvalue) =>
                 translateRValue(rvalue, Reg(Rax)) :::
-                translateLValue(lvalue, Reg(Rbx)) :::
-                List(Mov(Reg(Rax), Reg(Rbx)))
+                updateLValue(lvalue, Reg(Rax))
                 
 
             case AssignNew(declType, ident, rvalue) =>
@@ -401,7 +400,6 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         lvalue match {
             case variable: Var => translateVar(variable, targetReg)
             case _ => List.empty
-
         }
     }
 
@@ -455,6 +453,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
                 asmIR.IDiv(src, DWord) ::
                 asmIR.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
+
             case _ => List.empty
         }
     }
@@ -508,9 +507,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case v: Var => 
                  val (declType, _, location) = currentScope.table.get(v.v).get
                  declType match {
-                    case SemBool => Mov(source, location.get, Byte) :: Nil
-                    case SemChar => Mov(source, location.get, Byte) :: Nil
-                    case SemInt => Mov(source, location.get, DWord) :: Nil
+                    case SemBool | SemChar | SemInt => Mov(source, location.get, source.size) :: Nil
+                    // case SemChar => Mov(source, location.get, Byte) :: Nil
+                    // case SemInt => Mov(source, location.get, source.size) :: Nil
                     case _ => Nil
                  }               
             case _ => ???
