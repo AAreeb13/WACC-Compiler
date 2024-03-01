@@ -97,8 +97,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
             case Assign(lvalue, rvalue) =>
                 translateRValue(rvalue, Reg(Rax)) :::
-                translateLValue(lvalue, Reg(Rbx)) :::
-                List(Mov(Reg(Rax), Reg(Rbx)))
+                updateLValue(lvalue, Reg(Rax))
                 
 
             case AssignNew(declType, ident, rvalue) =>
@@ -401,7 +400,6 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         lvalue match {
             case variable: Var => translateVar(variable, targetReg)
             case _ => List.empty
-
         }
     }
 
@@ -438,15 +436,64 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
        
     def binOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
         op match {
-            case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
-            case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
-            case ast.Mul(_, _) => asmIR.IMul(src, targetReg, DWord) :: Nil
-            case ast.Div(_, _) => asmIR.IDiv(src, DWord) ::
+            case ast.Add(_, _) =>
+                addOverflowError() 
+                asmIR.Add(src, targetReg, DWord) ::
+                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
+            case ast.Sub(_, _) => 
+                addOverflowError()
+                asmIR.Sub(src, targetReg, DWord) ::
+                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil 
+            case ast.Mul(_, _) => 
+                addOverflowError()
+                asmIR.IMul(src, targetReg, DWord) ::
+                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
+            case ast.Div(_, _) => 
+                addDivzeroError()
+                asmIR.Cmp(ImmVal(0), src, DWord) ::
+                asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
+                asmIR.IDiv(src, DWord) ::
                 asmIR.Mov(Reg(Rax, DWord), targetReg, DWord)::  Nil
-            case ast.Mod(_, _) => asmIR.IDiv(src, DWord) :: 
+            case ast.Mod(_, _) => 
+                addDivzeroError()
+                asmIR.Cmp(ImmVal(0), src, DWord) ::
+                asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
+                asmIR.IDiv(src, DWord) ::
                 asmIR.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
+
             case _ => List.empty
         }
+    }
+
+    def addOverflowError(): Unit = {
+        val overflowLabel = Label("_errOverflow")
+        val printStringLabel = Label(".L._errOverflow_str0")
+        val mask = -16
+
+        addReadOnly(printStringLabel, 
+        StringDecl("fatal error: integer overflow or underflow occurred\\n", printStringLabel))
+
+        addErrorLabel(overflowLabel, printStringLabel)
+    }
+
+    def addDivzeroError(): Unit = {
+        val divzeroLabel = Label("_errDivZero")
+        val printStringLabel = Label(".L._errDivZero_str0")
+        val mask = -16
+
+        addReadOnly(printStringLabel, 
+        StringDecl("fatal error: division or modulo by zero\\n", printStringLabel))
+
+        addErrorLabel(divzeroLabel, printStringLabel)
+    }
+
+    def addErrorLabel(errorLabel: Label, stringLabel: Label, mask: Int = -16) : Unit = {
+        addLabel(errorLabel, List(
+        asmIR.And(ImmVal(mask), Reg(Rsp)),
+        Lea(Mem(Reg(Rip), stringLabel), Reg(Rdi))) ::: 
+        translatePrint(SemString) ::: 
+        List(Mov(ImmVal(-1), Reg(Rdi, Byte), Byte),
+        Call(LibFunc.Exit)))
     }
 
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
@@ -467,9 +514,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case v: Var => 
                  val (declType, _, location) = currentScope.table.get(v.v).get
                  declType match {
-                    case SemBool => Mov(source, location.get, Byte) :: Nil
-                    case SemChar => Mov(source, location.get, Byte) :: Nil
-                    case SemInt => Mov(source, location.get, DWord) :: Nil
+                    case SemBool | SemChar | SemInt => Mov(source, location.get, source.size) :: Nil
+                    // case SemChar => Mov(source, location.get, Byte) :: Nil
+                    // case SemInt => Mov(source, location.get, source.size) :: Nil
                     case _ => Nil
                  }               
             case _ => ???
