@@ -459,6 +459,16 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
+    def addDivzeroError(): Unit = {
+        val divzeroLabel = Label("_errDivZero")
+        val printStringLabel = Label(".L._errDivZero_str0")
+        val mask = -16
+
+        addReadOnly(printStringLabel, 
+        StringDecl("fatal error: division or modulo by zero\\n", printStringLabel))
+
+        addErrorLabel(divzeroLabel, printStringLabel)
+    }
 
     def addErrorLabel(errorLabel: Label, stringLabel: Label, mask: Int = -16) : Unit = {
         addLabel(errorLabel, List(
