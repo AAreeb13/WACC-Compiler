@@ -413,6 +413,13 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Jmp(Label("_errBadChar"), NotEqual)
                 )
             case Ord(expr) => translateExpression(expr, targetReg)
+            case Neg(expr) => Push(Reg(R12)) ::
+                translateExpression(expr, Reg(R12)) :::
+                List(
+                    Mov(ImmVal(0), targetReg.toSize(DWord), DWord),
+                    asmIR.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
+                    Pop(Reg(R12))
+                )
             case expr: ArithmeticOp => 
                 transArithmeticOp(expr, targetReg.toSize(DWord)) 
             
