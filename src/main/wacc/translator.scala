@@ -409,6 +409,13 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         expr match {
             case IntVal(int) => Mov(ImmVal(int), targetReg, DWord) :: Nil
             case variable: Var => translateVar(variable, targetReg, DWord)
+            case Neg(expr) => Push(Reg(R11)) :: /* Use r11 in order to not conflict with r12 */
+                transArithmeticOp(expr, Reg(R11, DWord)) :::
+                List(
+                    Mov(ImmVal(0), targetReg.toSize(DWord), DWord),
+                    asmIR.Sub(Reg(R11, DWord), targetReg.toSize(DWord), DWord),
+                    Pop(Reg(R11))
+                )
             case expr: ArithmeticOp =>
                 Push(Reg(R12)) ::
                 transArithmeticOp(expr.x, targetReg) ::: // movl x into %eax
