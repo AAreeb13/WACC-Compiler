@@ -412,6 +412,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     CMov(targetReg, Reg(Rsi), NotEqual),
                     Jmp(Label("_errBadChar"), NotEqual)
                 )
+            case Ord(expr) => translateExpression(expr, targetReg)
             case expr: ArithmeticOp => 
                 transArithmeticOp(expr, targetReg.toSize(DWord)) 
             
