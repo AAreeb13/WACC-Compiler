@@ -459,6 +459,16 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
+
+    def addErrorLabel(errorLabel: Label, stringLabel: Label, mask: Int = -16) : Unit = {
+        addLabel(errorLabel, List(
+        asmIR.And(ImmVal(mask), Reg(Rsp)),
+        Lea(Mem(Reg(Rip), stringLabel), Reg(Rdi))) ::: 
+        translatePrint(SemString) ::: 
+        List(Mov(ImmVal(-1), Reg(Rdi, Byte), Byte),
+        Call(LibFunc.Exit)))
+    }
+
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, location) = currentScope.table.get(v.v).get
         declType match {
