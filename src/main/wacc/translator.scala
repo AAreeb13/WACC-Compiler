@@ -389,8 +389,32 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
             case variable: Var => translateVar(variable, targetReg)
+            case Chr(expr) => 
+                val asciiCheck = -128
+                val mask = -16
+                val badCharLabel = Label("_errBadChar")
+                val badCharStringLabel = Label(".L._errBadChar_str0")
+                addReadOnly(badCharStringLabel, StringDecl("fatal error: int %d is not ascii character 0-127 \\n", badCharStringLabel))
+
+                addLabel(badCharLabel, List(
+                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    Lea(Mem(Reg(Rip), badCharStringLabel), Reg(Rdi)),
+                    Mov(ImmVal(0), Reg(Rax, Byte), Byte),
+                    Call(LibFunc.Printf),
+                    Mov(ImmVal(0), Reg(Rdi)),
+                    Call(LibFunc.Flush),
+                    Mov(ImmVal(-1), Reg(Rdi, Byte), Byte),
+                    Call(LibFunc.Exit)
+                ))
+
+                translateExpression(expr, targetReg) ::: List(
+                    Test(ImmVal(asciiCheck), targetReg),
+                    CMov(targetReg, Reg(Rsi), NotEqual),
+                    Jmp(Label("_errBadChar"), NotEqual)
+                )
             case expr: ArithmeticOp => 
                 transArithmeticOp(expr, targetReg.toSize(DWord)) 
+            
             case _ => List.empty
         }
     }

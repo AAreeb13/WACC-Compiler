@@ -96,6 +96,9 @@ object Mem {
     def apply(reg: Reg, offsetOp: ASMItem, multiplier: Int): Mem = Mem(reg, Some((offsetOp, Some(multiplier))))
 }
 
+case class Test(op1: Operand, op2: Operand, size: Size = QWord) extends Instr {
+    override def toString() = s"test${size} ${op1}, ${op2}"
+}
 
 sealed trait Instr extends ASMItem
 
