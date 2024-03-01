@@ -344,7 +344,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         case PairType(_, _) => QWord
     }
 
-    def translateRValue(rvalue: RValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
+    def translateRValue(rvalue: RValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
         case expr: Expr => translateExpression(expr, targetReg)
         case _ => List.empty
     }
@@ -367,7 +367,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def generateLabels: List[ASMItem] =
         labelMap.flatMap(_._2).toList
 
-    def translateExpression(expr: Expr, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateExpression(expr: Expr, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
             case IntVal(int) => 
                 List(
@@ -388,12 +388,14 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
-            case variable: Var => translateVar(variable)
+            case variable: Var => translateVar(variable, targetReg)
+            case expr: ArithmeticOp => 
+                transArithmeticOp(expr, targetReg.toSize(DWord)) 
             case _ => List.empty
         }
     }
 
-    def translateLValue(lvalue: LValue, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateLValue(lvalue: LValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         lvalue match {
             case variable: Var => translateVar(variable, targetReg)
             case _ => List.empty
@@ -401,17 +403,50 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
-    def translateVar(v: Var, targetReg: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def transArithmeticOp(expr: Expr, targetReg: Reg = Reg(Rax, DWord))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        expr match {
+            case IntVal(int) => Mov(ImmVal(int), targetReg, DWord) :: Nil
+            case variable: Var => translateVar(variable, targetReg, DWord)
+            case expr: ArithmeticOp =>
+                Push(Reg(R12)) ::
+                transArithmeticOp(expr.x, targetReg) ::: // movl x into %eax
+                transArithmeticOp(expr.y, Reg(R12, DWord)) ::: 
+                binOp(expr, Reg(R12, DWord), targetReg) :::
+                List(
+                    Movs(targetReg, targetReg.toSize(QWord), DWord),
+                    Pop(Reg(R12))
+                )
+            case _ => List.empty
+        }
+    }
+       
+    def binOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
+        op match {
+            case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
+            case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
+            case ast.Mul(_, _) => asmIR.IMul(src, targetReg, DWord) :: Nil
+            case ast.Div(_, _) => asmIR.IDiv(src, DWord) ::
+                asmIR.Mov(Reg(Rax, DWord), targetReg, DWord)::  Nil
+            case ast.Mod(_, _) => asmIR.IDiv(src, DWord) :: 
+                asmIR.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
+            case _ => List.empty
+        }
+    }
+
+    def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, location) = currentScope.table.get(v.v).get
         declType match {
             case SemBool => Movs(location.get, targetReg, Byte) :: Nil
             case SemChar => Movs(location.get, targetReg, Byte) :: Nil
-            case SemInt  => Movs(location.get, targetReg, DWord) :: Nil
+            case SemInt  => size == DWord match {
+                case true => Mov(location.get, targetReg, DWord) :: Nil
+                case _ => Movs(location.get, targetReg, DWord) :: Nil
+            }
             case _ => Nil
         }
     }
 
-    def updateLValue(lvalue: LValue, source: Operand = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def updateLValue(lvalue: LValue, source: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         lvalue match {
             case v: Var => 
                  val (declType, _, location) = currentScope.table.get(v.v).get

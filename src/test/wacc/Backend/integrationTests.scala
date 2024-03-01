@@ -13,9 +13,12 @@ import java.io.PrintWriter
 import scala.concurrent.blocking
 import java.io.ByteArrayOutputStream
 import wacc.globals._
+import scala.sys.process._
 
 
-class Tests extends AnyFlatSpec {
+
+
+class BackendIntegrationTest extends AnyFlatSpec {
     type Path = String
     type FileContents = String
     type Input = Option[String]
@@ -82,11 +85,24 @@ class Tests extends AnyFlatSpec {
         performTests(examplesDir + "while") 
     }
 
+    def hasDocker: Boolean = System.getProperty("os.arch").equals("aarch64") 
+    def hasWsl: Boolean = {
+        try {
+            "wsl -v".!!
+            true
+        } catch {
+            case _: Throwable => false
+        }
+    }
+
+
     def performTests(dir: Path) = {
         val assembledFiles = assembleAll(dir)
 
-        if (System.getProperty("os.arch").equals("aarch64")) {
+        if (hasDocker) {
             useDocker = true
+        } else if (hasWsl) {
+            useWSL = true
         }
 
         if (useDocker) {
@@ -98,10 +114,10 @@ class Tests extends AnyFlatSpec {
 
         val failed = assembledFiles.map { case fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)) =>
             // gcc -x assembler - -z noexecstack -o out (input is piped so no need to create .s file)
-            runCommandWithDocker(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
+            runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
 
             val outStream = new ByteArrayOutputStream 
-            val actualExit = runCommandWithDocker(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
+            val actualExit = runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
             val actualOut: Output = outStream.toString().split("\n").toList.filter(!_.isEmpty()) // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
 
             (examplePath, asmOutput, in, expectedOut, expectedExit, actualOut, actualExit)
@@ -114,7 +130,7 @@ class Tests extends AnyFlatSpec {
         if (useDocker) {
             runCommand(Seq("docker", "rm", "-f", "my-container"))
         } else {
-            runCommand(Seq("rm", "-f", "./out"))
+            runCustomCommand(Seq("rm", "-f", "./out"))
         }
 
         // Format errors
@@ -137,11 +153,13 @@ class Tests extends AnyFlatSpec {
         }
     }
 
-    def runCommandWithDocker(command: Seq[String],
+    def runCustomCommand(command: Seq[String],
                              inp: Array[Byte] = Array.emptyByteArray,
                              pout: ByteArrayOutputStream = new ByteArrayOutputStream): Int = {
         if (useDocker) {
             runCommand(Seq("docker", "exec", "-i", "my-container") ++ command, inp, pout)
+        } else if (useWSL) {
+            runCommand(Seq("wsl") ++ command, inp, pout)
         } else {
             runCommand(command, inp, pout)
         }

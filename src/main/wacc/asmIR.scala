@@ -150,8 +150,11 @@ case class Sub(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
 case class And(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"and${size} ${src}, ${dst}"
 }
+case class IMul(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
+    override def toString() = s"imul${size} ${src}, ${dst}"
+}
 case class IDiv(op: Operand, size: Size = QWord) extends Instr {
-    override def toString() = "cltd\n" + s"idiv${size} ${op}"
+    override def toString() = "cltd\n" + s"\tidiv${size} ${op}"
 }
 
 object RegisterNames extends Enumeration {
@@ -162,6 +165,9 @@ object RegisterNames extends Enumeration {
 import RegisterNames._
 
 case class Reg(name: Name, size: Size = QWord) extends Operand {
+  
+  def toSize(newSize: Size): Reg = Reg(name, newSize)
+
   override def toString: String = (name, size) match {
     case (Rip, QWord) => "%rip"
     case (Rip, DWord) => "%eip"
@@ -206,10 +212,10 @@ case class Reg(name: Name, size: Size = QWord) extends Operand {
     case (Rsp, DWord) => "%esp"
     case (Rsp, QWord) => "%rsp"
 
-    case (name, Byte) => s"%${name}b"
-    case (name, Word) => s"%${name}w"
-    case (name, DWord) => s"%${name}d"
-    case (name, QWord) => s"%${name}"
+    case (name, Byte) => s"%${name.toString().toLowerCase()}b"
+    case (name, Word) => s"%${name.toString().toLowerCase()}w"
+    case (name, DWord) => s"%${name.toString().toLowerCase()}d"
+    case (name, QWord) => s"%${name.toString().toLowerCase()}"
 
     case _ => "error"
   }

@@ -11,7 +11,7 @@ import scala.io.Source
 import globals._
 
 
-class IntegrationTest extends AnyFlatSpec {
+class FrontendIntegrationTest extends AnyFlatSpec {
     "Valid examples" should "compile successfully" in {
         runTests("wacc_examples/valid", exitSuccess) 
     }
