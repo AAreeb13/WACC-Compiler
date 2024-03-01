@@ -393,6 +393,10 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 transArithmeticOp(expr, targetReg.toSize(DWord))
             case expr: LogicalOp =>
                 transLogicalOp(expr, targetReg)
+            case expr: EqualityOp =>
+                transEqualityOp(expr, targetReg)
+            case expr: ComparisonOp =>
+                transComparisonOp(expr, targetReg)
             case _ => List.empty
         }
     }
@@ -401,8 +405,46 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         lvalue match {
             case variable: Var => translateVar(variable, targetReg)
             case _ => List.empty
-
         }
+    }
+    def transComparisonOp(expr: ComparisonOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val head = Push(Reg(R12)) ::
+                translateExpression(expr.y, targetReg) :::
+                List(Push(targetReg)) :::
+                translateExpression(expr.x, targetReg) :::
+                List(
+                Mov(targetReg, Reg(R12)),
+                Pop(targetReg),
+                Cmp(Reg(Rax), Reg(R12)))
+        val body = 
+        expr match {
+            case Grt(_, _) => List(asmIR.Set(Reg(Rax, Byte), Greater))
+            case GrtEql(_, _) => List(asmIR.Set(Reg(Rax, Byte), GreaterEqual))
+            case ast.Less(_, _) => List(asmIR.Set(Reg(Rax, Byte), asmIR.ComparisonType.Less))
+            case LessEql(_, _) => List(asmIR.Set(Reg(Rax, Byte), LessEqual)) 
+            case _ => List.empty
+        }
+        val tail = List(Movs(Reg(Rax, Byte), Reg(Rax), Byte), Pop(Reg(R12)))
+        head ::: body ::: tail
+    }
+    def transEqualityOp(expr: EqualityOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        
+        val head = Push(Reg(R12)) ::
+                translateExpression(expr.x, targetReg) :::
+                List(Push(targetReg)) :::
+                translateExpression(expr.y, targetReg) :::
+                List(Mov(targetReg, Reg(R12)),
+                Pop(targetReg),
+                Cmp(Reg(Rax), Reg(R12)))
+        val body = 
+        expr match {
+            case Eql(_, _) =>
+                List(asmIR.Set(Reg(Rax, Byte), Equal))
+            case NotEql(_, _) => 
+                List(asmIR.Set(Reg(Rax, Byte), NotEqual))
+        }
+        val tail = List(Movs(Reg(Rax, Byte), Reg(Rax), Byte), Pop(Reg(R12)))
+        head ::: body ::: tail
     }
     def transLogicalOp(expr: LogicalOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         val head = Push(Reg(R12)) ::
@@ -410,10 +452,10 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(Push(targetReg)) :::
                 translateExpression(expr.y, targetReg) :::
                 List(Mov(targetReg, Reg(R12)), Pop(targetReg))
-        val body =
-        expr match {
+        val body = expr match {
             case ast.And(_, _) => asmIR.And(Reg(R12), targetReg) :: Nil
             case ast.Or(_, _) => asmIR.Or(Reg(R12), targetReg) :: Nil
+
             case _ => List.empty
         }
         val tail = List(Pop(Reg(R12)))
