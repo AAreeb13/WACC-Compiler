@@ -30,6 +30,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     val readOnlyMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
     var stringCounter = 0
+    var ifCounter = 0
     var stackOffset = 0
 
     val asmList: List[ASMItem] = translateProgram(prog)
@@ -118,7 +119,37 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case r@Read(lvalue) =>
                 translateLValue(lvalue) :::
                 List(Mov(Reg(Rax), Reg(Rdi))) :::
-                translateRead(r) 
+                translateRead(r)
+            case Scope(stats) =>
+                val childTable = currentScope.children(0)
+                allocateStackVariables(childTable) :::
+                stats.flatten(translateStatement(_)(childTable)) :::
+                popStackVariables(childTable)
+            
+            case If(cond, ifStats, elseStats) =>
+                val ifChild = currentScope.children(0)
+                val elseChild = currentScope.children(1)
+                val ifBranch = Label(s".L$ifCounter")
+                ifCounter += 1
+                val endBranch = Label(s".L$ifCounter")
+                ifCounter += 1
+
+                translateExpression(cond) :::
+                List(
+                    Cmp(ImmVal(1), Reg(Rax)),
+                    Jmp(ifBranch, Equal)
+                ) :::
+                allocateStackVariables(elseChild) :::
+                ifStats.flatten(translateStatement(_)(elseChild)) :::
+                popStackVariables(elseChild) :::
+                List(
+                    Jmp(endBranch),
+                    ifBranch
+                ) :::
+                allocateStackVariables(ifChild) :::
+                elseStats.flatten(translateStatement(_)(ifChild)) :::
+                popStackVariables(ifChild) :::
+                List(endBranch)
 
             case _ => List.empty
         }
@@ -505,7 +536,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     }
 
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
-        val (declType, _, location) = currentScope.table.get(v.v).get
+        val (declType, _, location) = currentScope.get(v.v).get
         declType match {
             case SemBool => Movs(location.get, targetReg, Byte) :: Nil
             case SemChar => Movs(location.get, targetReg, Byte) :: Nil

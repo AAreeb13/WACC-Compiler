@@ -15,7 +15,7 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     //  (ident, (semantic type, reference to original node))
     var table: HashMap[String, (SemType, Node, Option[Operand])] = HashMap()
     var children: ListBuffer[SymbolTable] = ListBuffer.empty
-    var currentScopeOffset: Int = parent.map(_.currentScopeOffset).getOrElse(0)
+    var currentScopeOffset: Int = 0
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
@@ -28,6 +28,21 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
         table.addOne(name, (declType, node, None))
         updateScopeSize(declType)
         node.scope = this
+    }
+
+    def get(ident: String): Option[(SemType, Node, Option[Operand])] = {
+        table.get(ident).orElse(parent.flatMap(_.get(ident)))
+
+        // val retVal = table.get(ident)
+        // if (retVal.isEmpty) {
+        //     if (parent.isDefined) {
+        //         return parent.get(ident)
+        //     } else {
+        //         None
+        //     }
+        // } else {
+        //     retVal.get
+        // }
     }
 
     private def updateScopeSize(declType: SemType): Unit = {
