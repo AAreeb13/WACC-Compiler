@@ -431,12 +431,29 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
        
     def binOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
         op match {
-            case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
-            case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
-            case ast.Mul(_, _) => asmIR.IMul(src, targetReg, DWord) :: Nil
-            case ast.Div(_, _) => asmIR.IDiv(src, DWord) ::
+            case ast.Add(_, _) =>
+                //addOverflowError() 
+                asmIR.Add(src, targetReg, DWord) ::
+                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
+            case ast.Sub(_, _) => 
+                //addOverflowError()
+                asmIR.Sub(src, targetReg, DWord) ::
+                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil 
+            case ast.Mul(_, _) => 
+                //addOverflowError()
+                asmIR.IMul(src, targetReg, DWord) ::
+                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
+            case ast.Div(_, _) => 
+                //addDivzeroError()
+                asmIR.Cmp(ImmVal(0), src, DWord) ::
+                asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
+                asmIR.IDiv(src, DWord) ::
                 asmIR.Mov(Reg(Rax, DWord), targetReg, DWord)::  Nil
-            case ast.Mod(_, _) => asmIR.IDiv(src, DWord) :: 
+            case ast.Mod(_, _) => 
+                //addDivzeroError()
+                asmIR.Cmp(ImmVal(0), src, DWord) ::
+                asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
+                asmIR.IDiv(src, DWord) ::
                 asmIR.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
             case _ => List.empty
         }
