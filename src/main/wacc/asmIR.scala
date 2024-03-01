@@ -116,8 +116,8 @@ case class Push(reg: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"push${size} ${reg}"
 }
 
-case class Set(reg: Operand) {
-    override def toString() = s"set ${reg}"
+case class Set(reg: Operand, flag: Flag) extends Instr {
+    override def toString() = s"set${flag} ${reg}"
 }
 
 case class CMov(src: Operand, dst: Operand, flag: Flag) extends Instr {
@@ -149,6 +149,9 @@ case class Sub(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
 }
 case class And(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"and${size} ${src}, ${dst}"
+}
+case class Or(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
+    override def toString() = s"or${size} ${src}, ${dst}"
 }
 case class IMul(src: Operand, dst: Operand, size: Size = QWord) extends Instr {
     override def toString() = s"imul${size} ${src}, ${dst}"

@@ -390,7 +390,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 )
             case variable: Var => translateVar(variable, targetReg)
             case expr: ArithmeticOp => 
-                transArithmeticOp(expr, targetReg.toSize(DWord)) 
+                transArithmeticOp(expr, targetReg.toSize(DWord))
+            case expr: LogicalOp =>
+                transLogicalOp(expr, targetReg)
             case _ => List.empty
         }
     }
@@ -402,7 +404,21 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         }
     }
-
+    def transLogicalOp(expr: LogicalOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val head = Push(Reg(R12)) ::
+                translateExpression(expr.x, targetReg) :::
+                List(Push(targetReg)) :::
+                translateExpression(expr.y, targetReg) :::
+                List(Mov(targetReg, Reg(R12)), Pop(targetReg))
+        val body =
+        expr match {
+            case ast.And(_, _) => asmIR.And(Reg(R12), targetReg) :: Nil
+            case ast.Or(_, _) => asmIR.Or(Reg(R12), targetReg) :: Nil
+            case _ => List.empty
+        }
+        val tail = List(Pop(Reg(R12)))
+        head ::: body  ::: tail
+    }
     def transArithmeticOp(expr: Expr, targetReg: Reg = Reg(Rax, DWord))(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
             case IntVal(int) => Mov(ImmVal(int), targetReg, DWord) :: Nil
@@ -410,7 +426,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case expr: ArithmeticOp =>
                 Push(Reg(R12)) ::
                 transArithmeticOp(expr.x, targetReg) ::: // movl x into %eax
-                transArithmeticOp(expr.y, Reg(R12, DWord)) ::: 
+                List(Push(targetReg.toSize(QWord))) :::
+                transArithmeticOp(expr.y, targetReg) ::: 
+                List(Mov(targetReg.toSize(QWord), Reg(R12)), Pop(targetReg.toSize(QWord))) :::
                 binOp(expr, Reg(R12, DWord), targetReg) :::
                 List(
                     Movs(targetReg, targetReg.toSize(QWord), DWord),
