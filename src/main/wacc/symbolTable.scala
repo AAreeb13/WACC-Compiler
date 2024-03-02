@@ -32,17 +32,13 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
 
     def get(ident: String): Option[(SemType, Node, Option[Operand])] = {
         table.get(ident).orElse(parent.flatMap(_.get(ident)))
+    }
 
-        // val retVal = table.get(ident)
-        // if (retVal.isEmpty) {
-        //     if (parent.isDefined) {
-        //         return parent.get(ident)
-        //     } else {
-        //         None
-        //     }
-        // } else {
-        //     retVal.get
-        // }
+    def previousLocation(ident: String): Option[Operand] = {
+        table.get(ident) match {
+            case Some((_, _, Some(location))) => Some(location)
+            case _ => parent.flatMap(_.previousLocation(ident))
+        }
     }
 
     private def updateScopeSize(declType: SemType): Unit = {

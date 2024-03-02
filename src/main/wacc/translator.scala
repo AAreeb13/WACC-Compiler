@@ -98,8 +98,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
             case Assign(lvalue, rvalue) =>
                 translateRValue(rvalue, Reg(Rax)) :::
-                updateLValue(lvalue, Reg(Rax))
-                
+                updateLValue(lvalue, Reg(Rax))    
 
             case AssignNew(declType, ident, rvalue) =>
                 translateRValue(rvalue) :::
@@ -536,13 +535,15 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     }
 
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
-        val (declType, _, location) = currentScope.get(v.v).get
+        val (declType, _, locationOption) = currentScope.get(v.v).get
+        val location = locationOption.getOrElse(currentScope.previousLocation(v.v).get)
+        
         declType match {
-            case SemBool => Movs(location.get, targetReg, Byte) :: Nil
-            case SemChar => Movs(location.get, targetReg, Byte) :: Nil
+            case SemBool => Movs(location, targetReg, Byte) :: Nil
+            case SemChar => Movs(location, targetReg, Byte) :: Nil
             case SemInt  => size == DWord match {
-                case true => Mov(location.get, targetReg, DWord) :: Nil
-                case _ => Movs(location.get, targetReg, DWord) :: Nil
+                case true => Mov(location, targetReg, DWord) :: Nil
+                case _ => Movs(location, targetReg, DWord) :: Nil
             }
             case _ => Nil
         }
@@ -551,11 +552,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def updateLValue(lvalue: LValue, source: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         lvalue match {
             case v: Var => 
-                 val (declType, _, location) = currentScope.table.get(v.v).get
+                 val (declType, _, location) = currentScope.get(v.v).get
                  declType match {
                     case SemBool | SemChar | SemInt => Mov(source, location.get, source.size) :: Nil
-                    // case SemChar => Mov(source, location.get, Byte) :: Nil
-                    // case SemInt => Mov(source, location.get, source.size) :: Nil
                     case _ => Nil
                  }               
             case _ => ???
