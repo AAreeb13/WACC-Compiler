@@ -368,11 +368,11 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def generateLabels: List[ASMItem] =
         labelMap.flatMap(_._2).toList
 
-    def translateExpression(expr: Expr, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateExpression(expr: Expr, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
             case IntVal(int) => 
                 List(
-                    Mov(ImmVal(int), targetReg)
+                    Mov(ImmVal(int), targetReg, size)
                 )
             case CharVal(char) => 
                 List(
@@ -389,15 +389,15 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
-            case variable: Var => translateVar(variable, targetReg)
+            case variable: Var => translateVar(variable, targetReg, size)
             case expr: ArithmeticOp => 
-                transArithmeticOp(expr, targetReg.toSize(DWord))
+                translateArithmeticOp(expr, targetReg.toSize(DWord))
             case expr: LogicalOp =>
-                transLogicalOp(expr, targetReg)
+                translateLogicalOp(expr, targetReg)
             case expr: EqualityOp =>
-                transEqualityOp(expr, targetReg)
+                translateEqualityOp(expr, targetReg)
             case expr: ComparisonOp =>
-                transComparisonOp(expr, targetReg)
+                translateComparisonOp(expr, targetReg)
             case _ => List.empty
         }
     }
@@ -408,7 +408,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case _ => List.empty
         }
     }
-    def transComparisonOp(expr: ComparisonOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateComparisonOp(expr: ComparisonOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         implicit val body = List(Cmp(targetReg, Reg(R12)),
             asmIR.Set(targetReg.toSize(Byte), 
                 expr match {
@@ -420,53 +420,46 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 }
             ),
         Movs(targetReg.toSize(Byte), targetReg, Byte))
-        translatebinaryOperation(expr.y, expr.x, targetReg)
+        translateBinExpression(expr.y, expr.x, targetReg)
     }
-    def transEqualityOp(expr: EqualityOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateEqualityOp(expr: EqualityOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         implicit val body =
             Cmp(Reg(Rax), Reg(R12)) ::
-            binOp(expr, targetReg, targetReg) :::
+            translateBinOp(expr, targetReg, targetReg) :::
             List(Movs(targetReg.toSize(Byte), targetReg.toSize(QWord), Byte))
-        translatebinaryOperation(expr.x, expr.y, targetReg)
-    }
-    def transLogicalOp(expr: LogicalOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
-        implicit val body: List[ASMItem] = binOp(expr, Reg(R12), targetReg)
-        translatebinaryOperation(expr.x, expr.y, targetReg)
+        translateBinExpression(expr.x, expr.y, targetReg)
     }
 
-    def translatebinaryOperation(expr1: Expr, expr2: Expr, targetReg: Reg = Reg(Rax))
+    def translateLogicalOp(expr: LogicalOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        implicit val body: List[ASMItem] = translateBinOp(expr, Reg(R12), targetReg)
+        translateBinExpression(expr.x, expr.y, targetReg)
+    }
+
+    def translateBinExpression(expr1: Expr, expr2: Expr, targetReg: Reg = Reg(Rax), size: Size = QWord)
     (implicit currentScope: SymbolTable, body: List[ASMItem]): List[ASMItem] = {
-        val head = Push(Reg(R12)) ::
-                translateExpression(expr1, targetReg) :::
-                List(Push(targetReg)) :::
-                translateExpression(expr2, targetReg) :::
-                List(
-                    Mov(targetReg, Reg(R12)),
-                    Pop(targetReg))
-        val tail = List(Pop(Reg(R12)))
-        head ::: body ::: tail
+        
+        Push(Reg(R12)) ::
+        translateExpression(expr1, targetReg, size) :::
+        List(Push(targetReg.toSize(QWord))) :::
+        translateExpression(expr2, targetReg, size) :::
+        List(
+            Mov(targetReg.toSize(QWord), Reg(R12)),
+            Pop(targetReg.toSize(QWord))):::
+        body :::
+        List(Pop(Reg(R12)))
+
     }
 
-    def transArithmeticOp(expr: Expr, targetReg: Reg = Reg(Rax, DWord))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateArithmeticOp(expr: Expr, targetReg: Reg = Reg(Rax, DWord))(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
-            case IntVal(int) => Mov(ImmVal(int), targetReg, DWord) :: Nil
-            case variable: Var => translateVar(variable, targetReg, DWord)
             case expr: ArithmeticOp =>
-                Push(Reg(R12)) ::
-                transArithmeticOp(expr.x, targetReg) ::: // movl x into %eax
-                List(Push(targetReg.toSize(QWord))) :::
-                transArithmeticOp(expr.y, targetReg) ::: 
-                List(Mov(targetReg.toSize(QWord), Reg(R12)), Pop(targetReg.toSize(QWord))) :::
-                binOp(expr, Reg(R12, DWord), targetReg) :::
-                List(
-                    Movs(targetReg, targetReg.toSize(QWord), DWord),
-                    Pop(Reg(R12))
-                )
+                implicit val body: List[ASMItem] = translateBinOp(expr, Reg(R12, DWord), targetReg) ::: Movs(targetReg, targetReg.toSize(QWord), DWord) :: Nil
+                translateBinExpression(expr.x, expr.y, targetReg, DWord)
             case _ => List.empty
         }
     }
        
-    def binOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
+    def translateBinOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
         op match {
             case ast.Add(_, _) => asmIR.Add(src, targetReg, DWord) :: Nil
             case ast.Sub(_, _) => asmIR.Sub(src, targetReg, DWord) :: Nil 
