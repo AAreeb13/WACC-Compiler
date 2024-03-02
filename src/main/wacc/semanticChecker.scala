@@ -36,8 +36,8 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
     val errorCollector = errorCollectorOption.getOrElse(new SemanticErrorCollector)
 
     // Global symbol table
-    var globalTable = new SymbolTable()
-    var scopeList: ListBuffer[SymbolTable] = ListBuffer(globalTable)
+    // var globalTable = new SymbolTable()
+    var scopeList: ListBuffer[SymbolTable] = ListBuffer.empty
 
     // Function Table 
     //      := (return type, parameter types, node itself)
@@ -50,6 +50,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
       * Additional Constructor which generates function map and adds to statements to global symbol table
       */
     def checkProgram(): Unit = {
+        prog.scope = new SymbolTable()
         // Maps each function to an entry in funcTable
         prog.funcs.foreach { func =>
             // Throw an error if two function with same names exist
@@ -63,7 +64,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
 
         // Checks each statment in global scope and also in each statement
         prog.funcs.foreach(checkFunction(_))
-        prog.stats.foreach(checkStatement(_, SemNone)(globalTable))
+        prog.stats.foreach(checkStatement(_, SemNone)(prog.scope))
     }
 
     /**
@@ -94,6 +95,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
     def checkFunction(func: Func): Unit = {
         // A new symbol table for the function is created and added to the list
         val funcArgSymbolTable = new SymbolTable()
+        func.scope = funcArgSymbolTable
         scopeList.addOne(funcArgSymbolTable)
 
 

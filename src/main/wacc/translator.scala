@@ -24,9 +24,6 @@ object codeGenerator {
 class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     val labelMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
-    val topLevelTable = symbolTables.head
-    val functionTables = symbolTables.tail
-
     val readOnlyMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
     var stringCounter = 0
@@ -45,9 +42,8 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         // for all the variables we need to 
         // make stacks 
-        val programBody = prog.stats.flatMap(translateStatement(_)(topLevelTable))
-
-        val popVariablesInScope = topLevelTable.table.map(_ => Pop(Reg(Rax))).toList
+        val programBody = prog.stats.flatMap(translateStatement(_)(prog.scope))
+        val functions = prog.funcs.flatMap(f => translateFunction(f)(f.scope))
 
         val programFooter = List(
             Mov(ImmVal(0), Reg(Rax)),
@@ -58,11 +54,34 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         List(Global) ::: 
         generateReadOnlys :::
         programHeader :::
-        allocateStackVariables(topLevelTable) :::
+        allocateStackVariables(prog.scope) :::
         programBody :::
-        popStackVariables(topLevelTable) :::
+        popStackVariables(prog.scope) :::
         programFooter :::
+        functions :::
         generateLabels
+    }
+
+    def translateFunction(func: Func)(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val functionHeader = List(
+            Label(s"wacc_${func.name}"),
+            Push(Reg(Rbp)),
+            Mov(Reg(Rsp), Reg(Rbp)),
+        )
+
+        val functionBody = func.stats.flatMap(translateStatement(_)(func.scope.children(0)))
+
+        val functionFooter = List(
+            Mov(Reg(Rbp), Reg(Rsp)),
+            Pop(Reg(Rbp)),
+            Ret
+        )
+
+        functionHeader :::
+        allocateStackVariables(func.scope) :::
+        functionBody :::
+        popStackVariables(func.scope) :::
+        functionFooter 
     }
 
     def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
@@ -98,7 +117,10 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
             case Assign(lvalue, rvalue) =>
                 translateRValue(rvalue, Reg(Rax)) :::
-                updateLValue(lvalue, Reg(Rax))    
+                updateLValue(lvalue, Reg(Rax))  
+
+            case Return(expr) =>  
+                translateExpression(expr, Reg(Rax)) ::: Nil
 
             case AssignNew(declType, ident, rvalue) =>
                 translateRValue(rvalue) :::
