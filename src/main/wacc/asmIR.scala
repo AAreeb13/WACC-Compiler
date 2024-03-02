@@ -68,7 +68,7 @@ case object Global extends Section {
 case class StringDecl(strVal: String, label: Label) extends Section {
     override def toString() =
         Comment(s"length of ${label.toString}").toString() +
-        s"\t.int ${strVal.length}\n" + 
+        s"\n\t.int ${strVal.length}\n" + 
         label.toString + ": \n" + 
         s"\t.asciz \"${strVal}\""
 }

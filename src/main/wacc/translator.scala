@@ -89,7 +89,9 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         functionHeader :::
         allocateStackVariables(paramScope) :::
+        List(Pop(Reg(Rbx))) :::
         assignParameters :::
+        List(Push(Reg(Rbx)))
         allocateStackVariables(funcBodyScope) :::
         func.stats.flatMap(translateStatement(_)(funcBodyScope)) :::
         popStackVariables(funcBodyScope) :::
@@ -406,7 +408,11 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def translateRValue(rvalue: RValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
         case expr: Expr => translateExpression(expr, targetReg)
-        case FuncCall(ident, args) =>
+        case f@FuncCall(ident, args) =>
+            /*
+            translate each expression then store the result into stack location (allocate new variable)
+            then each time a parameter needs to be accessed we offset the size 
+            */
             args.flatMap(translateExpression(_) ::: List(Push(Reg(Rax)))) :::
             List(
                 Call(Label(s"wacc_$ident")),
@@ -433,6 +439,19 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def generateLabels: List[ASMItem] =
         labelMap.flatMap(_._2).toList
 
+    def toRaw(s: String) =
+        s.flatMap(_ match {
+            case '\\' => "\\\\"
+            case '\"' => "\\\""
+            case '\'' => "\\\'"
+            case '\n' => "\\n"
+            case '\t' => "\\t"
+            case '\f' => "\\f"
+            case '\r' => "\\r"
+            case '\b' => "\\b"
+            case other => other.toString
+        })
+
     def translateExpression(expr: Expr, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
             case IntVal(int) => 
@@ -449,7 +468,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 )
             case StrVal(str) => 
                 val strLabel = Label(s".L.str${stringCounter}")
-                addReadOnly(strLabel, StringDecl(str, strLabel))
+                addReadOnly(strLabel, StringDecl(toRaw(str), strLabel))
                 stringCounter += 1
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
@@ -603,6 +622,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, locationOption) = currentScope.get(v.v).get
+        println(currentScope.table)
         val location = locationOption.getOrElse(currentScope.previousLocation(v.v).get)
         
         declType match {
