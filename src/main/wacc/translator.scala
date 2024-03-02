@@ -220,25 +220,19 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case BoolType() => 1
             case CharType() => 1
             case IntType() => 4
+            case StringType() => 8
             case _ => 0
         }
 
-        val memLocation: Option[Operand] = declType match {
-            case BoolType() | CharType() | IntType() =>
-                val retVal = Some(Mem(Reg(Rbp), ImmVal(stackOffset.last -  currentScope.currentScopeOffset)))
-                currentScope.updateStackLocation(ident, retVal)
-                retVal
-            case _ => None
-        }
+        val memLocation: Option[Operand] = Some(Mem(Reg(Rbp), ImmVal(stackOffset.last -  currentScope.currentScopeOffset)))
+        currentScope.updateStackLocation(ident, memLocation)
 
         val retVal: List[ASMItem] = Comment(s"stackOffset: ${stackOffset.last}") :: {
             declType match {
-                case BoolType() =>
-                    Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
-                case CharType() =>
-                    Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
-                case IntType() =>
-                    Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
+                case BoolType() => Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
+                case CharType() => Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
+                case IntType() =>  Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
+                case StringType() =>  Mov(Reg(Rax, QWord), memLocation.get, QWord) :: Nil
                 case _ => Nil
             }
         }
@@ -622,7 +616,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, locationOption) = currentScope.get(v.v).get
-        println(currentScope.table)
+        //println(currentScope.table)
         val location = locationOption.getOrElse(currentScope.previousLocation(v.v).get)
         
         declType match {
