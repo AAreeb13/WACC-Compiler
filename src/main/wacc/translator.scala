@@ -30,7 +30,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     val readOnlyMap: HashMap[Label, List[ASMItem]] = HashMap.empty
 
     var stringCounter = 0
-    var ifCounter = 0
+    var labelCounter = 0
     var stackOffset = 0
 
     val asmList: List[ASMItem] = translateProgram(prog)
@@ -119,6 +119,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 translateLValue(lvalue) :::
                 List(Mov(Reg(Rax), Reg(Rdi))) :::
                 translateRead(r)
+
             case Scope(stats) =>
                 val childTable = currentScope.children(0)
                 allocateStackVariables(childTable) :::
@@ -128,10 +129,10 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case If(cond, ifStats, elseStats) =>
                 val ifChild = currentScope.children(0)
                 val elseChild = currentScope.children(1)
-                val ifBranch = Label(s".L$ifCounter")
-                ifCounter += 1
-                val endBranch = Label(s".L$ifCounter")
-                ifCounter += 1
+                val ifBranch = Label(s".L$labelCounter")
+                labelCounter += 1
+                val endBranch = Label(s".L$labelCounter")
+                labelCounter += 1
 
                 translateExpression(cond) :::
                 List(
@@ -149,6 +150,25 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 elseStats.flatten(translateStatement(_)(ifChild)) :::
                 popStackVariables(ifChild) :::
                 List(endBranch)
+
+            case While(cond, stats) =>
+                val childScope = currentScope.children(0)
+                val checkBranch = Label(s".L$labelCounter")
+                labelCounter += 1
+                val loopBranch = Label(s".L$labelCounter")
+                labelCounter += 1
+
+                List(
+                    Jmp(checkBranch),
+                    loopBranch
+                ) :::
+                stats.flatten(translateStatement(_)(childScope)) :::
+                List(checkBranch) :::
+                translateExpression(cond) :::
+                List(
+                    Cmp(ImmVal(1), Reg(Rax)),
+                    Jmp(loopBranch, Equal)
+                ) 
 
             case _ => List.empty
         }
