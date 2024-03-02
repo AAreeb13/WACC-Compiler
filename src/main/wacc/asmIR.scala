@@ -50,7 +50,7 @@ object LibFunc extends Enumeration {
 }
 
 case class Comment(contents: String) extends ASMItem {
-    override def toString() = s"# $contents\n"
+    override def toString() = s"# $contents"
 }
 
 sealed trait Section extends ASMItem

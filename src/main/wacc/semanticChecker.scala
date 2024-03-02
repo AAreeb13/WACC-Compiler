@@ -246,7 +246,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                 }
                 SemPair(fstType, sndType)
 
-            case FuncCall(ident, args) => funcTable.get(ident) match {
+            case f@FuncCall(ident, args) => funcTable.get(ident) match {
                 case None =>
                     // If function doesn't exist then create error and perform scope check on arguments
                     errorCollector.addError(rvalue, UndefinedFuncError(ident))
@@ -263,6 +263,7 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                         args.zip(paramTypes).foreach{ case (arg, paramType) => 
                             matchesType(checkExpression(arg), paramType)
                         }
+                        f.func = func
                         retType
                     }
                 }

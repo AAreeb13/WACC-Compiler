@@ -9,6 +9,7 @@ import wacc.asmIR.RegisterNames._
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import scala.language.implicitConversions
+import scala.collection.mutable.Stack
 
 object codeGenerator {
     def translate(astInfo: (Node, List[SymbolTable])): Either[String, String] = translate(astInfo._1, astInfo._2)
@@ -28,7 +29,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     var stringCounter = 0
     var labelCounter = 0
-    var stackOffset = 0
+    var stackOffset: ListBuffer[Int] = ListBuffer.empty
 
     val asmList: List[ASMItem] = translateProgram(prog)
 
@@ -42,6 +43,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         // for all the variables we need to 
         // make stacks 
+        stackOffset.addOne(0)
         val programBody = prog.stats.flatMap(translateStatement(_)(prog.scope))
         val functions = prog.funcs.flatMap(f => translateFunction(f)(f.scope))
 
@@ -69,7 +71,15 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             Mov(Reg(Rsp), Reg(Rbp)),
         )
 
-        val functionBody = func.stats.flatMap(translateStatement(_)(func.scope.children(0)))
+        val paramScope = func.scope
+        val funcBodyScope = paramScope.children.head
+
+        stackOffset.addOne(0)
+        val assignParameters = func.params.reverse.flatMap { param =>
+            Pop(Reg(Rax)) ::
+            nextStackLocation(param.name, param.declType)(paramScope)
+        }
+        stackOffset.remove(stackOffset.size - 1)
 
         val functionFooter = List(
             Mov(Reg(Rbp), Reg(Rsp)),
@@ -78,9 +88,12 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         )
 
         functionHeader :::
-        allocateStackVariables(func.scope) :::
-        functionBody :::
-        popStackVariables(func.scope) :::
+        allocateStackVariables(paramScope) :::
+        assignParameters :::
+        allocateStackVariables(funcBodyScope) :::
+        func.stats.flatMap(translateStatement(_)(funcBodyScope)) :::
+        popStackVariables(funcBodyScope) :::
+        popStackVariables(paramScope) :::
         functionFooter 
     }
 
@@ -149,7 +162,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case Scope(stats) =>
                 val childTable = currentScope.children(0)
                 allocateStackVariables(childTable) :::
-                stats.flatten(translateStatement(_)(childTable)) :::
+                stats.flatMap(translateStatement(_)(childTable)) :::
                 popStackVariables(childTable)
             
             case If(cond, ifStats, elseStats) =>
@@ -166,14 +179,14 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Jmp(ifBranch, Equal)
                 ) :::
                 allocateStackVariables(elseChild) :::
-                ifStats.flatten(translateStatement(_)(elseChild)) :::
+                ifStats.flatMap(translateStatement(_)(elseChild)) :::
                 popStackVariables(elseChild) :::
                 List(
                     Jmp(endBranch),
                     ifBranch
                 ) :::
                 allocateStackVariables(ifChild) :::
-                elseStats.flatten(translateStatement(_)(ifChild)) :::
+                elseStats.flatMap(translateStatement(_)(ifChild)) :::
                 popStackVariables(ifChild) :::
                 List(endBranch)
 
@@ -188,7 +201,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Jmp(checkBranch),
                     loopBranch
                 ) :::
-                stats.flatten(translateStatement(_)(childScope)) :::
+                stats.flatMap(translateStatement(_)(childScope)) :::
                 List(checkBranch) :::
                 translateExpression(cond) :::
                 List(
@@ -210,23 +223,25 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
         val memLocation: Option[Operand] = declType match {
             case BoolType() | CharType() | IntType() =>
-                val retVal = Some(Mem(Reg(Rbp), ImmVal(stackOffset -  currentScope.currentScopeOffset)))
+                val retVal = Some(Mem(Reg(Rbp), ImmVal(stackOffset.last -  currentScope.currentScopeOffset)))
                 currentScope.updateStackLocation(ident, retVal)
                 retVal
             case _ => None
         }
 
-        val retVal: List[ASMItem] = declType match {
-            case BoolType() =>
-                Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
-            case CharType() =>
-                Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
-            case IntType() =>
-                Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
-            case _ => Nil
+        val retVal: List[ASMItem] = Comment(s"stackOffset: ${stackOffset.last}") :: {
+            declType match {
+                case BoolType() =>
+                    Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
+                case CharType() =>
+                    Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
+                case IntType() =>
+                    Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
+                case _ => Nil
+            }
         }
 
-        stackOffset += size
+        stackOffset(stackOffset.size - 1) += size
         retVal
     }
 
@@ -392,6 +407,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def translateRValue(rvalue: RValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
         case expr: Expr => translateExpression(expr, targetReg)
         case FuncCall(ident, args) =>
+            args.flatMap(translateExpression(_) ::: List(Push(Reg(Rax)))) :::
             List(
                 Call(Label(s"wacc_$ident")),
                 Mov(Reg(Rax), targetReg)
