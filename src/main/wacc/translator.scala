@@ -194,7 +194,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Cmp(ImmVal(1), Reg(Rax)),
                     Jmp(loopBranch, Equal)
-                ) 
+                )
 
             case _ => List.empty
         }
@@ -391,6 +391,11 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def translateRValue(rvalue: RValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
         case expr: Expr => translateExpression(expr, targetReg)
+        case FuncCall(ident, args) =>
+            List(
+                Call(Label(s"wacc_$ident")),
+                Mov(Reg(Rax), targetReg)
+            )
         case _ => List.empty
     }
 
