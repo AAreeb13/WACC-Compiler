@@ -84,13 +84,17 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         functionFooter 
     }
 
-    def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
-        asmIR.Sub(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp)) :: Nil
+    def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] =
+        scopeTable.currentScopeOffset match {
+            case 0 => Nil
+            case offset => List(asmIR.Sub(ImmVal(offset), Reg(Rsp)))
     }
 
-    def popStackVariables(scopeTable: SymbolTable): List[ASMItem] = {
-        asmIR.Add(ImmVal(scopeTable.currentScopeOffset), Reg(Rsp)) :: Nil
-    }
+    def popStackVariables(scopeTable: SymbolTable): List[ASMItem] =
+        scopeTable.currentScopeOffset match {
+            case 0 => Nil
+            case offset => List(asmIR.Add(ImmVal(offset), Reg(Rsp)))
+        }
 
     def translateStatement(stat: Stat)(implicit currentScope: SymbolTable): List[ASMItem] = {
         stat match {
