@@ -100,16 +100,24 @@ object Main {
             // docker buildx build --platform linux/amd64 -t my-x86-image .
             // docker run -di --platform linux/amd64 --name my-container my-x86-image
             runCommand(Seq("docker", "run", "-di", "--platform", "linux/amd64", "--name", "my-container", "my-x86-image"))
+            runCommand(Seq("docker", "ps", "-a"))
         }
 
-        val compileSuccess = runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), assembly.getBytes())
+
+        
+        val errStream = new ByteArrayOutputStream
+        val compileSuccess = runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), assembly.getBytes(), errStream)
 
         if (compileSuccess != 0) {
             println("Compilation failure")
+            println(errStream.toString())
         } else {
             val outStream = new ByteArrayOutputStream
             val inStream = Source.stdin.map(_.toByte).toArray
             val actualExit = runCustomCommand(Seq("./out"), inStream, outStream)
+            println("Output:")
+            println(outStream.toString())
+            println(s"Executable finished with exit code $actualExit")
 
             if (!useDocker) {
                 runCustomCommand(Seq("rm", "-f", "./out"))
@@ -139,6 +147,11 @@ object Main {
         blocking(p.getOutputStream.write(inp))
         p.getOutputStream.close()
         blocking(pout.write(p.getInputStream().readAllBytes()))
+        blocking {
+            pout.write(Console.RED.getBytes())
+            pout.write(p.getErrorStream().readAllBytes())
+            pout.write(Console.RESET.getBytes())
+        }
         blocking(p.waitFor())
     }
 
