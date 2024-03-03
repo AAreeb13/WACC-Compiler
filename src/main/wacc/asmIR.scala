@@ -156,53 +156,53 @@ object asm {
     sealed trait Reg extends Operand
 
     case object Rax extends Reg {
-    override def toString: String = "%rax"
+        override def toString: String = "%rax"
     }
     case object Rbx extends Reg {
-    override def toString: String = "%rbx"
+        override def toString: String = "%rbx"
     }
     case object Rcx extends Reg {
-    override def toString: String = "%rcx"
+        override def toString: String = "%rcx"
     }
     case object Rdx extends Reg {
-    override def toString: String = "%rdx"
+        override def toString: String = "%rdx"
     }
     case object Rsi extends Reg {
-    override def toString: String = "%rsi"
+        override def toString: String = "%rsi"
     }
     case object Rdi extends Reg {
-    override def toString: String = "%rdi"
+        override def toString: String = "%rdi"
     }
     case object Rbp extends Reg {
-    override def toString: String = "%rbp"
+        override def toString: String = "%rbp"
     }
     case object Rsp extends Reg {
-    override def toString: String = "%rsp"
+        override def toString: String = "%rsp"
     }
 
     case object R8 extends Reg {
-    override def toString: String = "%r8"
+        override def toString: String = "%r8"
     }
     case object R9 extends Reg {
-    override def toString: String = "%r9"
+        override def toString: String = "%r9"
     }
     case object R10 extends Reg {
-    override def toString: String = "%r10"
+        override def toString: String = "%r10"
     }
     case object R11 extends Reg {
-    override def toString: String = "%r11"
+        override def toString: String = "%r11"
     }
     case object R12 extends Reg {
-    override def toString: String = "%r12"
+        override def toString: String = "%r12"
     }
     case object R13 extends Reg {
-    override def toString: String = "%r13"
+        override def toString: String = "%r13"
     }
     case object R14 extends Reg {
-    override def toString: String = "%r14"
+        override def toString: String = "%r14"
     }
     case object R15 extends Reg {
-    override def toString: String = "%r15"
+        override def toString: String = "%r15"
     }
 
 }
