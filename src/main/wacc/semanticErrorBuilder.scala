@@ -206,3 +206,8 @@ class SemanticErrorCollector(fileName: Option[String] = None, input: String = ""
 
     }
 }
+
+object SemanticErrorCollector {
+    override def apply(path: String, contents: String): SemanticErrorCollector = 
+        new SemanticErrorCollector(Some(path), contents)
+}

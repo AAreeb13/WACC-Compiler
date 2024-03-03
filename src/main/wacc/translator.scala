@@ -1,23 +1,21 @@
 package wacc
 
-import wacc.ast._
-import wacc.asm._
+import ast._
+import asm._
+import semAst._
+import semanticChecker._
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 
 object codeGenerator {
-    def translate(ast: Node, symbolTable: SymbolTable): Either[String, String] = {
-        ast match {
-            case prog: Prog => Right(new Assembler(prog, symbolTable).toAssembly)
-            case _ => Left("Invalid AST type for error generation")
-        }
-    }
+    def translate(result: Either[String, SemanticInfo]): String = 
+        result.map(new Translator(_).toAssembly).toOption.get
 }
 
-class Assembler(prog: Prog, val symbolTable: SymbolTable) {
+class Translator(semanticInfo: SemanticInfo) {
     val labelMap: HashMap[String, List[ASMItem]] = HashMap.empty
-    val asmList: List[ASMItem] = translateProgram(prog)
+    val asmList: List[ASMItem] = translateProgram(semanticInfo.ast)
 
     def translateProgram(prog: Prog): List[ASMItem] = {
         val programHeader = List(

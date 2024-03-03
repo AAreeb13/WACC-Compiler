@@ -3,7 +3,8 @@ package wacc
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 
-import wacc.ast.Node
+import ast.Node
+import semAst.SemType
 
 /**
   * Doubly linked symbol table class that keeps track of parent and child nodes 

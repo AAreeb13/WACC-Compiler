@@ -31,14 +31,9 @@ import scala.util
   */
 
 object parser {
-    def parseFile(path: String): Result[String, Node] = parser.parseFile(new File(path)) match {
-        case util.Success(result) => result
-        case util.Failure(_) => parsley.Failure("IO Exception")
-    }
+    def parse(input: String): Either[String, Prog] = parser.parse(input).toEither
 
-    def parse(input: String) = parser.parse(input)
-
-    lazy val parser: Parsley[Node] = fully(prog)
+    lazy val parser: Parsley[Prog] = fully(prog)
 
     // verified explains for additional clarity
     val _semicheck = "end".verifiedExplain("semi-colons may not appear at the end of a block")

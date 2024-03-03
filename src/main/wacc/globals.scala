@@ -7,11 +7,12 @@ object globals {
     val exitSuccess     = 0;
     val exitSyntaxErr   = 100;
     val exitSemanticErr = 200;
-    val exitRuntimeErr = 300;
     val exitInvalidOptions = 2;
 
-    var fullTypeCheck = true
-    var compile = true
-    var optimise = false
+    var syntaxCheckOnly = false
+    var semanticCheckOnly = false
+    var executeAssembly = true
     var enableColours = true
+
+    var useDocker = true
 }
