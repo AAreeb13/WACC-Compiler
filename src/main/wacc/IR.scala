@@ -119,5 +119,22 @@ object IR {
     case class Jmp(label: JumpLabel, flag: Condition = Unconditional) extends Instruction
     case class Call(label: FuncLabel) extends Instruction
 
+    sealed trait Condition
+    case object Greater extends Condition
+    case object GreaterEqual extends Condition
+    case object Equal extends Condition
+    case object NotEqual extends Condition
+    case object Less extends Condition
+    case object LessEqual extends Condition
+    case object Overflow extends Condition
+    case object Unconditional extends Condition
+
+    case class Comment(contents: String) extends Line
+
+    sealed class Tag(name: String) extends Line
+    case object TextTag   extends Tag("text")
+    case object GlobalTag extends Tag("global main")
+    case object ReadonlyTag  extends Tag("section readonly")
+
 
 }
