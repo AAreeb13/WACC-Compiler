@@ -263,6 +263,8 @@ class Analyser(val prog: Prog, errorCollectorOption: Option[SemanticErrorCollect
                         args.zip(paramTypes).foreach{ case (arg, paramType) => 
                             matchesType(checkExpression(arg), paramType)
                         }
+                        //f.func = func
+                        f.paramTypes = paramTypes
                         f.func = func
                         retType
                     }

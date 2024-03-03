@@ -5,6 +5,7 @@ import wacc.asmIR._
 import wacc.asmIR.ComparisonType._
 import wacc.asmIR.InstructionSize._
 import wacc.asmIR.RegisterNames._
+import wacc.Implicits.syntaxToSem
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
@@ -77,7 +78,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         stackOffset.addOne(0)
         val assignParameters = func.params.reverse.flatMap { param =>
             Pop(Reg(Rax)) ::
-            nextStackLocation(param.name, param.declType)(paramScope)
+            nextStackLocation(param.name, syntaxToSem(param.declType))(paramScope)
         }
         stackOffset.remove(stackOffset.size - 1)
 
@@ -91,7 +92,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         allocateStackVariables(paramScope) :::
         List(Pop(Reg(Rbx))) :::
         assignParameters :::
-        List(Push(Reg(Rbx)))
+        List(Push(Reg(Rbx))) :::
         allocateStackVariables(funcBodyScope) :::
         func.stats.flatMap(translateStatement(_)(funcBodyScope)) :::
         popStackVariables(funcBodyScope) :::
@@ -143,7 +144,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
             case AssignNew(declType, ident, rvalue) =>
                 translateRValue(rvalue) :::
-                nextStackLocation(ident, declType)
+                nextStackLocation(ident, syntaxToSem(declType))
             
             case p@Print(expr) =>
                 translateExpression(expr) :::
@@ -177,7 +178,6 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
                 translateExpression(cond) :::
                 List(
-                    Cmp(ImmVal(1), Reg(Rax)),
                     Jmp(ifBranch, Equal)
                 ) :::
                 allocateStackVariables(elseChild) :::
@@ -199,6 +199,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 val loopBranch = Label(s".L$labelCounter")
                 labelCounter += 1
 
+                Comment("Begin while") ::
                 List(
                     Jmp(checkBranch),
                     loopBranch
@@ -215,30 +216,15 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
-    def nextStackLocation(ident: String, declType: Type)(implicit currentScope: SymbolTable): List[ASMItem] = {
-        val size = declType match {
-            case BoolType() => 1
-            case CharType() => 1
-            case IntType() => 4
-            case StringType() => 8
-            case _ => 0
-        }
-
+    def nextStackLocation(ident: String, size: Size)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val memLocation: Option[Operand] = Some(Mem(Reg(Rbp), ImmVal(stackOffset.last -  currentScope.currentScopeOffset)))
         currentScope.updateStackLocation(ident, memLocation)
-
-        val retVal: List[ASMItem] = Comment(s"stackOffset: ${stackOffset.last}") :: {
-            declType match {
-                case BoolType() => Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
-                case CharType() => Mov(Reg(Rax, Byte), memLocation.get, Byte) :: Nil
-                case IntType() =>  Mov(Reg(Rax, DWord), memLocation.get, DWord) :: Nil
-                case StringType() =>  Mov(Reg(Rax, QWord), memLocation.get, QWord) :: Nil
-                case _ => Nil
-            }
-        }
-
         stackOffset(stackOffset.size - 1) += size
-        retVal
+        
+        List(
+            Comment(s"stackOffset: ${stackOffset.last}"),
+            Mov(Reg(Rax, Byte), memLocation.get, Byte)
+        )
     }
 
     def translatePrint(innerType: SemType): List[ASMItem] = {
@@ -390,14 +376,27 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         )
     }
 
-    implicit def typeToSize(declType: Type): Size = declType match {
-        case ArrayType(_) => QWord
-        case BoolType() => Byte
-        case CharType() => Byte
-        case IntType() => DWord
-        case StringType() => QWord
-        case ErasedPair() => QWord
-        case PairType(_, _) => QWord
+    // implicit def typeToSize(declType: Type): Size = declType match {
+    //     case ArrayType(_) => QWord
+    //     case BoolType() => Byte
+    //     case CharType() => Byte
+    //     case IntType() => DWord
+    //     case StringType() => QWord
+    //     case ErasedPair() => QWord
+    //     case PairType(_, _) => QWord
+    // }
+
+    implicit def typeToSize(declType: SemType): Size = declType match {
+        case SemBool | SemChar => Byte
+        case SemInt => DWord
+        case _ => QWord
+    }
+
+    implicit def sizeToInt(size: Size): Int = size match {
+        case QWord => 8
+        case DWord => 4
+        case Word => 2
+        case Byte => 1
     }
 
     def translateRValue(rvalue: RValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = rvalue match {
@@ -407,11 +406,17 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             translate each expression then store the result into stack location (allocate new variable)
             then each time a parameter needs to be accessed we offset the size 
             */
-            args.flatMap(translateExpression(_) ::: List(Push(Reg(Rax)))) :::
+            allocateStackVariables(f.func.scope) :::
+            args.zip(f.paramTypes).zip(f.func.params.map(_.name)).flatMap{ case ((argExpr, argType), argIdent) => 
+                translateExpression(argExpr) :::
+                nextStackLocation(argIdent, argType)
+            } :::
             List(
                 Call(Label(s"wacc_$ident")),
                 Mov(Reg(Rax), targetReg)
-            )
+            ) :::
+            popStackVariables(f.func.scope)
+
         case _ => List.empty
     }
 
@@ -616,16 +621,16 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, locationOption) = currentScope.get(v.v).get
-        //println(currentScope.table)
         val location = locationOption.getOrElse(currentScope.previousLocation(v.v).get)
         
         declType match {
             case SemBool => Movs(location, targetReg, Byte) :: Nil
             case SemChar => Movs(location, targetReg, Byte) :: Nil
-            case SemInt  => size == DWord match {
-                case true => Mov(location, targetReg, DWord) :: Nil
-                case _ => Movs(location, targetReg, DWord) :: Nil
+            case SemInt  => size match {
+                case DWord => Mov(location, targetReg, DWord) :: Nil
+                case _     => Movs(location, targetReg, DWord) :: Nil
             }
+            case SemString => Mov(location, targetReg, QWord) :: Nil
             case _ => Nil
         }
     }
