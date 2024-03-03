@@ -1,26 +1,21 @@
 package wacc
 
 import wacc.ast._
+import wacc.asm._
+
 import scala.collection.mutable.ListBuffer
-import wacc.asmIR._
 import scala.collection.mutable.HashMap
 
-object translator {
+object codeGenerator {
     def translate(ast: Node, symbolTable: SymbolTable): Either[String, String] = {
         ast match {
-            case prog: Prog => Right(new Translator(prog, symbolTable).toAssembly)
+            case prog: Prog => Right(new Assembler(prog, symbolTable).toAssembly)
             case _ => Left("Invalid AST type for error generation")
         }
     }
-
-    // def translate(ast: Node) = ast match {
-    //     case Add(op1, op2) => op1 match {
-            
-    //     }
-    // }
 }
 
-class Translator(prog: Prog, val symbolTable: SymbolTable) {
+class Assembler(prog: Prog, val symbolTable: SymbolTable) {
     val labelMap: HashMap[String, List[ASMItem]] = HashMap.empty
     val asmList: List[ASMItem] = translateProgram(prog)
 
@@ -53,7 +48,7 @@ class Translator(prog: Prog, val symbolTable: SymbolTable) {
                 addLabel(exitLabel, List(
                     Push(Rbp),
                     Mov(Rsp, Rbp),
-                    asmIR.And(ImmVal(mask), Rsp),
+                    asm.And(ImmVal(mask), Rsp),
                     Call(LibFunc.Exit),
                     Mov(Rbp, Rsp),
                     Pop(Rbp),
