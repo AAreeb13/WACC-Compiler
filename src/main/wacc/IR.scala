@@ -1,8 +1,5 @@
 package wacc
 
-import parsley.internal.machine.instructions.Instr
-import java.util.concurrent.locks.Condition
-
 object IR {
     sealed trait Line
 
@@ -13,24 +10,25 @@ object IR {
     sealed trait Location extends Operand
 
     sealed trait Register extends Location {
-        val size: Size
+        val size: Size = QWord
     }
 
-    case class R1(size: Size) extends Register
-    case class R2(size: Size) extends Register
-    case class R3(size: Size) extends Register
-    case class R4(size: Size) extends Register
-    case class R5(size: Size) extends Register
-    case class R6(size: Size) extends Register
-    case class R7(size: Size) extends Register
-    case class R8(size: Size) extends Register
-    case class R8(size: Size) extends Register
-    case class R10(size: Size) extends Register
-    case class R11(size: Size) extends Register
-    case class R12(size: Size) extends Register
-    case class R13(size: Size) extends Register
-    case class R14(size: Size) extends Register
-    case class R15(size: Size) extends Register
+    case object R0 extends Register
+    case object R1 extends Register
+    case object R2 extends Register
+    case object R3 extends Register
+    case object R4 extends Register
+    case object R5 extends Register
+    case object R6 extends Register
+    case object R7 extends Register
+    case object R8 extends Register
+    case object R9 extends Register
+    case object R10 extends Register
+    case object R11 extends Register
+    case object R12 extends Register
+    case object R13 extends Register
+    case object R14 extends Register
+    case object R15 extends Register
 
     sealed trait Memory extends Location
     case class RegisterOffset(reg: Register) extends Memory
@@ -56,7 +54,7 @@ object IR {
     sealed trait FuncLabel extends Label
 
     case class WaccFuncLabel(name: String) extends Label(name) with FuncLabel
-    case class LibFuncLabel(name: String) extends Label(name) with FuncLabel
+    sealed class LibFuncLabel(name: String) extends Label(name) with FuncLabel
     case class WrapperFuncLabel(name: String) extends Label(name) with FuncLabel
 
     case object Main extends Label("main") with FuncLabel
@@ -101,17 +99,16 @@ object IR {
     case class Div(op1: Operand, op2: Operand, dst: Location) extends Instruction
     case class Add(op1: Operand, op2: Operand, dst: Location) extends Instruction
     case class And(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class Mul(op1: Operand, op2: Operand, dst: Location) extends Instruction
     case class Or(op1: Operand, op2: Operand, dst: Location) extends Instruction
 
     case class Mov private (src: Operand, dst: Location, flag: Option[Condition], size: Option[Size]) extends Instruction
 
     object Mov {
-        override def apply(src: Operand, dst: Location, flag: Condition): Mov = 
+        def apply(src: Operand, dst: Location, flag: Condition): Mov = 
             Mov(src, dst, Some(flag), None)
         
-        override def apply(src: Operand, dst: Location, size: Size = Auto): Mov = 
-            Mov(src, dst, None, Some(flag))
+        def apply(src: Operand, dst: Location, size: Size = Auto): Mov = 
+            Mov(src, dst, None, Some(size))
     }
 
     case class Cmp(src: Operand, dst: Location) extends Instruction
@@ -136,5 +133,9 @@ object IR {
     case object GlobalTag extends Tag("global main")
     case object ReadonlyTag  extends Tag("section readonly")
 
+    val TrueImm = Imm(1)
+    val FalseImm = Imm(0)
+    val AlignmentMaskImm = Imm(-16)
+    val DefaultExitCode = Imm(0)
 
 }
