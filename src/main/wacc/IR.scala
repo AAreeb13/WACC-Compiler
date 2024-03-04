@@ -44,7 +44,7 @@ object IR {
     case object DWord extends Size
     case object QWord extends Size
 
-    case object Auto extends Size
+    //case object Auto extends Size
 
     sealed class Label(val name: String) extends Line
 
@@ -93,28 +93,29 @@ object IR {
 
     sealed trait Instruction extends Line
 
-    case class PushASM(op: Operand) extends Instruction
-    case class PopASM(op: Operand) extends Instruction // although immediates should not be popped to
+    case class PushASM(op: Operand, size: Size = QWord) extends Instruction
+    case class PopASM(op: Operand, size: Size = QWord) extends Instruction // although immediates should not be popped to
     
-    case class SubASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class MulASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class DivASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class AddASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class AndASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class OrASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class SubASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class MulASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class DivASM(op1: Operand, op2: Operand, dst: Location, size: Size = DWord) extends Instruction
+    case class AddASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class AndASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class OrASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
 
-    case class MovASM private (src: Operand, dst: Location, flag: Option[Condition], size: Option[Size]) extends Instruction
+    case class MovsASM(src: Operand, dst: Location, sizeFrom: Size, sizeTo: Size = QWord) extends Instruction
+    case class MovASM(src: Operand, dst: Location, flag: Condition, size: Size) extends Instruction
 
     object MovASM {
         def apply(src: Operand, dst: Location, flag: Condition): MovASM = 
-            MovASM(src, dst, Some(flag), None)
+            MovASM(src, dst, flag, DWord)
         
-        def apply(src: Operand, dst: Location, size: Size = Auto): MovASM = 
-            MovASM(src, dst, None, Some(size))
+        def apply(src: Operand, dst: Location, size: Size = QWord): MovASM = 
+            MovASM(src, dst, Unconditional, size)
     }
 
-    case class CmpASM(src: Operand, dst: Location) extends Instruction
-    case class SetASM(dst: Operand, flag: Condition) extends Instruction
+    case class CmpASM(src: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class SetASM(dst: Operand, flag: Condition, size: Size = Byte) extends Instruction
     case class JmpASM(label: JumpLabel, flag: Condition = Unconditional) extends Instruction
     case class CallASM(label: FuncLabel) extends Instruction
 

@@ -48,7 +48,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateBlock(prog.stats)(buf, prog.scope)
         //prog.stats.foreach(translateStatement(_))
 
-        buf += MovASM(DefaultExitCode, ReturnReg)
+        buf += MovASM(DefaultExitCode, ReturnReg, Byte)
         buf += PopASM(BasePointer)
         buf += RetASM
         

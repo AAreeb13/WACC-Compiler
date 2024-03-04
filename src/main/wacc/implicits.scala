@@ -32,7 +32,6 @@ object implicits {
     implicit def sizeToInt(s: Size): Int = s match {
         case QWord => 8
         case Byte => 1
-        case Auto => 0
         case Word => 2
         case DWord => 4
     }
