@@ -83,7 +83,7 @@ object Main {
         }
 
         // Code Generation
-        val assemblyResult = codeGenerator.translate(semanticResult)
+        val assemblyResult = codeGenerator.generateAssembly(semanticResult, X86Config)
 
         println(assemblyResult)
 

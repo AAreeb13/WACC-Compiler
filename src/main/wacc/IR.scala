@@ -49,7 +49,7 @@ object IR {
     sealed class Label(name: String) extends Line
 
     case class JumpLabel(name: String) extends Label(name)
-    case class StringLabel(name: String) extends Label(name)
+    case class StringLabel(name: String, value: String) extends Label(name)
 
     sealed trait FuncLabel extends Label
 
@@ -57,7 +57,7 @@ object IR {
     sealed class LibFuncLabel(name: String) extends Label(name) with FuncLabel
     case class WrapperFuncLabel(name: String) extends Label(name) with FuncLabel
 
-    case object Main extends Label("main") with FuncLabel
+    case object MainLabel extends Label("main") with FuncLabel
 
     case object MallocLabel    extends LibFuncLabel("malloc")
     case object ExitLabel      extends LibFuncLabel("exit")
@@ -67,54 +67,56 @@ object IR {
     case object FileFlush      extends LibFuncLabel("fflush")
     case object Puts           extends LibFuncLabel("puts")
 
-    case object Println      extends Label("_println") with FuncLabel
-    case object PrintInt     extends Label("_printi") with FuncLabel
-    case object PrintBool    extends Label("_printb") with FuncLabel
-    case object PrintChar    extends Label("_printc") with FuncLabel
-    case object PrintStr     extends Label("_prints") with FuncLabel
-    case object PrintPtr     extends Label("_printp") with FuncLabel
+    case object PrintlnLabel      extends Label("_println") with FuncLabel
+    case object PrintIntLabel     extends Label("_printi") with FuncLabel
+    case object PrintBoolLabel    extends Label("_printb") with FuncLabel
+    case object PrintCharLabel    extends Label("_printc") with FuncLabel
+    case object PrintStrLabel     extends Label("_prints") with FuncLabel
+    case object PrintPtrLabel     extends Label("_printp") with FuncLabel
 
-    case object ReadInt  extends Label("_readi") with FuncLabel
-    case object ReadChar extends Label("_readc") with FuncLabel
+    case object ReadIntLabel  extends Label("_readi") with FuncLabel
+    case object ReadCharLabel extends Label("_readc") with FuncLabel
 
-    case object CheckNull     extends Label("_errNull") with FuncLabel
-    case object CheckOverflow extends Label("_errOverflow") with FuncLabel
-    case object CheckDivZero  extends Label("_errDivZero") with FuncLabel
-    case object CheckBound    extends Label("_boundsCheck") with FuncLabel
+    case object CheckNullLabel     extends Label("_errNull") with FuncLabel
+    case object CheckOverflowLabel extends Label("_errOverflow") with FuncLabel
+    case object CheckDivZeroLabel  extends Label("_errDivZero") with FuncLabel
+    case object CheckBoundLabel    extends Label("_boundsCheck") with FuncLabel
 
-    case object ArrayStore  extends Label("_arrStore") with FuncLabel
-    case object ArrayStoreB extends Label("_arrStoreB") with FuncLabel
-    case object ArrayLoad   extends Label("_arrLoad") with FuncLabel
-    case object ArrayLoadB  extends Label("_arrLoadB") with FuncLabel
-    case object FreePair    extends Label("_freepair") with FuncLabel
-    case object FreeArray   extends Label("_free") with FuncLabel
+    case object ArrayStoreLabel  extends Label("_arrStore") with FuncLabel
+    case object ArrayStoreBLabel extends Label("_arrStoreB") with FuncLabel
+    case object ArrayLoadLabel   extends Label("_arrLoad") with FuncLabel
+    case object ArrayLoadBLabel  extends Label("_arrLoadB") with FuncLabel
+    case object FreePairLabel    extends Label("_freepair") with FuncLabel
+    case object FreeArrayLabel   extends Label("_free") with FuncLabel
+
+    case object RetASM extends Instruction
 
     sealed trait Instruction extends Line
 
-    case class Push(op: Operand) extends Instruction
-    case class Pop(op: Operand) extends Instruction // although immediates should not be popped to
+    case class PushASM(op: Operand) extends Instruction
+    case class PopASM(op: Operand) extends Instruction // although immediates should not be popped to
     
-    case class Sub(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class Mul(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class Div(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class Add(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class And(op1: Operand, op2: Operand, dst: Location) extends Instruction
-    case class Or(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class SubASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class MulASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class DivASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class AddASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class AndASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
+    case class OrASM(op1: Operand, op2: Operand, dst: Location) extends Instruction
 
-    case class Mov private (src: Operand, dst: Location, flag: Option[Condition], size: Option[Size]) extends Instruction
+    case class MovASM private (src: Operand, dst: Location, flag: Option[Condition], size: Option[Size]) extends Instruction
 
-    object Mov {
-        def apply(src: Operand, dst: Location, flag: Condition): Mov = 
-            Mov(src, dst, Some(flag), None)
+    object MovASM {
+        def apply(src: Operand, dst: Location, flag: Condition): MovASM = 
+            MovASM(src, dst, Some(flag), None)
         
-        def apply(src: Operand, dst: Location, size: Size = Auto): Mov = 
-            Mov(src, dst, None, Some(size))
+        def apply(src: Operand, dst: Location, size: Size = Auto): MovASM = 
+            MovASM(src, dst, None, Some(size))
     }
 
-    case class Cmp(src: Operand, dst: Location) extends Instruction
-    case class Set(dst: Operand, flag: Condition) extends Instruction
-    case class Jmp(label: JumpLabel, flag: Condition = Unconditional) extends Instruction
-    case class Call(label: FuncLabel) extends Instruction
+    case class CmpASM(src: Operand, dst: Location) extends Instruction
+    case class SetASM(dst: Operand, flag: Condition) extends Instruction
+    case class JmpASM(label: JumpLabel, flag: Condition = Unconditional) extends Instruction
+    case class CallASM(label: FuncLabel) extends Instruction
 
     sealed trait Condition
     case object Greater extends Condition

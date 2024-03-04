@@ -5,6 +5,7 @@ import scala.collection.mutable.ListBuffer
 
 import ast.Node
 import semAst.SemType
+import implicits._
 
 /**
   * Doubly linked symbol table class that keeps track of parent and child nodes 
@@ -13,8 +14,12 @@ import semAst.SemType
   */
 class SymbolTable(val parent: Option[SymbolTable] = None) {
     //  (ident, (semantic type, reference to original node))
-    var table: HashMap[String, (SemType, Node)] = HashMap()
+    var table: HashMap[String, (SemType, Node)] = HashMap.empty
+    var locationTable: HashMap[String, IR.Location] = HashMap.empty
     var children: ListBuffer[SymbolTable] = ListBuffer.empty
+    var scopeSize = 0
+
+    def getScopeSize(): Int = scopeSize
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
@@ -25,6 +30,7 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     // Add an entry to the symbol table
     def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {
         table.addOne(name, (declType, node))
+        scopeSize += sizeToInt(semanticToSize(declType))
         node.scope = this
     }
 
