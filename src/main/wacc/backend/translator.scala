@@ -513,7 +513,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     Movs(Reg(Rax, Byte), targetReg, Byte)
                 )
             case expr: ArithmeticOp => 
-                transArithmeticOp(expr, targetReg.toSize(DWord)) 
+                translateArithmeticOp(expr, targetReg.toSize(DWord)) 
             
             case _ => List.empty
         }
