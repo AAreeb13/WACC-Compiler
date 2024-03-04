@@ -113,7 +113,7 @@ object Main {
             println(errStream.toString())
         } else {
             val outStream = new ByteArrayOutputStream
-            val inStream = Source.stdin.map(_.toByte).toArray
+            val inStream = if (acceptInput) Source.stdin.map(_.toByte).toArray else Array.emptyByteArray
             val actualExit = runCustomCommand(Seq("./out"), inStream, outStream)
             println("Output:")
             println(outStream.toString())

@@ -12,6 +12,7 @@ object globals {
     var syntaxCheckOnly = false
     var semanticCheckOnly = false
     var executeAssembly = true
+    var acceptInput = false
     var enableColours = true
 
     var useDocker = true
