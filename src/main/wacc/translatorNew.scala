@@ -19,6 +19,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translate(): List[Line] = {
         // Generate Header
 
+        translateProg(semanticInfo.ast)
+
         asmList += GlobalTag
         if (!stringList.isEmpty) {
             asmList += ReadonlyTag

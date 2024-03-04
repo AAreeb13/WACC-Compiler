@@ -50,6 +50,7 @@ object semanticChecker {
          * Additional Constructor which generates function map and adds to statements to global symbol table
          */
         def checkProgram(): Unit = {
+            prog.scope = mainScope
             // Maps each function to an entry in funcTable
             prog.funcs.foreach { func =>
                 // Throw an error if two function with same names exist
@@ -94,6 +95,7 @@ object semanticChecker {
         def checkFunction(func: Func): Unit = {
             // A new symbol table for the function is created and added to the list
             val funcArgSymbolTable = new SymbolTable()
+            func.scope = funcArgSymbolTable
             topLevelScopes.addOne(funcArgSymbolTable)
 
 

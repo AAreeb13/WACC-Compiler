@@ -46,16 +46,16 @@ object IR {
 
     case object Auto extends Size
 
-    sealed class Label(name: String) extends Line
+    sealed class Label(val name: String) extends Line
 
-    case class JumpLabel(name: String) extends Label(name)
-    case class StringLabel(name: String, value: String) extends Label(name)
+    case class JumpLabel(override val name: String) extends Label(name)
+    case class StringLabel(override val name: String, value: String) extends Label(name)
 
     sealed trait FuncLabel extends Label
 
-    case class WaccFuncLabel(name: String) extends Label(name) with FuncLabel
-    sealed class LibFuncLabel(name: String) extends Label(name) with FuncLabel
-    case class WrapperFuncLabel(name: String) extends Label(name) with FuncLabel
+    case class WaccFuncLabel(override val name: String) extends Label(name) with FuncLabel
+    sealed class LibFuncLabel(override val name: String) extends Label(name) with FuncLabel
+    case class WrapperFuncLabel(override val name: String) extends Label(name) with FuncLabel
 
     case object MainLabel extends Label("main") with FuncLabel
 
@@ -130,7 +130,7 @@ object IR {
 
     case class Comment(contents: String) extends Line
 
-    sealed class Tag(name: String) extends Line
+    sealed class Tag(val name: String) extends Line
     case object TextTag   extends Tag("text")
     case object GlobalTag extends Tag("global main")
     case object ReadonlyTag  extends Tag("section readonly")
