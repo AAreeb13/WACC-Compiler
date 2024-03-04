@@ -64,14 +64,14 @@ case object X86Config extends TargetConfig {
     
 
 
-    override implicit def opStr(op: Operand)(implicit size: Size): String = {
+    override implicit def opStr(op: Operand)(implicit size: Size = QWord): String = {
         op match {
             case Imm(value) => s"$$$value"
-            case RegisterLabelOffset(reg, offsetLabel) => s"${offsetLabel.name}(${opStr(reg)})"
-            case RegisterRegisterOffset(reg, offsetReg) => s"(${opStr(reg)}, ${opStr(offsetReg)})"
-            case RegisterOffset(reg) => s"(${opStr(reg)})"
-            case RegisterImmediateOffset(reg, offset) => s"$offset(${opStr(reg)})"
-            case RegisterMultiplierOffset(reg, offsetReg, multiplier) => s"(${opStr(reg)}, ${opStr(offsetReg)}, $multiplier)"
+            case RegisterLabelOffset(reg, offsetLabel) => s"${offsetLabel.name}(${opStr(reg)()})"
+            case RegisterRegisterOffset(reg, offsetReg) => s"(${opStr(reg)()}, ${opStr(offsetReg)()})"
+            case RegisterOffset(reg) => s"(${opStr(reg)()})"
+            case RegisterImmediateOffset(reg, offset) => s"$offset(${opStr(reg)()})"
+            case RegisterMultiplierOffset(reg, offsetReg, multiplier) => s"(${opStr(reg)()}, ${opStr(offsetReg)()}, $multiplier)"
             case reg: Register => 
                 val regVal = reg match {
                     case Rax => size match {
