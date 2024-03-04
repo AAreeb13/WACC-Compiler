@@ -451,11 +451,11 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
             case other => other.toString
         })
 
-    def translateExpression(expr: Expr, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateExpression(expr: Expr, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
             case IntVal(int) => 
                 List(
-                    Mov(ImmVal(int), targetReg)
+                    Mov(ImmVal(int), targetReg, size)
                 )
             case CharVal(char) => 
                 List(
@@ -472,7 +472,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 List(
                     Lea(Mem(Reg(Rip), strLabel), targetReg)
                 )
-            case variable: Var => translateVar(variable, targetReg)
+            case variable: Var => translateVar(variable, targetReg, size)
             case Chr(expr) => 
                 val asciiCheck = -128
                 val mask = -16
@@ -526,38 +526,30 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         }
     }
 
-    def transArithmeticOp(expr: Expr, targetReg: Reg = Reg(Rax, DWord))(implicit currentScope: SymbolTable): List[ASMItem] = {
+    def translateBinExpression(expr1: Expr, expr2: Expr, targetReg: Reg = Reg(Rax), size: Size = QWord)
+    (implicit currentScope: SymbolTable, body: List[ASMItem]): List[ASMItem] = {  
+        Push(Reg(R12)) ::
+        translateExpression(expr1, targetReg, size) :::
+        List(Push(targetReg.toSize(QWord))) :::
+        translateExpression(expr2, targetReg, size) :::
+        List(
+            Mov(targetReg.toSize(QWord), Reg(R12)),
+            Pop(targetReg.toSize(QWord))):::
+        body :::
+        List(Pop(Reg(R12)))
+    }
+
+    def translateArithmeticOp(expr: Expr, targetReg: Reg = Reg(Rax, DWord))(implicit currentScope: SymbolTable): List[ASMItem] = {
         expr match {
-            case IntVal(int) => Mov(ImmVal(int), targetReg, DWord) :: Nil
-            case variable: Var => translateVar(variable, targetReg, DWord)
-            case Neg(expr) => Push(Reg(R12)) :: 
-                transArithmeticOp(expr, Reg(R12, DWord)) :::
-                List(
-                    Mov(ImmVal(0), targetReg.toSize(DWord), DWord),
-                    asm.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
-                    Pop(Reg(R12))
-                )
             case expr: ArithmeticOp =>
-                Push(Reg(R12)) ::
-                transArithmeticOp(expr.x, targetReg) ::: // movl x into %eax
-                List(
-                    Push(targetReg.toSize(QWord))
-                ) :::
-                transArithmeticOp(expr.y, targetReg) ::: 
-                List(
-                    Mov(targetReg.toSize(QWord), Reg(R12)), 
-                    Pop(targetReg.toSize(QWord))
-                ) :::
-                binOp(expr, Reg(R12, DWord), targetReg) :::
-                List(
-                    Movs(targetReg, targetReg.toSize(QWord), DWord),
-                    Pop(Reg(R12))
-                )
+                implicit val body: List[ASMItem] = translateBinOp(expr, Reg(R12, DWord), targetReg) ::: Movs(targetReg, targetReg.toSize(QWord), DWord) :: Nil
+                translateBinExpression(expr.x, expr.y, targetReg, DWord)
             case _ => List.empty
         }
+
     }
        
-    def binOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
+    def translateBinOp(op: BinOp, src: Reg, targetReg: Reg = Reg(Rax, DWord)): List[ASMItem] = {
         op match {
             case ast.Add(_, _) =>
                 addOverflowError() 
@@ -622,7 +614,6 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, locationOption) = currentScope.get(v.v).get
         val location = locationOption.getOrElse(currentScope.previousLocation(v.v).get)
-        System.err.println(s"location: $location, size: $size")
 
         Comment(s"Var: ${v.v}") ::
         {

@@ -1,6 +1,5 @@
 begin
-    int x = 5;
-    print x;
-    x = 10;
-    print x
+    int x = 7;
+    int y = -90;
+    println -x + (y + 9)
 end
