@@ -223,7 +223,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         
         List(
             Comment(s"stackOffset: ${stackOffset.last}"),
-            Mov(Reg(Rax, Byte), memLocation.get, Byte)
+            Mov(Reg(Rax, size), memLocation.get, size)
         )
     }
 
@@ -622,16 +622,20 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def translateVar(v: Var, targetReg: Reg = Reg(Rax), size: Size = QWord)(implicit currentScope: SymbolTable): List[ASMItem] = {
         val (declType, _, locationOption) = currentScope.get(v.v).get
         val location = locationOption.getOrElse(currentScope.previousLocation(v.v).get)
-        
-        declType match {
-            case SemBool => Movs(location, targetReg, Byte) :: Nil
-            case SemChar => Movs(location, targetReg, Byte) :: Nil
-            case SemInt  => size match {
-                case DWord => Mov(location, targetReg, DWord) :: Nil
-                case _     => Movs(location, targetReg, DWord) :: Nil
+        System.err.println(s"location: $location, size: $size")
+
+        Comment(s"Var: ${v.v}") ::
+        {
+            declType match {
+                case SemBool => Movs(location, targetReg, Byte) :: Nil
+                case SemChar => Movs(location, targetReg, Byte) :: Nil
+                case SemInt  => size match {
+                    case DWord => Mov(location, targetReg, DWord) :: Nil
+                    case _     => Movs(location, targetReg, DWord) :: Nil
+                }
+                case SemString => Mov(location, targetReg, QWord) :: Nil
+                case _ => Nil
             }
-            case SemString => Mov(location, targetReg, QWord) :: Nil
-            case _ => Nil
         }
     }
 
