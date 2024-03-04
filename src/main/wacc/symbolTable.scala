@@ -4,7 +4,7 @@ package wacc
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import ast._
-import asmIR._
+import asm._
 
 /**
   * Doubly linked symbol table class that keeps track of parent and child nodes 

@@ -6,7 +6,7 @@ import scala.language.implicitConversions
 import wacc.Implicits._
 import ast._
 import scala.io.Source.fromFile
-import asmIR.Operand
+import asm.Operand
 
 /**
   * Takes an AST and optionally a semanticError collector and performs semantic analysis on it

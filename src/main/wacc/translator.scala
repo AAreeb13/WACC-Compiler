@@ -1,10 +1,10 @@
 package wacc
 
 import wacc.ast._
-import wacc.asmIR._
-import wacc.asmIR.ComparisonType._
-import wacc.asmIR.InstructionSize._
-import wacc.asmIR.RegisterNames._
+import wacc.asm._
+import wacc.asm.ComparisonType._
+import wacc.asm.InstructionSize._
+import wacc.asm.RegisterNames._
 import wacc.Implicits.syntaxToSem
 
 import scala.collection.mutable.ListBuffer
@@ -103,13 +103,13 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def allocateStackVariables(scopeTable: SymbolTable): List[ASMItem] =
         scopeTable.currentScopeOffset match {
             case 0 => Nil
-            case offset => List(asmIR.Sub(ImmVal(offset), Reg(Rsp)))
+            case offset => List(asm.Sub(ImmVal(offset), Reg(Rsp)))
     }
 
     def popStackVariables(scopeTable: SymbolTable): List[ASMItem] =
         scopeTable.currentScopeOffset match {
             case 0 => Nil
-            case offset => List(asmIR.Add(ImmVal(offset), Reg(Rsp)))
+            case offset => List(asm.Add(ImmVal(offset), Reg(Rsp)))
         }
 
     def translateStatement(stat: Stat)(implicit currentScope: SymbolTable): List[ASMItem] = {
@@ -122,7 +122,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 addLabel(exitLabel, List(
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    asm.And(ImmVal(mask), Reg(Rsp)),
                     Call(LibFunc.Exit),
                     Mov(Reg(Rbp), Reg(Rsp)),
                     Pop(Reg(Rbp)),
@@ -239,7 +239,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    asm.And(ImmVal(mask), Reg(Rsp)),
                     Mov(Reg(Rdi, DWord), Reg(Rsi, DWord), DWord),
                     Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
                     Mov(ImmVal(0), Reg(Rax, Byte), Byte),
@@ -264,7 +264,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    asm.And(ImmVal(mask), Reg(Rsp)),
                     Mov(Reg(Rdi, Byte), Reg(Rsi, Byte), Byte),
                     Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
                     Mov(ImmVal(0), Reg(Rax, Byte), Byte),
@@ -290,7 +290,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    asm.And(ImmVal(mask), Reg(Rsp)),
                     Mov(Reg(Rdi), Reg(Rdx)),
                     Mov(Mem(Reg(Rdi), ImmVal(-4)), Reg(Rsi, DWord), DWord),
                     Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
@@ -325,7 +325,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 addLabel(printLabel, List(
                     Push(Reg(Rbp)),
                     Mov(Reg(Rsp), Reg(Rbp)),
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    asm.And(ImmVal(mask), Reg(Rsp)),
                     Cmp(ImmVal(0), Reg(Rdi, Byte), Byte),
                     Jmp(falseLabel, NotEqual),
                     Lea(Mem(Reg(Rip), printFalseLabel), Reg(Rdx)),
@@ -361,7 +361,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         addLabel(printLabel, List(
             Push(Reg(Rbp)),
             Mov(Reg(Rsp), Reg(Rbp)),
-            asmIR.And(ImmVal(mask), Reg(Rsp)),
+            asm.And(ImmVal(mask), Reg(Rsp)),
             Lea(Mem(Reg(Rip), printStringLabel), Reg(Rdi)),
             Call(LibFunc.Puts),
             Mov(ImmVal(0), Reg(Rdi)),
@@ -481,7 +481,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 addReadOnly(badCharStringLabel, StringDecl("fatal error: int %d is not ascii character 0-127 \\n", badCharStringLabel))
 
                 addLabel(badCharLabel, List(
-                    asmIR.And(ImmVal(mask), Reg(Rsp)),
+                    asm.And(ImmVal(mask), Reg(Rsp)),
                     Lea(Mem(Reg(Rip), badCharStringLabel), Reg(Rdi)),
                     Mov(ImmVal(0), Reg(Rax, Byte), Byte),
                     Call(LibFunc.Printf),
@@ -501,7 +501,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 translateExpression(expr, Reg(R12)) :::
                 List(
                     Mov(ImmVal(0), targetReg.toSize(DWord), DWord),
-                    asmIR.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
+                    asm.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
                     Pop(Reg(R12))
                 )
             case ast.Not(expr) => 
@@ -534,7 +534,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 transArithmeticOp(expr, Reg(R12, DWord)) :::
                 List(
                     Mov(ImmVal(0), targetReg.toSize(DWord), DWord),
-                    asmIR.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
+                    asm.Sub(Reg(R12, DWord), targetReg.toSize(DWord), DWord),
                     Pop(Reg(R12))
                 )
             case expr: ArithmeticOp =>
@@ -561,28 +561,28 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         op match {
             case ast.Add(_, _) =>
                 addOverflowError() 
-                asmIR.Add(src, targetReg, DWord) ::
-                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
+                asm.Add(src, targetReg, DWord) ::
+                asm.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
             case ast.Sub(_, _) => 
                 addOverflowError()
-                asmIR.Sub(src, targetReg, DWord) ::
-                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil 
+                asm.Sub(src, targetReg, DWord) ::
+                asm.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil 
             case ast.Mul(_, _) => 
                 addOverflowError()
-                asmIR.IMul(src, targetReg, DWord) ::
-                asmIR.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
+                asm.IMul(src, targetReg, DWord) ::
+                asm.Jmp(Label("_errOverflow"), ComparisonType.Overflow):: Nil
             case ast.Div(_, _) => 
                 addDivzeroError()
-                asmIR.Cmp(ImmVal(0), src, DWord) ::
-                asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
-                asmIR.IDiv(src, DWord) ::
-                asmIR.Mov(Reg(Rax, DWord), targetReg, DWord)::  Nil
+                asm.Cmp(ImmVal(0), src, DWord) ::
+                asm.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
+                asm.IDiv(src, DWord) ::
+                asm.Mov(Reg(Rax, DWord), targetReg, DWord)::  Nil
             case ast.Mod(_, _) => 
                 addDivzeroError()
-                asmIR.Cmp(ImmVal(0), src, DWord) ::
-                asmIR.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
-                asmIR.IDiv(src, DWord) ::
-                asmIR.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
+                asm.Cmp(ImmVal(0), src, DWord) ::
+                asm.Jmp(Label("_errDivZero"), ComparisonType.Equal) ::
+                asm.IDiv(src, DWord) ::
+                asm.Mov(Reg(Rdx, DWord), targetReg, DWord) :: Nil
 
             case _ => List.empty
         }
@@ -612,7 +612,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
     def addErrorLabel(errorLabel: Label, stringLabel: Label, mask: Int = -16) : Unit = {
         addLabel(errorLabel, List(
-        asmIR.And(ImmVal(mask), Reg(Rsp)),
+        asm.And(ImmVal(mask), Reg(Rsp)),
         Lea(Mem(Reg(Rip), stringLabel), Reg(Rdi))) ::: 
         translatePrint(SemString) ::: 
         List(Mov(ImmVal(-1), Reg(Rdi, Byte), Byte),
@@ -658,15 +658,15 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
         addLabel(readLabel, List(
                 Push(Reg(Rbp)),
                 Mov(Reg(Rsp), Reg(Rbp)),
-                asmIR.And(ImmVal(mask), Reg(Rsp)),
-                asmIR.Sub(ImmVal(readOffset), Reg(Rsp)),
+                asm.And(ImmVal(mask), Reg(Rsp)),
+                asm.Sub(ImmVal(readOffset), Reg(Rsp)),
                 Mov(Reg(Rdi, size), Mem(Reg(Rsp)), size),
                 Lea(Mem(Reg(Rsp)), Reg(Rsi)),
                 Lea(Mem(Reg(Rip), readStringLabel), Reg(Rdi)),
                 Mov(ImmVal(0), Reg(Rax, Byte), Byte),
                 Call(LibFunc.Scanf),
                 Movs(Mem(Reg(Rsp)), Reg(Rax), size),
-                asmIR.Add(ImmVal(readOffset), Reg(Rsp)),
+                asm.Add(ImmVal(readOffset), Reg(Rsp)),
                 Mov(Reg(Rbp), Reg(Rsp)),
                 Pop(Reg(Rbp)),
                 Ret

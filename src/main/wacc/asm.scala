@@ -1,6 +1,6 @@
 package wacc
 
-object asmIR {
+object asm {
 
 object ComparisonType extends Enumeration {
     type Flag = Value
