@@ -4,7 +4,7 @@ package wacc
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import ast._
-import asmIR._
+import asm._
 
 /**
   * Doubly linked symbol table class that keeps track of parent and child nodes 
@@ -15,7 +15,7 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     //  (ident, (semantic type, reference to original node))
     var table: HashMap[String, (SemType, Node, Option[Operand])] = HashMap()
     var children: ListBuffer[SymbolTable] = ListBuffer.empty
-    var currentScopeOffset: Int = parent.map(_.currentScopeOffset).getOrElse(0)
+    var currentScopeOffset: Int = 0
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
@@ -28,6 +28,17 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
         table.addOne(name, (declType, node, None))
         updateScopeSize(declType)
         node.scope = this
+    }
+
+    def get(ident: String): Option[(SemType, Node, Option[Operand])] = {
+        table.get(ident).orElse(parent.flatMap(_.get(ident)))
+    }
+
+    def previousLocation(ident: String): Option[Operand] = {
+        table.get(ident) match {
+            case Some((_, _, Some(location))) => Some(location)
+            case _ => parent.flatMap(_.previousLocation(ident))
+        }
     }
 
     private def updateScopeSize(declType: SemType): Unit = {

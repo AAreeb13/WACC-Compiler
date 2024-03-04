@@ -117,6 +117,9 @@ case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue
 case class PairCons(fst: Expr, snd: Expr)(val pos: (Int, Int))            extends RValue
 case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
+    //var func: Func = null
+    var paramTypes: List[SemType] = null
+    var func: Func = null
     override def toString = s"FuncCall(\"$ident\",$args)"
 }
 
