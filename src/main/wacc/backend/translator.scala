@@ -178,17 +178,18 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
 
                 translateExpression(cond) :::
                 List(
+                    Cmp(ImmVal(1), Reg(Rax)),
                     Jmp(ifBranch, Equal)
                 ) :::
                 allocateStackVariables(elseChild) :::
-                ifStats.flatMap(translateStatement(_)(elseChild)) :::
+                elseStats.flatMap(translateStatement(_)(elseChild)) :::
                 popStackVariables(elseChild) :::
                 List(
                     Jmp(endBranch),
                     ifBranch
                 ) :::
                 allocateStackVariables(ifChild) :::
-                elseStats.flatMap(translateStatement(_)(ifChild)) :::
+                ifStats.flatMap(translateStatement(_)(ifChild)) :::
                 popStackVariables(ifChild) :::
                 List(endBranch)
 
