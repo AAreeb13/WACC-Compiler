@@ -23,7 +23,12 @@ object X86Generator {
                         case AndASM(op, _, dst, size) => s"and${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
                         case MulASM(op, _, dst, size) => s"mul${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
                         case PushASM(op, size) => s"push${sizeStr(size)} ${opStr(op)(size)}"
-                        case CallASM(label) => s"call ${label.name}"
+                        case CallASM(label) => 
+                            val suffix = label match {
+                                case _: LibFuncLabel => "@plt"
+                                case _ => ""
+                            }
+                            s"call ${label.name}$suffix"
                         case JmpASM(label, flag) => 
                             val flagChar = flag match {
                                 case Unconditional => "mp"

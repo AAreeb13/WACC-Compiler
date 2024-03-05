@@ -7,13 +7,14 @@ import ast._
 import scala.collection.mutable.HashMap
 import implicits._
 import semAst._
+import scala.collection.mutable.HashSet
 
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
     var branchCounter: Int = 0
     var asmList: ListBuffer[Line] = ListBuffer.empty
-    var stringList: ListBuffer[StringLabel] = ListBuffer.empty
+    var stringSet: HashSet[StringLabel] = HashSet.empty
     var funcMap: HashMap[FuncLabel, ListBuffer[Line]] = HashMap.empty
 
 
@@ -23,9 +24,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateProg(semanticInfo.ast)
 
         asmList += GlobalTag
-        if (!stringList.isEmpty) {
+        if (!stringSet.isEmpty) {
             asmList += ReadonlyTag
-            asmList ++= stringList
+            asmList ++= stringSet
         }
         asmList += TextTag
 
@@ -151,6 +152,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translatePrint(node: Printable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Print statement here
         translateExpression(node.expr)
+        buf += MovASM(ScratchReg, ParamRegs.head)
         val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
             case SemBool => (PrintBoolLabel, "%.*s")
             case SemInt => (PrintIntLabel, "%d")
@@ -209,16 +211,24 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateExpression(expr: Expr)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         expr match {
             case v: Var => translateVar(v)
-            case v: CharVal =>
-            case v: StrVal =>
-            case v: BoolVal =>
-            case v: PairVal =>
+            case CharVal(c) => buf += MovASM(Imm(c.toInt), ScratchReg)
+            case StrVal(s) =>
+                val stringLabel = addStringConstant(s)
+                buf += LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ScratchReg)
+            case BoolVal(b) => buf += MovASM(Imm(if (b) 1 else 0), ScratchReg)
+            case PairVal() => buf += MovASM(NullImm, ScratchReg)
             case v: ArrayVal =>
-            case v: IntVal =>
+            case IntVal(x) => buf += MovASM(Imm(x), ScratchReg)
             case _: BinOp => 
             case _: UnOp => 
             
         }
+    }
+
+    def addStringConstant(string: String): StringLabel = {
+        val retVal = StringLabel(s".L.str${stringSet.size}", toRaw(string))
+        if (!stringSet.contains(retVal)) stringSet.add(retVal)
+        retVal
     }
 
     def translateLValue(lvalue: LValue, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -286,6 +296,20 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     ///////////////// UTILITY FUNCTIONS ///////////////////
 
+    def toRaw(s: String): String =
+        s.flatMap(_ match {
+            case '\\' => "\\\\"
+            case '\"' => "\\\""
+            case '\'' => "\\\'"
+            case '\n' => "\\n"
+            case '\t' => "\\t"
+            case '\f' => "\\f"
+            case '\r' => "\\r"
+            case '\b' => "\\b"
+            case other => other.toString
+        })
+
+
     def translateExitLabel: ListBuffer[Line] = {
         ListBuffer(
             PushASM(BasePointer),
@@ -301,7 +325,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateReadLabel(label: WrapperFuncLabel, fstring: String, size: Size): ListBuffer[Line] = {
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
 
-        stringList.addOne(stringLabel)
+        stringSet.addOne(stringLabel)
 
         ListBuffer(
             PushASM(BasePointer),
@@ -325,7 +349,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
         val size = semanticToSize(_type)
 
-        stringList.addOne(stringLabel)
+        stringSet.addOne(stringLabel)
 
         val buf: ListBuffer[Line] = ListBuffer(
             PushASM(BasePointer),
@@ -340,8 +364,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 val trueStringLabel = StringLabel(s".L.${label.name}_string_true", fstring)
                 val falseStringLabel = StringLabel(s".L.${label.name}_string_false", fstring)
 
-                stringList.addOne(trueStringLabel)
-                stringList.addOne(falseStringLabel)
+                stringSet.addOne(trueStringLabel)
+                stringSet.addOne(falseStringLabel)
 
                 buf ++= ListBuffer(
                     CmpASM(FalseImm, ParamRegs.head),
@@ -376,7 +400,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translatePrintlnLabel: ListBuffer[Line] = {
         val stringLabel = StringLabel(s".L.println_string", "")
-        stringList.addOne(stringLabel)
+        stringSet.addOne(stringLabel)
 
         ListBuffer(
             PushASM(BasePointer),
