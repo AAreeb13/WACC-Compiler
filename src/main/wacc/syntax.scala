@@ -52,7 +52,7 @@ object ast {
         override def toString = s"Func($retType,\"$name\",$params,$stats)"
     }
 
-    case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node {
+    case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node with Declarable {
         override def toString = s"Param($declType,\"$name\")"
     }
 
@@ -80,15 +80,18 @@ object ast {
         def unapply(p: Printable): Option[Expr] = Some(p.expr)
     }
 
-
+    sealed trait Declarable {
+        val declType: Type
+        val name: String
+    }
 
     sealed trait Stat                                                   extends Node
     case class Skip()(val pos: (Int, Int))                                                   extends Stat {
         override def toString = "Skip"
     }
 
-    case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat {
-        override def toString = s"AssignNew($t,\"$ident\",$rvalue)"
+    case class AssignNew(declType: Type, name: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat with Declarable {
+        override def toString = s"AssignNew($declType,\"$name\",$rvalue)"
     }
     
     case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
@@ -167,12 +170,17 @@ object ast {
         def unapply(op: ArithmeticOp): Option[(Expr, Expr)] = Some((op.x, op.y))
     }
 
-    sealed trait EqualityOp extends BinOp
+    sealed trait ComparativeOp extends BinOp
+    object ComparativeOp {
+        def unapply(op: ComparativeOp): Option[(Expr, Expr)] = Some((op.x, op.y))
+    }
+
+    sealed trait EqualityOp extends ComparativeOp
     object EqualityOp {
         def unapply(op: EqualityOp): Option[(Expr, Expr)] = Some((op.x, op.y))
     }
 
-    sealed trait ComparisonOp extends BinOp
+    sealed trait ComparisonOp extends ComparativeOp
     object ComparisonOp {
         def unapply(op: ComparisonOp): Option[(Expr, Expr)] = Some((op.x, op.y))
     }

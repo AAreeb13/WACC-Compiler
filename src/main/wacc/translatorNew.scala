@@ -12,6 +12,7 @@ import scala.collection.mutable.HashSet
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
+    var stackOffset: Int = 0
     var branchCounter: Int = 0
     var asmList: ListBuffer[Line] = ListBuffer.empty
     var stringSet: HashSet[StringLabel] = HashSet.empty
@@ -109,11 +110,25 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateAssign(node: Assign)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Assign statement here
-        
+        translateRValue(node.rvalue)
+        translateLValue(node.lvalue, true)
     }
 
     def translateDeclaration(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
+        translateRValue(node.rvalue)
+        assignLocation(node)
+    }
+
+    def assignLocation(node: Declarable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        // Implement translation for Declaration statement here
+        val memLocation = RegisterImmediateOffset(BasePointer, stackOffset - st.getScopeSize())
+        val size = semanticToSize(syntaxToSemanticType(node.declType))
+
+        st.updateLocation(node.name, memLocation)
+        stackOffset += sizeToInt(size)
+
+        buf += MovASM(ScratchReg, memLocation, size)
     }
 
     def translateRead(node: Read)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -217,7 +232,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 buf += LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ScratchReg)
             case BoolVal(b) => buf += MovASM(Imm(if (b) 1 else 0), ScratchReg)
             case PairVal() => buf += MovASM(NullImm, ScratchReg)
-            case v: ArrayVal =>
+            case v: ArrayVal => translateArrayElem(v)
             case IntVal(x) => buf += MovASM(Imm(x), ScratchReg)
             case node: BinOp => translateBinOp(node)
             case node: UnOp => translateUnOp(node)
@@ -372,6 +387,19 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateVar(node: Var, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        assert(st.contains(node.v), s"Variable ${node.v} was not contained in the symbol table")
+        assert(st.hasLocation(node.v), s"The location of variable ${node.v} was not contained in the symbol table")
+
+        val location = st.getLocation(node.v).get
+        val declType = st.typeof(node.v).get
+        val size = semanticToSize(declType)
+
+        if (writeTo) {
+            MovASM(ScratchReg, location, size)
+        } else {
+            MovASM(location, ScratchReg, size)
+        }
+        
     }
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {

@@ -34,6 +34,25 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
         node.scope = this
     }
 
+    def getLocation(name: String): Option[IR.Location] = 
+        locationTable.get(name).orElse(parent.flatMap(_.getLocation(name)))
+
+    def hasLocation(name: String): Boolean =
+        locationTable.contains(name) || parent.exists(_.hasLocation(name))
+
+    def hasLocationInCurrent(name: String): Boolean = {
+        locationTable.contains(name)
+    }
+
+    def updateLocation(name: String, location: IR.Location): Unit = {
+        if (hasLocation(name)) {
+            locationTable.update(name, location)
+        } else {
+            locationTable.addOne((name, location))
+        }
+    }
+
+
     // Check for existence in this and all parent scopes
     def contains(name: String): Boolean =
         table.contains(name) || parent.exists(_.contains(name))
