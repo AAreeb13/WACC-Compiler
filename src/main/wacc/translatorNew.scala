@@ -60,6 +60,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def allocateStackVariables()(implicit buf: ListBuffer[Line], st: SymbolTable) = {
         if (st.getScopeSize() > 0) {
+            buf += Comment(s"The current scope size is ${st.getScopeSize()}")
             buf += SubASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
         }
     }
@@ -81,7 +82,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: Println    => translatePrintln(node)
             case Skip()           => 
             case node: Exit       => translateExit(node)
-            case node: Scope      => translateBlock(node.stats)
+            case node: Scope      => translateBlock(node.stats)(buf, st.children(0))
             case node: Free       => translateFree(node)
             case node: Return     => translateReturn(node)
         }
@@ -98,10 +99,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateExpression(node.cond)
         buf += CmpASM(TrueImm, ScratchReg)
         buf += JmpASM(trueLabel, Equal)
-        translateBlock(node.elseStat)
+        translateBlock(node.elseStat)(buf, st.children(1))
         buf += JmpASM(endLabel)
         buf += trueLabel
-        translateBlock(node.ifStat)
+        translateBlock(node.ifStat)(buf, st.children(0))
         buf += endLabel
 
         buf += Comment("End IF")
@@ -126,7 +127,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
         st.updateLocation(node.name, memLocation)
-        stackOffset += sizeToInt(size)
+        stackOffset -= sizeToInt(size) // should this be a - or +?
 
         buf += MovASM(ScratchReg, memLocation, size)
     }
@@ -155,7 +156,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         buf += JmpASM(doneLabel)
         buf += repeatLabel
-        translateBlock(node.stats)
+        translateBlock(node.stats)(buf, st.children(0))
         buf += doneLabel
         translateExpression(node.cond)
         buf += CmpASM(TrueImm, ScratchReg)
@@ -333,7 +334,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
                 buf ++= ListBuffer(
                     TestASM(Imm(-128), ScratchReg),
-                    MovASM(ScratchReg, ParamRegs(1)),
+                    MovASM(ScratchReg, ParamRegs(1), NotEqual),
+                    //MovASM(ScratchReg, ParamRegs(1)),
                     JmpASM(CheckBadCharLabel, NotEqual)
                 )
             case Neg(expr) =>
@@ -394,11 +396,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val declType = st.typeof(node.v).get
         val size = semanticToSize(declType)
 
-        if (writeTo) {
-            MovASM(ScratchReg, location, size)
-        } else {
-            MovASM(location, ScratchReg, size)
-        }
+        val (src, dst) = if (writeTo) (ScratchReg, location)
+                         else         (location, ScratchReg)
+
+        buf += MovASM(src, dst, size)
         
     }
 
@@ -597,7 +598,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateBadCharLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127 \n\\n")
+        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n")
         stringSet.addOne(errorLabel)
 
         ListBuffer(

@@ -31,6 +31,7 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {
         table.addOne(name, (declType, node))
         scopeSize += sizeToInt(semanticToSize(declType))
+        System.err.println(s"Scope size is now updated! $scopeSize")
         node.scope = this
     }
 

@@ -34,7 +34,7 @@ object X86Generator {
                                 case Unconditional => "mp"
                                 case other => flagStr(other)
                             }
-                            s"j$flagChar $label"
+                            s"j$flagChar ${label.name}"
                         case DivASM(_, _, dst, size) => s"cltd\n\tidiv${sizeStr(size)} ${opStr(dst)(size)}"
                         case OrASM(op, _, dst, size) => s"or${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
                         case SubASM(op, _, dst, size) => s"sub${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
