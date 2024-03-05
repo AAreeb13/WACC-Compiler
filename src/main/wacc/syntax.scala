@@ -68,6 +68,11 @@ object ast {
         case _ => false
     }
 
+    sealed trait TypeCapture {
+        var enclosingType: semAst.SemType = null
+    }
+
+
     sealed trait Stat                                                   extends Node
     case class Skip()(val pos: (Int, Int))                                                   extends Stat {
         override def toString = "Skip"
@@ -76,13 +81,14 @@ object ast {
     case class AssignNew(t: Type, ident: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat {
         override def toString = s"AssignNew($t,\"$ident\",$rvalue)"
     }
+    
     case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
-    case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat
+    case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat with TypeCapture
     case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
     case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
     case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
-    case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat
-    case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat
+    case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with TypeCapture
+    case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with TypeCapture
     case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat
     case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat
     case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat

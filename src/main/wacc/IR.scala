@@ -13,6 +13,7 @@ object IR {
         val size: Size = QWord
     }
 
+    case object PC extends Register
     case object R0 extends Register
     case object R1 extends Register
     case object R2 extends Register
@@ -55,7 +56,7 @@ object IR {
 
     case class WaccFuncLabel(override val name: String) extends Label(name) with FuncLabel
     sealed class LibFuncLabel(override val name: String) extends Label(name) with FuncLabel
-    case class WrapperFuncLabel(override val name: String) extends Label(name) with FuncLabel
+    sealed class WrapperFuncLabel(override val name: String) extends Label(name) with FuncLabel
 
     case object MainLabel extends Label("main") with FuncLabel
 
@@ -67,27 +68,28 @@ object IR {
     case object FileFlush      extends LibFuncLabel("fflush")
     case object Puts           extends LibFuncLabel("puts")
 
-    case object PrintlnLabel      extends Label("_println") with FuncLabel
-    case object PrintIntLabel     extends Label("_printi") with FuncLabel
-    case object PrintBoolLabel    extends Label("_printb") with FuncLabel
-    case object PrintCharLabel    extends Label("_printc") with FuncLabel
-    case object PrintStrLabel     extends Label("_prints") with FuncLabel
-    case object PrintPtrLabel     extends Label("_printp") with FuncLabel
+    case object PrintlnLabel      extends WrapperFuncLabel("_println")
+    case object PrintIntLabel     extends WrapperFuncLabel("_printi")
+    case object PrintBoolLabel    extends WrapperFuncLabel("_printb")
+    case object PrintCharLabel    extends WrapperFuncLabel("_printc")
+    case object PrintStrLabel     extends WrapperFuncLabel("_prints")
+    case object PrintPtrLabel     extends WrapperFuncLabel("_printp")
 
-    case object ReadIntLabel  extends Label("_readi") with FuncLabel
-    case object ReadCharLabel extends Label("_readc") with FuncLabel
+    case object ReadIntLabel  extends WrapperFuncLabel("_readi")
+    case object ReadCharLabel extends WrapperFuncLabel("_readc")
+    case object ExitWrapperLabel extends WrapperFuncLabel("_exit")
 
-    case object CheckNullLabel     extends Label("_errNull") with FuncLabel
-    case object CheckOverflowLabel extends Label("_errOverflow") with FuncLabel
-    case object CheckDivZeroLabel  extends Label("_errDivZero") with FuncLabel
-    case object CheckBoundLabel    extends Label("_boundsCheck") with FuncLabel
+    case object CheckNullLabel     extends WrapperFuncLabel("_errNull")
+    case object CheckOverflowLabel extends WrapperFuncLabel("_errOverflow")
+    case object CheckDivZeroLabel  extends WrapperFuncLabel("_errDivZero")
+    case object CheckBoundLabel    extends WrapperFuncLabel("_boundsCheck")
 
-    case object ArrayStoreLabel  extends Label("_arrStore") with FuncLabel
-    case object ArrayStoreBLabel extends Label("_arrStoreB") with FuncLabel
-    case object ArrayLoadLabel   extends Label("_arrLoad") with FuncLabel
-    case object ArrayLoadBLabel  extends Label("_arrLoadB") with FuncLabel
-    case object FreePairLabel    extends Label("_freepair") with FuncLabel
-    case object FreeArrayLabel   extends Label("_free") with FuncLabel
+    case object ArrayStoreLabel  extends WrapperFuncLabel("_arrStore")
+    case object ArrayStoreBLabel extends WrapperFuncLabel("_arrStoreB")
+    case object ArrayLoadLabel   extends WrapperFuncLabel("_arrLoad")
+    case object ArrayLoadBLabel  extends WrapperFuncLabel("_arrLoadB")
+    case object FreePairLabel    extends WrapperFuncLabel("_freepair")
+    case object FreeArrayLabel   extends WrapperFuncLabel("_free")
 
     case object RetASM extends Instruction
 
@@ -117,6 +119,7 @@ object IR {
     case class CmpASM(src: Operand, dst: Location, size: Size = QWord) extends Instruction
     case class SetASM(dst: Operand, flag: Condition, size: Size = Byte) extends Instruction
     case class JmpASM(label: JumpLabel, flag: Condition = Unconditional) extends Instruction
+    case class LeaASM(src: Operand, dst: Register, size: Size = QWord) extends Instruction
     case class CallASM(label: FuncLabel) extends Instruction
 
     sealed trait Condition
@@ -139,6 +142,7 @@ object IR {
     val TrueImm = Imm(1)
     val FalseImm = Imm(0)
     val AlignmentMaskImm = Imm(-16)
+    val ReadOffsetImm = Imm(16)
     val DefaultExitCode = Imm(0)
 
 }

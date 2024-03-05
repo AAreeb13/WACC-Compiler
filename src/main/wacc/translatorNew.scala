@@ -6,6 +6,7 @@ import scala.collection.mutable.ListBuffer
 import ast._
 import scala.collection.mutable.HashMap
 import implicits._
+import semAst._
 
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
@@ -46,9 +47,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += MovASM(StackPointer, BasePointer)
 
         translateBlock(prog.stats)(buf, prog.scope)
-        //prog.stats.foreach(translateStatement(_))
 
-        buf += MovASM(DefaultExitCode, ReturnReg, Byte)
+        buf += MovASM(DefaultExitCode, ReturnReg)
         buf += PopASM(BasePointer)
         buf += RetASM
         
@@ -117,6 +117,16 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateRead(node: Read)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Read statement here
+        val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
+            case SemChar => (ReadCharLabel, "%c")
+            case SemInt => (ReadIntLabel, "%d")
+        }
+
+        if (!funcMap.contains(wrapperLabel)) {
+            translateReadLabel(wrapperLabel, fstring, semanticToSize(node.enclosingType))
+        }
+
+        buf += CallASM(wrapperLabel)
     }
 
     def translateWhile(node: While)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -140,6 +150,21 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translatePrint(node: Print)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Print statement here
+        translateExpression(node.expr)
+        node.enclosingType match {
+            case SemArray(t) => 
+            case SemNone =>
+            case SemBool =>
+            case SemAny =>
+            case SemInt =>
+            case SemNull =>
+            case SemChar =>
+            case SemString =>
+            case SemUnknown =>
+            case SemErasedPair =>
+            case SemPair(t1, t2) =>
+        }
+
     }
 
     def translatePrintln(node: Println)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -148,9 +173,13 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateExit(node: Exit)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Exit statement here
+        if (!funcMap.contains(ExitWrapperLabel)) {
+            funcMap.addOne(ExitWrapperLabel, translateExitLabel)
+        }
 
         translateExpression(node.expr)
-
+        buf += MovASM(ReturnReg, ParamRegs.head)
+        buf += CallASM(ExitWrapperLabel)
     }
 
     def translateBlock(stats: List[Stat])(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -241,5 +270,46 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += RetASM
 
         buf
+    }
+
+
+
+
+
+    ///////////////// UTILITY FUNCTIONS ///////////////////
+
+    def translateExitLabel: ListBuffer[Line] = {
+        ListBuffer(
+            PushASM(BasePointer),
+            MovASM(StackPointer, BasePointer),
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            CallASM(ExitLabel),
+            MovASM(BasePointer, StackPointer),
+            PopASM(BasePointer),
+            RetASM
+        )
+    }
+
+    def translateReadLabel(label: WrapperFuncLabel, fstring: String, size: Size): ListBuffer[Line] = {
+        val stringLabel = StringLabel(s".L.${label.name}_str0", fstring)
+
+        stringList.addOne(stringLabel)
+
+        ListBuffer(
+            PushASM(BasePointer),
+            MovASM(StackPointer, BasePointer),
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            SubASM(ReadOffsetImm, StackPointer, StackPointer),
+            MovASM(ParamRegs(0), RegisterOffset(StackPointer), size),
+            LeaASM(RegisterOffset(StackPointer), ParamRegs(1)),
+            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs(0)),
+            MovASM(Imm(0), R0, Byte), // for SIMD purposes
+            CallASM(ScanFormatted),
+            MovsASM(RegisterOffset(StackPointer), ReturnReg, size),
+            AddASM(ReadOffsetImm, StackPointer, StackPointer),
+            MovASM(BasePointer, StackPointer),
+            PopASM(BasePointer),
+            RetASM
+        )
     }
 }

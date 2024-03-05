@@ -7,6 +7,7 @@ abstract class TargetConfig {
     val StackPointer: Register
     val BasePointer: Register
     val ScratchReg: Register
+    val InstructionPointer: Register
 
     val ParamRegs: List[Register]
     val CallerSaved: List[Register]
@@ -51,11 +52,14 @@ case object X86Config extends TargetConfig {
     val Rdi = R5
     val Rsp = R6
     val Rbp = R7
+    val Rip = PC
 
     override val ReturnReg: Register = Rax
     override val ScratchReg: Register = Rax
     override val StackPointer: Register = Rsp
     override val BasePointer: Register = Rbp
+
+    override val InstructionPointer: Register = Rip
 
     override val ParamRegs: List[Register] = List(Rdi, Rsi, Rdx, Rcx, R8, R9)
     override val CallerSaved: List[Register] = List(Rax, R10, R11) ++ ParamRegs
@@ -121,6 +125,12 @@ case object X86Config extends TargetConfig {
                         case DWord => "ebp"
                         case Word => "bp"
                         case Byte => "bpl"
+                    }
+                    case Rip => size match {
+                        case QWord => "rip"
+                        case DWord => "eip"
+                        case Word => "undefined"
+                        case Byte => "undefined"
                     }
                     case numberedReg => 
                         val suffix = size match {

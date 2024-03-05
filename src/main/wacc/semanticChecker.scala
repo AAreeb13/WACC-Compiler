@@ -151,8 +151,8 @@ object semanticChecker {
                             errorCollector.addError(expr, TypeError(s"$other", "1-dimensional array or pair type"))
                     }
 
-                case Print(expr) => checkExpression(expr)
-                case Println(expr) => checkExpression(expr)
+                case p@Print(expr) => p.enclosingType = checkExpression(expr)
+                case p@Println(expr) => p.enclosingType = checkExpression(expr)
                 case Skip() => // do nothing
 
                 // Exit must be an integer
@@ -180,10 +180,10 @@ object semanticChecker {
                     case retType => matchesType(checkExpression(expr), retType)
                 }
                     
-                case Read(lvalue) => checkLValue(lvalue) match {
+                case r@Read(lvalue) => checkLValue(lvalue) match {
                     case SemUnknown => 
                         errorCollector.addError(lvalue, SpecialError("Type Error", "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure"))
-                    case other => matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
+                    case other => r.enclosingType = matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
                 }
 
                 case assignNew@AssignNew(declType, ident, rvalue) =>
