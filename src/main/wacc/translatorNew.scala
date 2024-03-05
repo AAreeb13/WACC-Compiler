@@ -8,11 +8,12 @@ import scala.collection.mutable.HashMap
 import implicits._
 import semAst._
 import scala.collection.mutable.HashSet
+import scala.collection.mutable.Stack
 
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
-    var stackOffset: Int = 0
+    var stackOffsets: Stack[Int] = Stack(0)
     var branchCounter: Int = 0
     var asmList: ListBuffer[Line] = ListBuffer.empty
     var stringSet: HashSet[StringLabel] = HashSet.empty
@@ -37,8 +38,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateProg(prog: Prog) = {
-        prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), translateFunction(f))))
+        // prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), ListBuffer.empty)))
+        // funcMap.addOne((MainLabel, translateMain(prog)))
+        // prog.funcs.foreach(f => funcMap.update(WaccFuncLabel(f.name), translateFunction(f)))
         funcMap.addOne((MainLabel, translateMain(prog)))
+        prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), translateFunction(f))))
     }
 
     def translateMain(prog: Prog)(implicit buf: ListBuffer[Line] = ListBuffer.empty): ListBuffer[Line] = {
@@ -123,13 +127,36 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def assignLocation(node: Declarable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        val memLocation = RegisterImmediateOffset(BasePointer, stackOffset - st.getScopeSize())
-        val size = semanticToSize(syntaxToSemanticType(node.declType))
+        node match {
+            case _: AssignNew => 
+                val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getScopeSize())
 
-        st.updateLocation(node.name, memLocation)
-        stackOffset -= sizeToInt(size) // should this be a - or +?
+                val size = semanticToSize(syntaxToSemanticType(node.declType))
 
-        buf += MovASM(ScratchReg, memLocation, size)
+                st.updateLocation(node.name, memLocation)
+                incrementStackOffset(sizeToInt(size)) // should this be a - or +?
+
+                buf += MovASM(ScratchReg, memLocation, size)
+            
+            case _: Param => 
+                val size = semanticToSize(syntaxToSemanticType(node.declType))
+
+                val localMemLocation = RegisterImmediateOffset(StackPointer, st.getScopeSize() - size - stackOffsets.head) // todo
+                val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
+
+                st.updateLocation(node.name, funcMemLocation)
+                
+                incrementStackOffset(sizeToInt(size))
+                buf += MovASM(ScratchReg, localMemLocation, size)
+
+        }
+            
+
+    }
+
+    def incrementStackOffset(size: Int) = {
+        assert(!stackOffsets.isEmpty, "Stack offsets should not be empty")
+        stackOffsets.push(stackOffsets.pop() + size)
     }
 
     def translateRead(node: Read)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -221,7 +248,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateReturn(node: Return)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         translateExpression(node.expr)
-        buf += MovASM(ScratchReg, ReturnReg)
+        //buf += MovASM(ScratchReg, ReturnReg)
     }
 
     def translateExpression(expr: Expr)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -385,7 +412,16 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
     
     def translateFuncCall(node: FuncCall)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        // Implement translation for Free statement here
+        // Implement translation for FuncCall statement here
+        allocateStackVariables()(buf, node.funcInfo.func.scope)
+        stackOffsets.push(0)
+        node.args.zip(node.funcInfo.func.params).foreach { case (expr, param) =>
+            translateExpression(expr)
+            assignLocation(param)(buf, node.funcInfo.func.scope)
+        }
+        buf += CallASM(WaccFuncLabel(node.ident))
+        stackOffsets.pop()
+        popStackVariables()(buf, node.funcInfo.func.scope)
     }
 
     def translateVar(node: Var, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {

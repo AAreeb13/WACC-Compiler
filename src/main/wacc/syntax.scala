@@ -2,6 +2,7 @@
 package wacc
 
 import bridges._
+import semanticChecker.FuncInfo
 
 /**
   * This file is concerned with the literal syntactical AST types. They are
@@ -122,6 +123,7 @@ object ast {
     case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue
     case class PairCons(fst: Expr, snd: Expr)(val pos: (Int, Int))            extends RValue
     case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
+        var funcInfo: FuncInfo = null
         override def toString = s"FuncCall(\"$ident\",$args)"
     }
 

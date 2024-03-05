@@ -21,7 +21,9 @@ object X86Generator {
                         case AddASM(op, _, dst, size) => s"add${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
                         case PopASM(op, size) => s"pop${sizeStr(size)} ${opStr(op)(size)}"
                         case AndASM(op, _, dst, size) => s"and${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
-                        case MulASM(op, _, dst, size) => s"mul${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
+                        case MulASM(op1, op2, dst, size) => 
+                            if (op2 == dst) s"imul${sizeStr(size)} ${opStr(op1)(size)}, ${opStr(dst)(size)}"
+                            else s"imul${sizeStr(size)} ${opStr(op1)(size)}, ${opStr(op2)(size)}, ${opStr(dst)(size)}"
                         case PushASM(op, size) => s"push${sizeStr(size)} ${opStr(op)(size)}"
                         case CallASM(label) => 
                             val suffix = label match {

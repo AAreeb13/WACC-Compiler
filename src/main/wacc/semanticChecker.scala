@@ -26,7 +26,8 @@ object semanticChecker {
 
     // Function Table 
     //      := (return type, parameter types, node itself)
-    type FuncInfo = (SemType, List[SemType], Func)
+    //type FuncInfo = (SemType, List[SemType], Func)
+    case class FuncInfo(returnType: SemType, paramTypes: List[SemType], func: Func)
     type FuncTable = HashMap[String, FuncInfo]
 
     /**
@@ -55,11 +56,11 @@ object semanticChecker {
             prog.funcs.foreach { func =>
                 // Throw an error if two function with same names exist
                 if (funcTable.contains(func.name)) {
-                    val prevFunc = funcTable.get(func.name).get._3
+                    val prevFunc = funcTable.get(func.name).get.func
                     errorCollector.addError(func, RedefinedFuncError(func, Some(prevFunc)), "No support for overloaded functions")
                 }
                 // Add latest entry to table
-                funcTable.addOne((func.name, (func.retType, func.params.map(_.declType), func)))
+                funcTable.addOne((func.name, FuncInfo(func.retType, func.params.map(_.declType), func)))
             }
 
             // Checks each statment in global scope and also in each statement
@@ -244,13 +245,13 @@ object semanticChecker {
                     }
                     SemPair(fstType, sndType)
 
-                case FuncCall(ident, args) => funcTable.get(ident) match {
+                case funcCall@FuncCall(ident, args) => funcTable.get(ident) match {
                     case None =>
                         // If function doesn't exist then create error and perform scope check on arguments
                         errorCollector.addError(rvalue, UndefinedFuncError(ident))
                         args.foreach(checkExpression(_))
                         SemNone
-                    case Some((retType, paramTypes, func)) =>
+                    case Some(funcInfo@FuncInfo(retType, paramTypes, func)) =>
                         // Check that argument size is the same
                         if (paramTypes.size != args.size) {
                             errorCollector.addError(rvalue, FuncArgumentSizeError(ident, args.size, paramTypes.size))
@@ -261,6 +262,7 @@ object semanticChecker {
                             args.zip(paramTypes).foreach{ case (arg, paramType) => 
                                 matchesType(checkExpression(arg), paramType)
                             }
+                            funcCall.funcInfo = funcInfo
                             retType
                         }
                     }

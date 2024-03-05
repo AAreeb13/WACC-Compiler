@@ -54,7 +54,9 @@ object IR {
 
     sealed trait FuncLabel extends Label
 
-    case class WaccFuncLabel(override val name: String) extends Label(name) with FuncLabel
+    case class WaccFuncLabel(_name: String) extends Label(_name) with FuncLabel {
+        override val name = s"wacc_${_name}"
+    }
     sealed class LibFuncLabel(override val name: String) extends Label(name) with FuncLabel
     sealed class WrapperFuncLabel(override val name: String) extends Label(name) with FuncLabel
 
