@@ -159,7 +159,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateBlock(node.stats)(buf, st.children(0))
         buf += doneLabel
         translateExpression(node.cond)
-        buf += CmpASM(TrueImm, ScratchReg)
+        buf += CmpASM(TrueImm, ScratchReg, Byte)
         buf += JmpASM(repeatLabel, Equal)
 
         buf += Comment("End WHILE")
@@ -282,7 +282,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 buf += PushASM(ScratchReg)
                 translateExpression(rhs)
                 buf += PopASM(R1) // could be wrong, need to save lhs value
-                buf += CmpASM(R1, ScratchReg)
+                buf += CmpASM(ScratchReg, R1)
                 val flag = op match {
                     case _: Eql => Equal
                     case _: NotEql => NotEqual
@@ -396,10 +396,19 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val declType = st.typeof(node.v).get
         val size = semanticToSize(declType)
 
-        val (src, dst) = if (writeTo) (ScratchReg, location)
-                         else         (location, ScratchReg)
+        if (writeTo) {
+            buf += MovASM(ScratchReg, location, size)
+        } else {
+            size match {
+                case QWord => buf += MovASM(location, ScratchReg, size)
+                case size => buf += MovsASM(location, ScratchReg, size)
+            }
+        }
 
-        buf += MovASM(src, dst, size)
+        // val (src, dst) = if (writeTo) (ScratchReg, location)
+        //                  else         (location, ScratchReg)
+
+        // buf += MovASM(src, dst, size)
         
     }
 
@@ -441,6 +450,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def toRaw(s: String): String =
         s.flatMap(_ match {
+            case '\u0000' => "\\\u0000"
             case '\\' => "\\\\"
             case '\"' => "\\\""
             case '\'' => "\\\'"
