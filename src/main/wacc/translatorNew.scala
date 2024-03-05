@@ -322,7 +322,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translatePrintLabel(label: WrapperFuncLabel, fstring: String, _type: SemType): ListBuffer[Line] = {
-        val stringLabel = StringLabel(s".L.${label.name}_str", fstring)
+        val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
         val size = semanticToSize(_type)
 
         stringList.addOne(stringLabel)
@@ -337,8 +337,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case SemBool =>
                 val trueLabel = JumpLabel(s".L${label.name}_true")
                 val falseLabel = JumpLabel(s".L${label.name}_false")
-                val trueStringLabel = StringLabel(s".L.${label.name}_str_true", fstring)
-                val falseStringLabel = StringLabel(s".L.${label.name}_str_false", fstring)
+                val trueStringLabel = StringLabel(s".L.${label.name}_string_true", fstring)
+                val falseStringLabel = StringLabel(s".L.${label.name}_string_false", fstring)
 
                 stringList.addOne(trueStringLabel)
                 stringList.addOne(falseStringLabel)
@@ -370,10 +370,13 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             PopASM(BasePointer),
             RetASM
         )
+
+        buf
     }
 
     def translatePrintlnLabel: ListBuffer[Line] = {
         val stringLabel = StringLabel(s".L.println_string", "")
+        stringList.addOne(stringLabel)
 
         ListBuffer(
             PushASM(BasePointer),
