@@ -148,27 +148,35 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += Comment("End WHILE")
     }
 
-    def translatePrint(node: Print)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translatePrint(node: Printable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Print statement here
         translateExpression(node.expr)
-        node.enclosingType match {
-            case SemArray(t) => 
-            case SemNone =>
-            case SemBool =>
-            case SemAny =>
-            case SemInt =>
-            case SemNull =>
-            case SemChar =>
-            case SemString =>
-            case SemUnknown =>
-            case SemErasedPair =>
-            case SemPair(t1, t2) =>
+        val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
+            case SemBool => (PrintBoolLabel, "%.*s")
+            case SemInt => (PrintIntLabel, "%d")
+            case SemChar => (PrintCharLabel, "%c")
+            case SemString | SemArray(SemChar) => (PrintStrLabel, "%.*s")
+
+            case other => (PrintPtrLabel, "%p")
         }
+
+        if (!funcMap.contains(wrapperLabel)) {
+            funcMap.addOne(wrapperLabel, translatePrintLabel(wrapperLabel, fstring, node.enclosingType))
+        }
+
+        buf += CallASM(wrapperLabel)
 
     }
 
     def translatePrintln(node: Println)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Println statement here
+        translatePrint(node)
+
+        if (!funcMap.contains(PrintlnLabel)) {
+            funcMap.addOne((PrintlnLabel, translatePrintlnLabel))
+        }
+
+        buf += CallASM(PrintlnLabel)
     }
 
     def translateExit(node: Exit)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -291,7 +299,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateReadLabel(label: WrapperFuncLabel, fstring: String, size: Size): ListBuffer[Line] = {
-        val stringLabel = StringLabel(s".L.${label.name}_str0", fstring)
+        val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
 
         stringList.addOne(stringLabel)
 
@@ -307,6 +315,74 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             CallASM(ScanFormatted),
             MovsASM(RegisterOffset(StackPointer), ReturnReg, size),
             AddASM(ReadOffsetImm, StackPointer, StackPointer),
+            MovASM(BasePointer, StackPointer),
+            PopASM(BasePointer),
+            RetASM
+        )
+    }
+
+    def translatePrintLabel(label: WrapperFuncLabel, fstring: String, _type: SemType): ListBuffer[Line] = {
+        val stringLabel = StringLabel(s".L.${label.name}_str", fstring)
+        val size = semanticToSize(_type)
+
+        stringList.addOne(stringLabel)
+
+        val buf: ListBuffer[Line] = ListBuffer(
+            PushASM(BasePointer),
+            MovASM(StackPointer, BasePointer),
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer)
+        )
+
+        _type match {
+            case SemBool =>
+                val trueLabel = JumpLabel(s".L${label.name}_true")
+                val falseLabel = JumpLabel(s".L${label.name}_false")
+                val trueStringLabel = StringLabel(s".L.${label.name}_str_true", fstring)
+                val falseStringLabel = StringLabel(s".L.${label.name}_str_false", fstring)
+
+                stringList.addOne(trueStringLabel)
+                stringList.addOne(falseStringLabel)
+
+                buf ++= ListBuffer(
+                    CmpASM(FalseImm, ParamRegs.head),
+                    JmpASM(falseLabel, NotEqual),
+                    LeaASM(RegisterLabelOffset(InstructionPointer, falseStringLabel), ParamRegs(2)),
+                    JmpASM(trueLabel),
+                    falseLabel,
+                    LeaASM(RegisterLabelOffset(InstructionPointer, trueStringLabel), ParamRegs(2)),
+                    trueLabel,
+                    MovASM(RegisterImmediateOffset(ParamRegs(2), -4), ParamRegs(1), DWord)
+                )
+            case SemString | SemArray(SemChar) =>
+                buf += MovASM(ParamRegs(0), ParamRegs(2))
+                buf += MovASM(RegisterImmediateOffset(ParamRegs(0), -4), ParamRegs(1), DWord)
+            case other =>
+                buf += MovASM(ParamRegs(0), ParamRegs(1), size)
+        }
+
+        buf ++= ListBuffer(
+            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs.head),
+            MovASM(Imm(0), R0, Byte), // for SIMD purposes
+            CallASM(PrintFormatted),
+            MovASM(Imm(0), ParamRegs.head),
+            CallASM(FileFlush),
+            MovASM(BasePointer, StackPointer),
+            PopASM(BasePointer),
+            RetASM
+        )
+    }
+
+    def translatePrintlnLabel: ListBuffer[Line] = {
+        val stringLabel = StringLabel(s".L.println_string", "")
+
+        ListBuffer(
+            PushASM(BasePointer),
+            MovASM(StackPointer, BasePointer),
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs.head),
+            CallASM(Puts),
+            MovASM(Imm(0), ParamRegs.head),
+            CallASM(FileFlush),
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM

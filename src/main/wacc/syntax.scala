@@ -72,6 +72,15 @@ object ast {
         var enclosingType: semAst.SemType = null
     }
 
+    sealed trait Printable extends TypeCapture {
+        val expr: Expr
+    }
+
+    object Printable {
+        def unapply(p: Printable): Option[Expr] = Some(p.expr)
+    }
+
+
 
     sealed trait Stat                                                   extends Node
     case class Skip()(val pos: (Int, Int))                                                   extends Stat {
@@ -87,8 +96,8 @@ object ast {
     case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
     case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
     case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
-    case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with TypeCapture
-    case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with TypeCapture
+    case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with Printable
+    case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with Printable
     case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat
     case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat
     case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat
