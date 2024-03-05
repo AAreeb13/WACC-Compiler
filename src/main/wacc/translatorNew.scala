@@ -219,16 +219,124 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case PairVal() => buf += MovASM(NullImm, ScratchReg)
             case v: ArrayVal =>
             case IntVal(x) => buf += MovASM(Imm(x), ScratchReg)
-            case _: BinOp => 
-            case _: UnOp => 
+            case node: BinOp => translateBinOp(node)
+            case node: UnOp => translateUnOp(node)
             
         }
     }
 
-    def addStringConstant(string: String): StringLabel = {
-        val retVal = StringLabel(s".L.str${stringSet.size}", toRaw(string))
-        if (!stringSet.contains(retVal)) stringSet.add(retVal)
-        retVal
+    def translateBinOp(binop: BinOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        binop match {
+            case op@ArithmeticOp(lhs, rhs) =>
+                translateExpression(rhs)
+                buf += PushASM(ScratchReg) // also maybe specify dword/long size for push/pop
+                translateExpression(lhs)
+                buf += PopASM(R1) // could be wrong, need to save lhs value
+
+                op match {
+                    case divMod @ (Mod(_, _) | Div(_, _)) =>
+                        if (!funcMap.contains(CheckDivZeroLabel)) {
+                            funcMap.addOne((CheckDivZeroLabel, translateDivZeroLabel))
+                        }
+
+                        buf += CmpASM(Imm(0), R1, DWord)
+                        buf += DivASM(ScratchReg, ScratchReg, R1) // note that first 2 args are ignored for x86
+
+                        (divMod: @unchecked) match {
+                            case _: Div =>// buf += MovASM(ScratchReg, ScratchReg, DWord)
+                            case _: Mod => buf += MovASM(R3, ScratchReg, DWord) // todo: specify divMod register in config
+                        }
+                        buf += MovsASM(ScratchReg, ScratchReg, DWord)
+                    case other =>
+                        if (!funcMap.contains(CheckOverflowLabel)) {
+                            funcMap.addOne((CheckOverflowLabel, translateOverflowLabel))
+                        }
+
+                        (other: @unchecked) match {
+                            case _: Add => buf += AddASM(R1, ScratchReg, ScratchReg, DWord)
+                            case _: Sub => buf += SubASM(R1, ScratchReg, ScratchReg, DWord) // check commutativity
+                            case _: Mul => buf += MulASM(R1, ScratchReg, ScratchReg, DWord)
+                        }
+                        buf += JmpASM(CheckOverflowLabel, Overflow)
+                        buf += MovsASM(ScratchReg, ScratchReg, DWord)
+                }
+
+            case op@ComparativeOp(lhs, rhs) =>  // covers both equality and comparison operators
+                translateExpression(lhs)
+                buf += PushASM(ScratchReg)
+                translateExpression(rhs)
+                buf += PopASM(R1) // could be wrong, need to save lhs value
+                buf += CmpASM(R1, ScratchReg)
+                val flag = op match {
+                    case _: Eql => Equal
+                    case _: NotEql => NotEqual
+                    case _: GrtEql => GreaterEqual
+                    case _: Grt => Greater
+                    case _: LessEql => LessEqual
+                    case _: Less => IR.Less
+                }
+                buf += SetASM(ScratchReg, flag)
+                buf += MovsASM(ScratchReg, ScratchReg, Byte)
+
+            case op@LogicalOp(lhs, rhs) =>
+                translateExpression(lhs)
+
+                val endLabel = JumpLabel(s".L_logical_op_$branchCounter")
+                branchCounter += 1
+                
+                buf += CmpASM(TrueImm, ScratchReg)
+                val flag = op match {
+                    case _: And => NotEqual
+                    case _: Or => Equal
+                }
+                buf += JmpASM(endLabel, flag)
+                translateExpression(rhs)
+                buf += CmpASM(TrueImm, ScratchReg)
+                buf += endLabel
+                buf += SetASM(ScratchReg, Equal)
+                buf += MovsASM(ScratchReg, ScratchReg, Byte)
+                
+            case _ => println("This should never happen")
+        }
+    }
+
+    def translateUnOp(unop: UnOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        unop match {
+            case node: Len => 
+            case Not(expr) =>
+                translateExpression(expr)
+                buf += CmpASM(TrueImm, ScratchReg) // idk if this one is necessary
+                buf += SetASM(ScratchReg, NotEqual, Byte)
+                buf += MovsASM(ScratchReg, ScratchReg, Byte)
+            case Ord(expr) => translateExpression(expr)
+            case Chr(expr) =>
+                translateExpression(expr)
+
+                if (!funcMap.contains(CheckBadCharLabel)) {
+                    funcMap.addOne((CheckBadCharLabel, translateBadCharLabel))
+                }
+
+                buf ++= ListBuffer(
+                    TestASM(Imm(-128), ScratchReg),
+                    MovASM(ScratchReg, ParamRegs(1)),
+                    JmpASM(CheckBadCharLabel, NotEqual)
+                )
+            case Neg(expr) =>
+                translateExpression(expr)
+
+                if (!funcMap.contains(CheckOverflowLabel)) {
+                    funcMap.addOne((CheckOverflowLabel, translateOverflowLabel))
+                }
+
+                buf ++= ListBuffer(
+                    MovsASM(ScratchReg, ScratchReg, DWord),
+                    MovASM(ScratchReg, R1), // next scratch reg
+                    MovASM(Imm(0), ScratchReg, DWord),
+                    SubASM(R1, ScratchReg, ScratchReg, DWord),
+                    JmpASM(CheckOverflowLabel, Overflow),
+                    MovsASM(ScratchReg, ScratchReg, DWord),
+                )
+        }
     }
 
     def translateLValue(lvalue: LValue, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -295,6 +403,12 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
 
     ///////////////// UTILITY FUNCTIONS ///////////////////
+
+    def addStringConstant(string: String): StringLabel = {
+        val retVal = StringLabel(s".L.str${stringSet.size}", toRaw(string))
+        if (!stringSet.contains(retVal)) stringSet.add(retVal)
+        retVal
+    }
 
     def toRaw(s: String): String =
         s.flatMap(_ match {
@@ -413,6 +527,60 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM
+        )
+    }
+
+    ////////////////// ERRORS ////////////////////
+
+
+    def translateOverflowLabel: ListBuffer[Line] = {
+        val errorLabel = StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n")
+        stringSet.addOne(errorLabel)
+
+        if (!funcMap.contains(PrintStrLabel)) {
+            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
+        }
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            CallASM(PrintStrLabel),
+            MovASM(Imm(-1), ParamRegs.head, Byte),
+            CallASM(ExitLabel)
+        )
+    }
+
+
+    def translateDivZeroLabel: ListBuffer[Line] = { // identical to translateOverflow - maybe simplify
+        val errorLabel = StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n")
+        stringSet.addOne(errorLabel)
+
+        if (!funcMap.contains(PrintStrLabel)) {
+            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
+        }
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            CallASM(PrintStrLabel),
+            MovASM(Imm(-1), ParamRegs.head, Byte),
+            CallASM(ExitLabel)
+        )
+    }
+
+    def translateBadCharLabel: ListBuffer[Line] = {
+        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127 \n\\n")
+        stringSet.addOne(errorLabel)
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            MovASM(Imm(0), R0, Byte),
+            CallASM(PrintFormatted),
+            MovASM(Imm(0), ParamRegs.head),
+            CallASM(FileFlush),
+            MovASM(Imm(-1), ParamRegs.head, Byte),
+            CallASM(ExitLabel)
         )
     }
 }

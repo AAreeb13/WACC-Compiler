@@ -41,6 +41,7 @@ object X86Generator {
                         case CmpASM(src, dst, size) => s"cmp${sizeStr(size)} ${opStr(src)(size)}, ${opStr(dst)(size)}"
                         case SetASM(dst, flag, size) => s"set${flagStr(flag)} ${opStr(dst)(size)}"
                         case LeaASM(src, dst, size) => s"lea${sizeStr(size)} ${opStr(src)(size)}, ${opStr(dst)(size)}"
+                        case TestASM(src, dst, size) => s"test${sizeStr(size)} ${opStr(src)(size)}, ${opStr(dst)(size)}"
                         case RetASM => "ret"
                         case _ => "unreached"
                     }

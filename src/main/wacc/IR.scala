@@ -5,7 +5,7 @@ object IR {
 
     sealed trait Operand
 
-    case class Imm(value: Int) extends Operand
+    case class Imm(value: BigInt) extends Operand
 
     sealed trait Location extends Operand
 
@@ -83,6 +83,7 @@ object IR {
     case object CheckOverflowLabel extends WrapperFuncLabel("_errOverflow")
     case object CheckDivZeroLabel  extends WrapperFuncLabel("_errDivZero")
     case object CheckBoundLabel    extends WrapperFuncLabel("_boundsCheck")
+    case object CheckBadCharLabel  extends WrapperFuncLabel("_errBadChar")
 
     case object ArrayStoreLabel  extends WrapperFuncLabel("_arrStore")
     case object ArrayStoreBLabel extends WrapperFuncLabel("_arrStoreB")
@@ -99,11 +100,13 @@ object IR {
     case class PopASM(op: Operand, size: Size = QWord) extends Instruction // although immediates should not be popped to
     
     case class SubASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
-    case class MulASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class MulASM(op1: Operand, op2: Operand, dst: Location, size: Size = DWord) extends Instruction
     case class DivASM(op1: Operand, op2: Operand, dst: Location, size: Size = DWord) extends Instruction
     case class AddASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
     case class AndASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
     case class OrASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+
+    case class TestASM(src: Operand, dst: Operand, size: Size = QWord) extends Instruction // todo: check if src/dst are operands or locations
 
     case class MovsASM(src: Operand, dst: Location, sizeFrom: Size, sizeTo: Size = QWord) extends Instruction
     case class MovASM(src: Operand, dst: Location, flag: Condition, size: Size) extends Instruction
@@ -118,7 +121,7 @@ object IR {
 
     case class CmpASM(src: Operand, dst: Location, size: Size = QWord) extends Instruction
     case class SetASM(dst: Operand, flag: Condition, size: Size = Byte) extends Instruction
-    case class JmpASM(label: JumpLabel, flag: Condition = Unconditional) extends Instruction
+    case class JmpASM(label: Label, flag: Condition = Unconditional) extends Instruction
     case class LeaASM(src: Operand, dst: Register, size: Size = QWord) extends Instruction
     case class CallASM(label: FuncLabel) extends Instruction
 
@@ -136,11 +139,12 @@ object IR {
 
     sealed class Tag(val name: String) extends Line
     case object TextTag   extends Tag("text")
-    case object GlobalTag extends Tag("global main")
-    case object ReadonlyTag  extends Tag("section readonly")
+    case object GlobalTag extends Tag("globl main")
+    case object ReadonlyTag  extends Tag("section .rodata")
 
     val TrueImm = Imm(1)
     val FalseImm = Imm(0)
+    val NullImm = Imm(0)
     val AlignmentMaskImm = Imm(-16)
     val ReadOffsetImm = Imm(16)
     val DefaultExitCode = Imm(0)
