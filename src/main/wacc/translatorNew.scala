@@ -166,7 +166,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
 
         if (!funcMap.contains(wrapperLabel)) {
-            translateReadLabel(wrapperLabel, fstring, semanticToSize(node.enclosingType))
+            funcMap.addOne(wrapperLabel, translateReadLabel(wrapperLabel, fstring, semanticToSize(node.enclosingType)))
         }
 
         buf += CallASM(wrapperLabel)
@@ -447,6 +447,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne((MallocWrapperLabel, translateMallocLabel))
         }
 
+        buf += Comment(s"Begin Pair Cons $node")
+
         val PairSize = Imm(16)
         buf += MovASM(PairSize, ParamRegs.head, DWord)
         buf += CallASM(MallocWrapperLabel)
@@ -456,6 +458,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateExpression(node.snd)
         buf += MovASM(ScratchRegs.head, RegisterImmediateOffset(ArrayPointer, sizeToInt(QWord)))
         buf += MovASM(ArrayPointer, ScratchRegs.head)
+
+        buf += Comment("End Pair Cons")
         
     }
     
@@ -532,36 +536,69 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             
         }
 
-
-
-        // only consider expressions of size 1 for now
-        // var innerType = st.typeof(node.v).get
-
-        // val size = semanticToSize(node.enclosingType)
-        // var arrayLocation = st.getLocation(node.v).get
-        // val label = if (writeTo) ArrayStoreLabel(size) else ArrayLoadLabel(size)
-        
-        // node.exprs.foreach{ expr =>
-        //     innerType = innerType match {
-        //         case SemArray(t) => t 
-        //         case other => other
-        //     }
-        //     val size = semanticToSize(innerType)
-
-        //     if (writeTo) buf += PushASM(ScratchRegs.head)
-        //     translateExpression(expr)
-
-        //     if (!funcMap.contains(label)) {
-        //         funcMap.addOne((label, translateArrayElemLabel(size, writeTo)))
-        //     }
-
-        //     buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
-        //     if (writeTo) buf += PopASM(ScratchRegs.head)
-        //     buf += MovASM(arrayLocation, ArrayPointer)
-        //     buf += CallASM(label))
-        // }
-
     }
+
+    /*
+    /**
+  * Retrieves the address of a pair element, performing null checks and potentially dereferencing the pointer.
+  * Supports accessing the first or second element of a pair variable or an expression.
+  * @param x The pair element (first or second) to be accessed.
+  * @param st The symbol table for current scope variable and type information.
+  * @param target The list of assembly instructions being generated.
+  * @param dereference Indicates whether the address should be dereferenced to obtain the value.
+  * @return The type of the element accessed, or ErrorType in case of an array element access attempt.
+  */
+  def getPairElemAddr(x: PairElem, st: symbolTable, target: ListBuffer[ASMInstr], dereference: Boolean): Type = {
+    x match {
+        case FstPairElem(f) => f match {
+          case PairLValue(p)   => {
+            val t = getPairElemAddr(p, st, target, dereference)
+            target += Mov(RETURN_REG, MemAddr(RETURN_REG), 8)
+            t
+          }
+          case VarLValue(v)    => {
+            val (PairType(t, _), _, Some(mem)) = st.lookupAllIR(v.str).get
+            target += Mov(SCRATCH_REG_1, mem, 8)
+            target += Cmp(SCRATCH_REG_1, ImmVal(0), 8)
+            target += Jump(Comp.Eq, LabelCall("_nullNaughtiness"))
+            addNullDereferenceLabel()
+            if (dereference) {
+              target += Mov(RETURN_REG, MemAddr(SCRATCH_REG_1), 8)
+            } else {
+              target += Mov(RETURN_REG, SCRATCH_REG_1, 8)
+            }
+            t
+          }
+          case ArrLValue(ArrElem(v, ls)) => ErrorType.default
+        }
+
+
+      case SndPairElem(f) => f match {
+          case PairLValue(p)   => {
+            val t = getPairElemAddr(p, st, target, dereference)
+            target += AddInstr(RETURN_REG, ImmVal(8), 8)
+            target += Mov(RETURN_REG, MemAddr(RETURN_REG), 8)
+            t
+          }
+          case VarLValue(v)    => {
+            val (PairType(_, t), _, Some(mem)) = st.lookupAllIR(v.str).get
+            target += Mov(SCRATCH_REG_1, mem, 8)
+            target += Cmp(SCRATCH_REG_1, ImmVal(0), 8)
+            target += Jump(Comp.Eq, LabelCall("_nullNaughtiness"))
+            addNullDereferenceLabel()
+            if (dereference) {
+              target += Mov(RETURN_REG, MemAddr(SCRATCH_REG_1, 8), 8)
+            } else {
+              target += Mov(RETURN_REG, SCRATCH_REG_1, 8)
+              target += AddInstr(RETURN_REG, ImmVal(8), 8)
+            }
+            t
+          }
+          case ArrLValue(ArrElem(v, ls)) => ErrorType.default
+        }
+    }
+  }
+    */
 
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // only 1D case, not nested yet
@@ -582,11 +619,15 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne((CheckNullLabel, translateNullLabel))
         }
 
+        buf += Comment(s"Begin Pair Elem $node")
+
         if (writeTo) buf += MovASM(ScratchRegs(0), ScratchRegs(1))
         buf += MovASM(location, ScratchRegs.head)
         buf += CmpASM(NullImm, ScratchRegs.head)
         buf += JmpASM(CheckNullLabel, Equal)
         buf += MovASM(src, dst)
+
+        buf += Comment(s"End Pair Elem")
     }
 
 

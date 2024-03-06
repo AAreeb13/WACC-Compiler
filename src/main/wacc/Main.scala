@@ -18,6 +18,7 @@ object Main {
             -p --only-parse => syntax parse only
             -s --only-typecheck => syntax & semantic checks only
             -x --execute => execute generate assembly code
+            -i --interactive => allow for input to be piped in
             -l --colour => coloured output for semantic errors
       */
     def parseArguments(args: Array[String]): String = {
@@ -37,6 +38,7 @@ object Main {
                     case "s" | "-only-typecheck" => semanticCheckOnly = true
                     case "l" | "-colour" =>         enableColours = true
                     case "x" | "-execute" =>        executeAssembly = true
+                    case "i" | "-interactive" =>    acceptInput = true
                     case _ => printErrAndLeave
                 }
             } else if (i != args.length - 1) {
