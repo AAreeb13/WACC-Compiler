@@ -11,6 +11,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 import scala.language.implicitConversions
 import scala.collection.mutable.Stack
+import parsley.internal.deepembedding.singletons.Offset
 
 object codeGenerator {
     def translate(astInfo: (Node, List[SymbolTable])): Either[String, String] = translate(astInfo._1, astInfo._2)
@@ -136,16 +137,27 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                 )
 
             case Assign(lvalue, rvalue) =>
-                translateRValue(rvalue, Reg(Rax)) :::
-                updateLValue(lvalue, Reg(Rax))  
+                rvalue match {
+                    // case ArrayLiteral(exprs) =>
+                    //     translateArrayInitialisation(exprs, lvalue)
+                    case _ =>
+                        translateRValue(rvalue, Reg(Rax)) :::
+                        updateLValue(lvalue, Reg(Rax))  
+                }
 
             case Return(expr) =>  
                 translateExpression(expr, Reg(Rax)) ::: Nil
 
             case AssignNew(declType, ident, rvalue) =>
-                translateRValue(rvalue) :::
-                nextStackLocation(ident, syntaxToSem(declType))
-            
+                rvalue match{
+                    case ArrayLiteral(exprs) =>
+                        nextStackLocation(ident, syntaxToSem(declType)) :::
+                        translateInitialiseArray(exprs, syntaxToSem(declType))
+                    case _ =>
+                        translateRValue(rvalue) :::
+                        nextStackLocation(ident, syntaxToSem(declType))
+                } 
+
             case p@Print(expr) =>
                 translateExpression(expr) :::
                 List(Mov(Reg(Rax), Reg(Rdi))) :::
@@ -531,8 +543,83 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
     def translateLValue(lvalue: LValue, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
         lvalue match {
             case variable: Var => translateVar(variable, targetReg)
+            case ArrayVal(ident, exprs) => translateArrayValAssignment(ident, exprs)
             case _ => List.empty
         }
+    }
+    def translateArrayValAssignment(ident: String, exprs: List[Expr], targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val (declType, _, locationOption) = currentScope.get(ident).get
+        val location = locationOption.getOrElse(currentScope.previousLocation(ident).get)
+        var listOfStatements: List[ASMItem] = Push(Reg(R11)) :: Mov(location, Reg(R11, DWord), DWord) :: Nil
+        val size = 4;
+
+        for ( i <- 0 to exprs.length - 2) {
+            val expr = exprs(i)
+            val offset = size * i
+            listOfStatements = listOfStatements ::: 
+            translateExpression(expr, Reg(Rax)) :::
+            List(
+                Mov(Mem(Reg(R11), ImmVal(offset)), Reg(R11, DWord), DWord)
+            )
+        }
+
+        listOfStatements ::: translateExpression(exprs(exprs.length - 1)) ::: Pop(Reg(R11)) :: Nil
+    }
+    def translateInitialiseArray(exprs: List[Expr], arrayType: SemType, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
+        val length = exprs.length
+        val mallocLabel = Label("_malloc")
+        val mask = -16
+        val elemSize = arrayType match {
+            case SemArray(SemArray(_)) => 4
+            case SemArray(t) => sizeToInt(typeToSize(t))
+            case _ => 8
+        }
+        val mallocSize = length * elemSize + 4
+
+        addLabel(mallocLabel,
+            List(
+                Push(Reg(Rbp)),
+                Mov(Reg(Rsp), Reg(Rbp)),
+                asm.And(ImmVal(mask), Reg(Rsp)),
+                Call(LibFunc.Malloc),
+                Cmp(ImmVal(0), Reg(Rax)),
+                /*
+                 Jmp(Label("_errOutOfMemory"), Equal),
+                 need to add this label --> add prints label
+                */
+                Mov(Reg(Rbp), Reg(Rsp)),
+                Pop(Reg(Rbp)),
+                Ret
+            )
+        )
+        List(
+            Mov(ImmVal(mallocSize), targetReg.toSize(DWord), DWord), 
+            Call(mallocLabel),
+            Push(Reg(R11)),
+            Mov(targetReg.toSize(QWord), Reg(R11)),
+            asm.Add(ImmVal(4), Reg(R11)),
+            Mov(ImmVal(length), Mem(Reg(R11), ImmVal(-4)), DWord)) ::: 
+            storeArrayElements(exprs, Reg(R11), elemSize, length) :::
+            List(Mov(Reg(R11), Reg(Rax)),
+                Pop(Reg(R11))
+            )
+    }
+
+    // private def getInnerType(expr: Expr): SemType = {
+    //     expr match {
+    //         case ArrayVal(ident, exprs) => getInnerType(exprs(0))
+    //         case _ => ???
+    //     }
+    // }
+    def storeArrayElements(exprs: List[Expr], targetReg: Reg = Reg(R11), elemSize: Int, length: Int)(implicit currentScope: SymbolTable): List[ASMItem] = {
+        var listOfArrayElems: List[ASMItem] = Nil
+        for (index <- 0 to length - 1) {
+            val offset = (index) * elemSize
+            listOfArrayElems = listOfArrayElems :::
+                translateExpression(exprs(index), Reg(Rax)) :::
+                List(Mov(Reg(Rax, DWord), Mem(targetReg, ImmVal(offset)), DWord))
+        }
+        listOfArrayElems
     }
 
     def translateComparisonOp(expr: ComparisonOp, targetReg: Reg = Reg(Rax))(implicit currentScope: SymbolTable): List[ASMItem] = {
@@ -666,6 +753,7 @@ class Translator(prog: Prog, val symbolTables: List[SymbolTable]) {
                     case _     => Movs(location, targetReg, DWord) :: Nil
                 }
                 case SemString => Mov(location, targetReg, QWord) :: Nil
+                case SemArray(t) => Mov(location, targetReg, DWord) :: Nil
                 case _ => Nil
             }
         }
