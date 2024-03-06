@@ -148,7 +148,7 @@ object ast {
         override def toString = s"Var(\"$v\")"
     }
 
-    case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue {
+    case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue with TypeCapture {
         override def toString = s"ArrayVal(\"$v\",$exprs)"
     }
 

@@ -344,6 +344,7 @@ object semanticChecker {
                             errorCollector.addError(arrayElem, TypeError(s"dimenesion ${arrayElem.exprs.size}", s"dimension ${arrType.dimensions}"))
                             SemNone
                         case Some(innerType) =>
+                            arrayElem.enclosingType = innerType
                             innerType
                     }
                     case other => 

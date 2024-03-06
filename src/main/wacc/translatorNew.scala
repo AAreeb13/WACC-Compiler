@@ -101,7 +101,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += Comment("Begin IF")
 
         translateExpression(node.cond)
-        buf += CmpASM(TrueImm, ScratchReg)
+        buf += CmpASM(TrueImm, ScratchRegs.head)
         buf += JmpASM(trueLabel, Equal)
         translateBlock(node.elseStat)(buf, st.children(1))
         buf += JmpASM(endLabel)
@@ -136,7 +136,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 st.updateLocation(node.name, memLocation)
                 incrementStackOffset(sizeToInt(size)) // should this be a - or +?
 
-                buf += MovASM(ScratchReg, memLocation, size)
+                buf += MovASM(ScratchRegs.head, memLocation, size)
             
             case _: Param => 
                 val size = semanticToSize(syntaxToSemanticType(node.declType))
@@ -147,7 +147,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 st.updateLocation(node.name, funcMemLocation)
                 
                 incrementStackOffset(sizeToInt(size))
-                buf += MovASM(ScratchReg, localMemLocation, size)
+                buf += MovASM(ScratchRegs.head, localMemLocation, size)
 
         }
             
@@ -186,7 +186,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateBlock(node.stats)(buf, st.children(0))
         buf += doneLabel
         translateExpression(node.cond)
-        buf += CmpASM(TrueImm, ScratchReg, Byte)
+        buf += CmpASM(TrueImm, ScratchRegs.head, Byte)
         buf += JmpASM(repeatLabel, Equal)
 
         buf += Comment("End WHILE")
@@ -195,7 +195,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translatePrint(node: Printable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Print statement here
         translateExpression(node.expr)
-        buf += MovASM(ScratchReg, ParamRegs.head)
+        buf += MovASM(ScratchRegs.head, ParamRegs.head)
         val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
             case SemBool => (PrintBoolLabel, "%.*s")
             case SemInt => (PrintIntLabel, "%d")
@@ -248,20 +248,20 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateReturn(node: Return)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         translateExpression(node.expr)
-        //buf += MovASM(ScratchReg, ReturnReg)
+        //buf += MovASM(ScratchRegs, ReturnReg)
     }
 
     def translateExpression(expr: Expr)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         expr match {
             case v: Var => translateVar(v)
-            case CharVal(c) => buf += MovASM(Imm(c.toInt), ScratchReg)
+            case CharVal(c) => buf += MovASM(Imm(c.toInt), ScratchRegs.head)
             case StrVal(s) =>
                 val stringLabel = addStringConstant(s)
-                buf += LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ScratchReg)
-            case BoolVal(b) => buf += MovASM(Imm(if (b) 1 else 0), ScratchReg)
-            case PairVal() => buf += MovASM(NullImm, ScratchReg)
+                buf += LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ScratchRegs.head)
+            case BoolVal(b) => buf += MovASM(Imm(if (b) 1 else 0), ScratchRegs.head)
+            case PairVal() => buf += MovASM(NullImm, ScratchRegs.head)
             case v: ArrayVal => translateArrayElem(v)
-            case IntVal(x) => buf += MovASM(Imm(x), ScratchReg)
+            case IntVal(x) => buf += MovASM(Imm(x), ScratchRegs.head)
             case node: BinOp => translateBinOp(node)
             case node: UnOp => translateUnOp(node)
             
@@ -272,9 +272,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         binop match {
             case op@ArithmeticOp(lhs, rhs) =>
                 translateExpression(rhs)
-                buf += PushASM(ScratchReg) // also maybe specify dword/long size for push/pop
+                buf += PushASM(ScratchRegs.head) // also maybe specify dword/long size for push/pop
                 translateExpression(lhs)
-                buf += PopASM(R1) // could be wrong, need to save lhs value
+                buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
 
                 op match {
                     case divMod @ (Mod(_, _) | Div(_, _)) =>
@@ -282,34 +282,34 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                             funcMap.addOne((CheckDivZeroLabel, translateDivZeroLabel))
                         }
 
-                        buf += CmpASM(Imm(0), R1, DWord)
-                        buf += DivASM(ScratchReg, ScratchReg, R1) // note that first 2 args are ignored for x86
+                        buf += CmpASM(Imm(0), ScratchRegs(1), DWord)
+                        buf += DivASM(ScratchRegs.head, ScratchRegs.head, ScratchRegs(1)) // note that first 2 args are ignored for x86
 
                         (divMod: @unchecked) match {
-                            case _: Div =>// buf += MovASM(ScratchReg, ScratchReg, DWord)
-                            case _: Mod => buf += MovASM(R3, ScratchReg, DWord) // todo: specify divMod register in config
+                            case _: Div =>// buf += MovASM(ScratchRegs.head, ScratchRegs.head, DWord)
+                            case _: Mod => buf += MovASM(R3, ScratchRegs.head, DWord) // todo: specify divMod register in config
                         }
-                        buf += MovsASM(ScratchReg, ScratchReg, DWord)
+                        buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
                     case other =>
                         if (!funcMap.contains(CheckOverflowLabel)) {
                             funcMap.addOne((CheckOverflowLabel, translateOverflowLabel))
                         }
 
                         (other: @unchecked) match {
-                            case _: Add => buf += AddASM(R1, ScratchReg, ScratchReg, DWord)
-                            case _: Sub => buf += SubASM(R1, ScratchReg, ScratchReg, DWord) // check commutativity
-                            case _: Mul => buf += MulASM(R1, ScratchReg, ScratchReg, DWord)
+                            case _: Add => buf += AddASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
+                            case _: Sub => buf += SubASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord) // check commutativity
+                            case _: Mul => buf += MulASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                         }
                         buf += JmpASM(CheckOverflowLabel, Overflow)
-                        buf += MovsASM(ScratchReg, ScratchReg, DWord)
+                        buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
                 }
 
             case op@ComparativeOp(lhs, rhs) =>  // covers both equality and comparison operators
                 translateExpression(lhs)
-                buf += PushASM(ScratchReg)
+                buf += PushASM(ScratchRegs(0))
                 translateExpression(rhs)
-                buf += PopASM(R1) // could be wrong, need to save lhs value
-                buf += CmpASM(ScratchReg, R1)
+                buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
+                buf += CmpASM(ScratchRegs(0), ScratchRegs(1))
                 val flag = op match {
                     case _: Eql => Equal
                     case _: NotEql => NotEqual
@@ -318,8 +318,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                     case _: LessEql => LessEqual
                     case _: Less => IR.Less
                 }
-                buf += SetASM(ScratchReg, flag)
-                buf += MovsASM(ScratchReg, ScratchReg, Byte)
+                buf += SetASM(ScratchRegs(0), flag)
+                buf += MovsASM(ScratchRegs(0), ScratchRegs(0), Byte)
 
             case op@LogicalOp(lhs, rhs) =>
                 translateExpression(lhs)
@@ -327,17 +327,17 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 val endLabel = JumpLabel(s".L_logical_op_$branchCounter")
                 branchCounter += 1
                 
-                buf += CmpASM(TrueImm, ScratchReg)
+                buf += CmpASM(TrueImm, ScratchRegs.head)
                 val flag = op match {
                     case _: And => NotEqual
                     case _: Or => Equal
                 }
                 buf += JmpASM(endLabel, flag)
                 translateExpression(rhs)
-                buf += CmpASM(TrueImm, ScratchReg)
+                buf += CmpASM(TrueImm, ScratchRegs.head)
                 buf += endLabel
-                buf += SetASM(ScratchReg, Equal)
-                buf += MovsASM(ScratchReg, ScratchReg, Byte)
+                buf += SetASM(ScratchRegs.head, Equal)
+                buf += MovsASM(ScratchRegs.head, ScratchRegs.head, Byte)
                 
             case _ => println("This should never happen")
         }
@@ -347,14 +347,14 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         unop match {
             case Len(expr) => 
                 translateExpression(expr)
-                buf += MovASM(ScratchReg, R1) // can this be optimised out?
-                buf += MovsASM(RegisterImmediateOffset(R1, -sizeToInt(DWord)), ScratchReg, DWord)
+                buf += MovASM(ScratchRegs.head, ScratchRegs(1)) // can this be optimised out?
+                buf += MovsASM(RegisterImmediateOffset(ScratchRegs(1), -sizeToInt(DWord)), ScratchRegs.head, DWord)
 
             case Not(expr) =>
                 translateExpression(expr)
-                buf += CmpASM(TrueImm, ScratchReg) // idk if this one is necessary
-                buf += SetASM(ScratchReg, NotEqual, Byte)
-                buf += MovsASM(ScratchReg, ScratchReg, Byte)
+                buf += CmpASM(TrueImm, ScratchRegs.head) // idk if this one is necessary
+                buf += SetASM(ScratchRegs.head, NotEqual, Byte)
+                buf += MovsASM(ScratchRegs.head, ScratchRegs.head, Byte)
             case Ord(expr) => translateExpression(expr)
             case Chr(expr) =>
                 translateExpression(expr)
@@ -364,9 +364,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 }
 
                 buf ++= ListBuffer(
-                    TestASM(Imm(-128), ScratchReg),
-                    MovASM(ScratchReg, ParamRegs(1), NotEqual),
-                    //MovASM(ScratchReg, ParamRegs(1)),
+                    TestASM(Imm(-128), ScratchRegs.head),
+                    MovASM(ScratchRegs.head, ParamRegs(1), NotEqual, QWord),
                     JmpASM(CheckBadCharLabel, NotEqual)
                 )
             case Neg(expr) =>
@@ -377,12 +376,12 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 }
 
                 buf ++= ListBuffer(
-                    MovsASM(ScratchReg, ScratchReg, DWord),
-                    MovASM(ScratchReg, R1), // next scratch reg
-                    MovASM(Imm(0), ScratchReg, DWord),
-                    SubASM(R1, ScratchReg, ScratchReg, DWord),
+                    MovsASM(ScratchRegs(0), ScratchRegs(0), DWord),
+                    MovASM(ScratchRegs(0), ScratchRegs(1)), // next scratch reg
+                    MovASM(Imm(0), ScratchRegs(0), DWord),
+                    SubASM(ScratchRegs(1), ScratchRegs(0), ScratchRegs(0), DWord),
                     JmpASM(CheckOverflowLabel, Overflow),
-                    MovsASM(ScratchReg, ScratchReg, DWord),
+                    MovsASM(ScratchRegs(0), ScratchRegs(0), DWord),
                 )
         }
     }
@@ -417,15 +416,15 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val totalSize = sizeToInt(DWord) + singleSize * node.exprs.size
         buf += MovASM(Imm(totalSize), ParamRegs.head, DWord)
         buf += CallASM(MallocWrapperLabel)
-        buf += MovASM(ScratchReg, R11) // R11 = array register
-        buf += AddASM(Imm(sizeToInt(DWord)), R11, R11)
-        buf += MovASM(Imm(node.exprs.size), ScratchReg)
-        buf += MovASM(ScratchReg, RegisterImmediateOffset(R11, -sizeToInt(DWord)))
+        buf += MovASM(ScratchRegs(0), ArrayPointer)
+        buf += AddASM(Imm(sizeToInt(DWord)), ArrayPointer, ArrayPointer)
+        buf += MovASM(Imm(node.exprs.size), ScratchRegs(0))
+        buf += MovASM(ScratchRegs(0), RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)))
         node.exprs.zipWithIndex.foreach { case (expr, index) =>
             translateExpression(expr)
-            buf += MovASM(ScratchReg, RegisterImmediateOffset(R11, index * singleSize))
+            buf += MovASM(ScratchRegs(0), RegisterImmediateOffset(ArrayPointer, index * singleSize))
         }
-        buf += MovASM(R11, ScratchReg)
+        buf += MovASM(ArrayPointer, ScratchRegs(0))
     }
 
     def translatePairCons(node: PairCons)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -454,17 +453,34 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val size = semanticToSize(declType)
 
         if (writeTo) {
-            buf += MovASM(ScratchReg, location, size)
+            buf += MovASM(ScratchRegs.head, location, size)
         } else {
             size match {
-                case QWord => buf += MovASM(location, ScratchReg, size)
-                case size => buf += MovsASM(location, ScratchReg, size)
+                case QWord => buf += MovASM(location, ScratchRegs.head, size)
+                case size => buf += MovsASM(location, ScratchRegs.head, size)
             }
         }
 
     }
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        // only consider expressions of size 1 for now
+        // and array storing (writeTo = true)
+
+        val innerType = semanticToSize(node.enclosingType)
+        val arrayLabel = ArrayStoreLabel(innerType)
+        val location = st.getLocation(node.v).get
+        buf += PushASM(ScratchRegs.head)
+        translateExpression(node.exprs.head)
+
+        if (!funcMap.contains(arrayLabel)) {
+            funcMap.addOne((arrayLabel, translateArrayStore(innerType)))
+        }
+
+        buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
+        buf += PopASM(ScratchRegs.head)
+        buf += MovASM(location, ArrayPointer)
+        buf += CallASM(arrayLabel)
     }
 
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -513,6 +529,27 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case '\b' => "\\b"
             case other => other.toString
         })
+    
+    def translateArrayStore(size: Size): ListBuffer[Line] = {
+        if (!funcMap.contains(CheckBoundsLabel)) {
+            funcMap.addOne((CheckBoundsLabel, translateBoundsLabel))
+        }
+
+        ListBuffer(
+            Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, value to store in $ScratchRegs"),
+            PushASM(ScratchRegs(1)),
+            CmpASM(Imm(0), IndexPointer, DWord),
+            MovASM(IndexPointer, ParamRegs.head, IR.Less),
+            JmpASM(CheckBoundsLabel, IR.Less),
+            MovASM(RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
+            CmpASM(ScratchRegs(1), IndexPointer, DWord),
+            MovASM(IndexPointer, ParamRegs.head, GreaterEqual),
+            JmpASM(CheckBoundsLabel, GreaterEqual),
+            MovASM(R0, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), size),
+            PopASM(ScratchRegs(1)),
+            RetASM
+        )
+    }
 
     def translateMallocLabel: ListBuffer[Line] = {
         if (!funcMap.contains(CheckOOMLabel)) {
@@ -639,6 +676,22 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     ////////////////// ERRORS ////////////////////
+
+    def translateBoundsLabel: ListBuffer[Line] = {
+        val errorLabel = StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n")
+        stringSet.addOne(errorLabel)
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            MovASM(Imm(0), R0, Byte),
+            CallASM(PrintFormatted),
+            MovASM(Imm(0), ParamRegs.head),
+            CallASM(FileFlush),
+            MovASM(Imm(-1), ParamRegs.head, Byte),
+            CallASM(ExitLabel)
+        )
+    }
     
     def translateOOMLabel: ListBuffer[Line] = {
         val errorLabel = StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n")

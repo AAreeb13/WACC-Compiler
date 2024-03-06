@@ -1,5 +1,7 @@
 package wacc
 
+import implicits.sizeToInt
+
 object IR {
     sealed trait Line
 
@@ -85,13 +87,19 @@ object IR {
     case object CheckNullLabel     extends WrapperFuncLabel("_errNull")
     case object CheckOverflowLabel extends WrapperFuncLabel("_errOverflow")
     case object CheckDivZeroLabel  extends WrapperFuncLabel("_errDivZero")
-    case object CheckBoundLabel    extends WrapperFuncLabel("_boundsCheck")
+    case object CheckBoundsLabel    extends WrapperFuncLabel("_boundsCheck")
     case object CheckBadCharLabel  extends WrapperFuncLabel("_errBadChar")
     case object CheckOOMLabel     extends WrapperFuncLabel("_errOutOfMemory")
 
-    case object ArrayStoreLabel  extends WrapperFuncLabel("_arrStore")
+    case class ArrayStoreLabel(size: Size)  extends WrapperFuncLabel("_arrStore") {
+        override val name = s"_arrStore${sizeToInt(size)}"
+    }
+    
+    case class ArrayLoadLabel(size: Size)   extends WrapperFuncLabel("_arrLoad") {
+        override val name = s"_arrLoad${sizeToInt(size)}"
+    }
+
     case object ArrayStoreBLabel extends WrapperFuncLabel("_arrStoreB")
-    case object ArrayLoadLabel   extends WrapperFuncLabel("_arrLoad")
     case object ArrayLoadBLabel  extends WrapperFuncLabel("_arrLoadB")
     case object FreePairLabel    extends WrapperFuncLabel("_freepair")
     case object FreeArrayLabel   extends WrapperFuncLabel("_free")
