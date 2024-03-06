@@ -1,0 +1,16 @@
+# SubtractionWithBigNumbers
+
+# Output:
+# -2147483648
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = -2100000000;
+  int y = 47483648;
+  int sub = x - y;
+  print sub
+end
