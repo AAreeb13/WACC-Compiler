@@ -492,24 +492,74 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        // only consider expressions of size 1 for now
-        val size = semanticToSize(node.enclosingType)
-        val arrayLocation = st.getLocation(node.v).get
-        val label = if (writeTo) ArrayStoreLabel(size) else ArrayLoadLabel(size)
-        
-        node.exprs.foreach{ expr =>
-            if (writeTo) buf += PushASM(ScratchRegs.head)
-            translateExpression(expr)
+        /*
+        Need to unwrap array one by one
+        Only call store on the last label
+        Store result of array load in array pointer (Rax -> R9)
+        Get array location
+        */
+
+        var location = st.getLocation(node.v).get
+        var innerSize = semanticToSize(node.enclosingType)
+
+        if (writeTo) buf += PushASM(ScratchRegs.head)
+
+        node.exprs.zipWithIndex.foreach { case (expr, index) =>
+            val store = writeTo && index == node.exprs.size - 1
+            val size = if (index == node.exprs.size - 1) innerSize else QWord
+            val label = if (store) ArrayStoreLabel(size) else ArrayLoadLabel(size)
 
             if (!funcMap.contains(label)) {
-                funcMap.addOne((label, translateArrayElemLabel(size, writeTo)))
+                funcMap.addOne((label, translateArrayElemLabel(size, store)))
             }
 
+            translateExpression(expr)
             buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
-            if (writeTo) buf += PopASM(ScratchRegs.head)
-            buf += MovASM(arrayLocation, ArrayPointer)
-            buf += CallASM(label) 
+
+
+            if (index != 0) buf += PopASM(location)
+
+            buf += MovASM(location, ArrayPointer)
+
+            if (store) buf += PopASM(ScratchRegs.head)
+
+            buf += CallASM(label)
+
+            if (index != node.exprs.size - 1) {
+                location = ScratchRegs.head
+                buf += PushASM(location)
+            }
+            
         }
+
+
+
+        // only consider expressions of size 1 for now
+        // var innerType = st.typeof(node.v).get
+
+        // val size = semanticToSize(node.enclosingType)
+        // var arrayLocation = st.getLocation(node.v).get
+        // val label = if (writeTo) ArrayStoreLabel(size) else ArrayLoadLabel(size)
+        
+        // node.exprs.foreach{ expr =>
+        //     innerType = innerType match {
+        //         case SemArray(t) => t 
+        //         case other => other
+        //     }
+        //     val size = semanticToSize(innerType)
+
+        //     if (writeTo) buf += PushASM(ScratchRegs.head)
+        //     translateExpression(expr)
+
+        //     if (!funcMap.contains(label)) {
+        //         funcMap.addOne((label, translateArrayElemLabel(size, writeTo)))
+        //     }
+
+        //     buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
+        //     if (writeTo) buf += PopASM(ScratchRegs.head)
+        //     buf += MovASM(arrayLocation, ArrayPointer)
+        //     buf += CallASM(label))
+        // }
 
     }
 
