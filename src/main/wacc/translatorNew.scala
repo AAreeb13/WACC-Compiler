@@ -243,16 +243,21 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateFree(node: Free)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Free statement here
-        // only for arrays so far
-        if (!funcMap.contains(FreeArrayLabel)) {
-            funcMap.addOne(FreeArrayLabel, translateFreeLabel)
+        val freeLabel = if (node.isArray) FreeArrayLabel else FreePairLabel
+        
+        if (!funcMap.contains(freeLabel)) {
+                funcMap.addOne(freeLabel, translateFreeLabel(node.isArray))
         }
 
         translateExpression(node.expr)
-        buf += Comment(s"array pointers are shifted forward by ${sizeToInt(DWord)} bytes, so correct it back to original pointer before free")
-        buf += SubASM(Imm(sizeToInt(DWord)), ScratchRegs.head, ScratchRegs.head)
+
+        if (node.isArray) {
+            buf += Comment(s"array pointers are shifted forward by ${sizeToInt(DWord)} bytes, so correct it back to original pointer before free")
+            buf += SubASM(Imm(sizeToInt(DWord)), ScratchRegs.head, ScratchRegs.head)
+        }
+
         buf += MovASM(ScratchRegs.head, ParamRegs.head)
-        buf += CallASM(FreeArrayLabel)
+        buf += CallASM(freeLabel)
     }
 
     def translateReturn(node: Return)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -439,6 +444,20 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translatePairCons(node: PairCons)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Free statement here
+        if (!funcMap.contains(MallocWrapperLabel)) {
+            funcMap.addOne((MallocWrapperLabel, translateMallocLabel))
+        }
+
+        val PairSize = Imm(16)
+        buf += MovASM(PairSize, ParamRegs.head, DWord)
+        buf += CallASM(MallocWrapperLabel)
+        buf += MovASM(ScratchRegs.head, ArrayPointer)
+        translateExpression(node.fst)
+        buf += MovASM(ScratchRegs.head, RegisterOffset(ArrayPointer))
+        translateExpression(node.snd)
+        buf += MovASM(ScratchRegs.head, RegisterImmediateOffset(ArrayPointer, sizeToInt(QWord)))
+        buf += MovASM(ArrayPointer, ScratchRegs.head)
+        
     }
     
     def translateFuncCall(node: FuncCall)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -494,6 +513,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        
     }
 
 
@@ -540,16 +560,31 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case other => other.toString
         })
 
-    def translateFreeLabel: ListBuffer[Line] = {
-        ListBuffer(
+
+    def translateFreeLabel(isArray: Boolean): ListBuffer[Line] = {
+        var buf: ListBuffer[Line] = ListBuffer(
             PushASM(BasePointer),
             MovASM(StackPointer, BasePointer),
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer)
+        )
+        
+        if (!isArray) {
+            if (!funcMap.contains(CheckNullLabel)) {
+                funcMap.addOne((CheckNullLabel, translateNullLabel))
+            }
+
+            buf += CmpASM(NullImm, ParamRegs.head)
+            buf += JmpASM(CheckNullLabel, Equal)
+        }
+        
+        buf ++= ListBuffer(
             CallASM(FreeLabel),
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM
         )
+
+        buf
     }
     
     def translateArrayElemLabel(size: Size, store: Boolean): ListBuffer[Line] = {
@@ -702,6 +737,23 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     ////////////////// ERRORS ////////////////////
+
+    def translateNullLabel: ListBuffer[Line] = {
+        val errorLabel = StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n")
+        stringSet.addOne(errorLabel)
+
+        if (!funcMap.contains(PrintStrLabel)) {
+            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
+        }
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            CallASM(PrintStrLabel),
+            MovASM(Imm(-1), ParamRegs.head, Byte),
+            CallASM(ExitLabel)
+        )
+    }
 
     def translateBoundsLabel: ListBuffer[Line] = {
         val errorLabel = StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n")

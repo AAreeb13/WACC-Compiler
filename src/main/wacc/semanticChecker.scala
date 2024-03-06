@@ -145,9 +145,10 @@ object semanticChecker {
                         case (lvalType, rvalType) => matchesType(lvalType, rvalType)
                     }
 
-                case Free(expr) => checkExpression(expr) match {
+                case f@Free(expr) => checkExpression(expr) match {
                         // Expression must be any of "null", array or pair
-                        case SemArray(_) | SemNull | SemPair(_, _) =>
+                        case SemArray(_) => f.isArray = true
+                        case SemNull | SemPair(_, _) =>
                         case other =>
                             errorCollector.addError(expr, TypeError(s"$other", "1-dimensional array or pair type"))
                     }

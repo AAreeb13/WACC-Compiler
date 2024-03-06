@@ -97,7 +97,9 @@ object ast {
     
     case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
     case class Read(lvalue: LValue)(val pos: (Int, Int))                                     extends Stat with TypeCapture
-    case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat
+    case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat {
+        var isArray = false
+    }
     case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
     case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
     case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with Printable
