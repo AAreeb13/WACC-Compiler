@@ -465,22 +465,22 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // only consider expressions of size 1 for now
-        // and array storing (writeTo = true)
-
-        val innerType = semanticToSize(node.enclosingType)
-        val arrayLabel = ArrayStoreLabel(innerType)
-        val location = st.getLocation(node.v).get
-        buf += PushASM(ScratchRegs.head)
+        val size = semanticToSize(node.enclosingType)
+        val arrayLocation = st.getLocation(node.v).get
+        val label = if (writeTo) ArrayStoreLabel(size) else ArrayLoadLabel(size)
+        
+        if (writeTo) buf += PushASM(ScratchRegs.head)
         translateExpression(node.exprs.head)
 
-        if (!funcMap.contains(arrayLabel)) {
-            funcMap.addOne((arrayLabel, translateArrayStore(innerType)))
+        if (!funcMap.contains(label)) {
+            funcMap.addOne((label, translateArrayElemLabel(size, writeTo)))
         }
 
         buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
-        buf += PopASM(ScratchRegs.head)
-        buf += MovASM(location, ArrayPointer)
-        buf += CallASM(arrayLabel)
+        if (writeTo) buf += PopASM(ScratchRegs.head)
+        buf += MovASM(arrayLocation, ArrayPointer)
+        buf += CallASM(label)
+
     }
 
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -530,26 +530,51 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case other => other.toString
         })
     
-    def translateArrayStore(size: Size): ListBuffer[Line] = {
+    def translateArrayElemLabel(size: Size, store: Boolean): ListBuffer[Line] = {
         if (!funcMap.contains(CheckBoundsLabel)) {
             funcMap.addOne((CheckBoundsLabel, translateBoundsLabel))
         }
 
+        val (src, dst) = if (store) (ScratchRegs.head, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size))
+                         else (RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ScratchRegs.head)
+
         ListBuffer(
-            Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, value to store in $ScratchRegs"),
+            Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, ${if (store) "value to store in" else "and return into"} ${ScratchRegs.head}"),
             PushASM(ScratchRegs(1)),
             CmpASM(Imm(0), IndexPointer, DWord),
-            MovASM(IndexPointer, ParamRegs.head, IR.Less),
+            MovASM(IndexPointer, ParamRegs(1), IR.Less),
             JmpASM(CheckBoundsLabel, IR.Less),
             MovASM(RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
             CmpASM(ScratchRegs(1), IndexPointer, DWord),
-            MovASM(IndexPointer, ParamRegs.head, GreaterEqual),
+            MovASM(IndexPointer, ParamRegs(1), GreaterEqual),
             JmpASM(CheckBoundsLabel, GreaterEqual),
-            MovASM(R0, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), size),
+            if (store || size == QWord) MovASM(src, dst, size)
+            else MovsASM(src, dst, size),
             PopASM(ScratchRegs(1)),
             RetASM
         )
     }
+    
+    // def translateArrayStore(size: Size): ListBuffer[Line] = {
+    //     if (!funcMap.contains(CheckBoundsLabel)) {
+    //         funcMap.addOne((CheckBoundsLabel, translateBoundsLabel))
+    //     }
+
+    //     ListBuffer(
+    //         Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, value to store in ${ScratchRegs.head}"),
+    //         PushASM(ScratchRegs(1)),
+    //         CmpASM(Imm(0), IndexPointer, DWord),
+    //         MovASM(IndexPointer, ParamRegs(1), IR.Less),
+    //         JmpASM(CheckBoundsLabel, IR.Less),
+    //         MovASM(RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
+    //         CmpASM(ScratchRegs(1), IndexPointer, DWord),
+    //         MovASM(IndexPointer, ParamRegs(1), GreaterEqual),
+    //         JmpASM(CheckBoundsLabel, GreaterEqual),
+    //         MovASM(R0, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), size),
+    //         PopASM(ScratchRegs(1)),
+    //         RetASM
+    //     )
+    // }
 
     def translateMallocLabel: ListBuffer[Line] = {
         if (!funcMap.contains(CheckOOMLabel)) {
