@@ -497,17 +497,19 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         val arrayLocation = st.getLocation(node.v).get
         val label = if (writeTo) ArrayStoreLabel(size) else ArrayLoadLabel(size)
         
-        if (writeTo) buf += PushASM(ScratchRegs.head)
-        translateExpression(node.exprs.head)
+        node.exprs.foreach{ expr =>
+            if (writeTo) buf += PushASM(ScratchRegs.head)
+            translateExpression(expr)
 
-        if (!funcMap.contains(label)) {
-            funcMap.addOne((label, translateArrayElemLabel(size, writeTo)))
+            if (!funcMap.contains(label)) {
+                funcMap.addOne((label, translateArrayElemLabel(size, writeTo)))
+            }
+
+            buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
+            if (writeTo) buf += PopASM(ScratchRegs.head)
+            buf += MovASM(arrayLocation, ArrayPointer)
+            buf += CallASM(label) 
         }
-
-        buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
-        if (writeTo) buf += PopASM(ScratchRegs.head)
-        buf += MovASM(arrayLocation, ArrayPointer)
-        buf += CallASM(label)
 
     }
 
