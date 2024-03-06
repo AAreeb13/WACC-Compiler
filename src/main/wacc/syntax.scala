@@ -120,7 +120,7 @@ object ast {
     case class FstPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
     case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 
-    case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue
+    case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue with TypeCapture
     case class PairCons(fst: Expr, snd: Expr)(val pos: (Int, Int))            extends RValue
     case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
         var funcInfo: FuncInfo = null

@@ -80,12 +80,14 @@ object IR {
     case object ReadIntLabel  extends WrapperFuncLabel("_readi")
     case object ReadCharLabel extends WrapperFuncLabel("_readc")
     case object ExitWrapperLabel extends WrapperFuncLabel("_exit")
+    case object MallocWrapperLabel extends WrapperFuncLabel("_malloc")
 
     case object CheckNullLabel     extends WrapperFuncLabel("_errNull")
     case object CheckOverflowLabel extends WrapperFuncLabel("_errOverflow")
     case object CheckDivZeroLabel  extends WrapperFuncLabel("_errDivZero")
     case object CheckBoundLabel    extends WrapperFuncLabel("_boundsCheck")
     case object CheckBadCharLabel  extends WrapperFuncLabel("_errBadChar")
+    case object CheckOOMLabel     extends WrapperFuncLabel("_errOutOfMemory")
 
     case object ArrayStoreLabel  extends WrapperFuncLabel("_arrStore")
     case object ArrayStoreBLabel extends WrapperFuncLabel("_arrStoreB")

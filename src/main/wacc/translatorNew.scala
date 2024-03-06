@@ -345,7 +345,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateUnOp(unop: UnOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         unop match {
-            case node: Len => 
+            case Len(expr) => 
+                translateExpression(expr)
+                buf += MovASM(ScratchReg, R1) // can this be optimised out?
+                buf += MovsASM(RegisterImmediateOffset(R1, -sizeToInt(DWord)), ScratchReg, DWord)
+
             case Not(expr) =>
                 translateExpression(expr)
                 buf += CmpASM(TrueImm, ScratchReg) // idk if this one is necessary
@@ -404,7 +408,24 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateArrayLiteral(node: ArrayLiteral)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        // Implement translation for Free statement here
+        // Implement translation for Array Literals here
+        if (!funcMap.contains(MallocWrapperLabel)) {
+            funcMap.addOne((MallocWrapperLabel, translateMallocLabel))
+        }
+
+        val singleSize = semanticToSize(node.enclosingType)
+        val totalSize = sizeToInt(DWord) + singleSize * node.exprs.size
+        buf += MovASM(Imm(totalSize), ParamRegs.head, DWord)
+        buf += CallASM(MallocWrapperLabel)
+        buf += MovASM(ScratchReg, R11) // R11 = array register
+        buf += AddASM(Imm(sizeToInt(DWord)), R11, R11)
+        buf += MovASM(Imm(node.exprs.size), ScratchReg)
+        buf += MovASM(ScratchReg, RegisterImmediateOffset(R11, -sizeToInt(DWord)))
+        node.exprs.zipWithIndex.foreach { case (expr, index) =>
+            translateExpression(expr)
+            buf += MovASM(ScratchReg, RegisterImmediateOffset(R11, index * singleSize))
+        }
+        buf += MovASM(R11, ScratchReg)
     }
 
     def translatePairCons(node: PairCons)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -441,11 +462,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             }
         }
 
-        // val (src, dst) = if (writeTo) (ScratchReg, location)
-        //                  else         (location, ScratchReg)
-
-        // buf += MovASM(src, dst, size)
-        
     }
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -498,6 +514,23 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case other => other.toString
         })
 
+    def translateMallocLabel: ListBuffer[Line] = {
+        if (!funcMap.contains(CheckOOMLabel)) {
+            funcMap.addOne((CheckOOMLabel, translateOOMLabel))
+        }
+
+        ListBuffer(
+            PushASM(BasePointer),
+            MovASM(StackPointer, BasePointer),
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            CallASM(MallocLabel),
+            CmpASM(NullImm, ReturnReg),
+            JmpASM(CheckOOMLabel, Equal),
+            MovASM(BasePointer, StackPointer),
+            PopASM(BasePointer),
+            RetASM
+        )
+    }
 
     def translateExitLabel: ListBuffer[Line] = {
         ListBuffer(
@@ -606,7 +639,23 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     ////////////////// ERRORS ////////////////////
+    
+    def translateOOMLabel: ListBuffer[Line] = {
+        val errorLabel = StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n")
+        stringSet.addOne(errorLabel)
 
+        if (!funcMap.contains(PrintStrLabel)) {
+            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
+        }
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            CallASM(PrintStrLabel),
+            MovASM(Imm(-1), ParamRegs.head, Byte),
+            CallASM(ExitLabel)
+        )
+    }
 
     def translateOverflowLabel: ListBuffer[Line] = {
         val errorLabel = StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n")

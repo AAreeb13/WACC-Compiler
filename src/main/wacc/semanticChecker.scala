@@ -190,6 +190,7 @@ object semanticChecker {
                 case assignNew@AssignNew(declType, ident, rvalue) =>
                     // Checks for type matching and also that it is not already contained in current scope of symbol table
                     matchesType(checkRValue(rvalue), declType)(rvalue)
+                    //if (rvalue.isInstanceOf[ArrayLiteral]) rvalue.asInstanceOf[ArrayLiteral].enclosingType = declType  // I DONT THINK THIS IS A GOOD WAY TO DO IT
                     if (!currentScope.containsInCurrent(ident))
                         currentScope.addOne(ident, declType)
                     else {
@@ -215,7 +216,7 @@ object semanticChecker {
         def checkRValue(rvalue: RValue)(implicit currentScope: SymbolTable): SemType = {
             implicit val node: Node = rvalue
             rvalue match {
-                case ArrayLiteral(exprs) => 
+                case arrayLit@ArrayLiteral(exprs) => 
                     // Semantic check each expression then perform a fold to gain type ancestor
                     exprs.map(checkExpression(_)).fold(SemAny) {
                         case (acc, expType) if (acc reducesTo expType) => expType
@@ -227,7 +228,9 @@ object semanticChecker {
                     } match {
                         // In case of an error, return SemNone to signify otherwise return array type
                         case SemNone => SemNone
-                        case other => SemArray(other)
+                        case other =>
+                            arrayLit.enclosingType = other
+                            SemArray(other)
                     }
                     
                 case pairElem: PairElem => checkPair(pairElem)
