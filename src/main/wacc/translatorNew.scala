@@ -57,7 +57,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += MovASM(DefaultExitCode, ReturnReg)
         buf += PopASM(BasePointer)
         buf += RetASM
-        
 
         buf
     }
@@ -513,7 +512,29 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        // only 1D case, not nested yet
+        val location = node.lvalue match {
+            case Var(name) => st.getLocation(name).get
+            case _ => ???
+        }
+
+        val memReg = node match {
+            case _: FstPair => RegisterOffset(ScratchRegs.head)
+            case _: SndPair => RegisterImmediateOffset(ScratchRegs.head, 8)
+        }
         
+        val (src, dst) = if (writeTo) (ScratchRegs(1), memReg)
+                         else         (memReg, ScratchRegs.head)
+
+        if (!funcMap.contains(CheckNullLabel)) {
+            funcMap.addOne((CheckNullLabel, translateNullLabel))
+        }
+
+        if (writeTo) buf += MovASM(ScratchRegs(0), ScratchRegs(1))
+        buf += MovASM(location, ScratchRegs.head)
+        buf += CmpASM(NullImm, ScratchRegs.head)
+        buf += JmpASM(CheckNullLabel, Equal)
+        buf += MovASM(src, dst)
     }
 
 
