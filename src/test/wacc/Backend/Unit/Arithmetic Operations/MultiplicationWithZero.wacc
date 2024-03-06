@@ -1,0 +1,16 @@
+# MultiplicationWithZero
+
+# Output:
+# 0
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 29134092;
+  int y = 0;
+  int prod = x * y;
+  print prod
+end

@@ -1,0 +1,16 @@
+# MultiplicationWithOne
+
+# Output:
+# 15
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 15;
+  int y = 1;
+  int prod = x * y;
+  print prod
+end
