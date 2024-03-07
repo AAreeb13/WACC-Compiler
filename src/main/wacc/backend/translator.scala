@@ -925,8 +925,8 @@ and also to adjust its contents
             case SemBool =>
                 val trueLabel = JumpLabel(s".L${label.name}_true")
                 val falseLabel = JumpLabel(s".L${label.name}_false")
-                val trueStringLabel = StringLabel(s".L.${label.name}_string_true", fstring)
-                val falseStringLabel = StringLabel(s".L.${label.name}_string_false", fstring)
+                val trueStringLabel = StringLabel(s".L.${label.name}_string_true", "true")
+                val falseStringLabel = StringLabel(s".L.${label.name}_string_false", "false")
 
                 stringSet.addOne(trueStringLabel)
                 stringSet.addOne(falseStringLabel)
