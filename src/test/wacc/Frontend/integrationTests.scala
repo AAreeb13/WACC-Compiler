@@ -9,6 +9,7 @@ import java.io.File
 import java.nio.file.Files
 import scala.io.Source
 import globals._
+import semanticChecker.SemanticInfo
 
 
 class FrontendIntegrationTest extends AnyFlatSpec {
@@ -40,7 +41,7 @@ class FrontendIntegrationTest extends AnyFlatSpec {
             sb.append("\n\n")
         }
 
-        if (!(failed.isEmpty || ((expected == exitSemanticErr) && onlyTypeCheck))) {
+        if (!(failed.isEmpty || ((expected == exitSemanticErr) && semanticCheckOnly))) {
             fail(sb.toString())
         }
 
@@ -61,7 +62,7 @@ class FrontendIntegrationTest extends AnyFlatSpec {
     def compileSingle(path: String): (String, String, Int) = {
         val input = Source.fromFile(path).mkString
 
-        val syntaxResult = parser.parse(input).toEither
+        val syntaxResult = parser.parse(input)
 
         syntaxResult match {
             case Left(err) =>
@@ -77,7 +78,7 @@ class FrontendIntegrationTest extends AnyFlatSpec {
             case Left(err) =>
                 return (path, input ++ aBunchOfDashes(path) ++ err, exitSemanticErr)
 
-            case Right((ast, _)) => 
+            case Right(SemanticInfo(ast, _, _)) => 
                 return (path, ast.toString, exitSuccess)
         }    
 

@@ -31,7 +31,7 @@ import scala.util
   */
 
 object parser {
-    def parse(input: String): Either[String, Prog] = parser.parse(input).toEither
+    def parse(input: String): Either[String, Node] = parser.parse(input).toEither
 
     lazy val parser: Parsley[Prog] = fully(prog)
 

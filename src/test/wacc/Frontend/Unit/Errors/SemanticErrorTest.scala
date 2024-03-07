@@ -1,8 +1,9 @@
 package wacc.unit.errors
 
 import wacc.astFactory._
+import wacc.semAst._
 import wacc._
-import wacc.Implicits._
+import wacc.implicits._
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers._
