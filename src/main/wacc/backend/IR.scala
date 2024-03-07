@@ -2,6 +2,16 @@ package wacc
 
 import implicits.sizeToInt
 
+/*
+ * This file contains the Intermediate representaion for encapsulating
+ * all the necessary information needed to formulate the assembly code
+ * 
+ * It is generic, meaning it is platform independent
+ * This can be used to generate for any platform
+ * 
+ * It defines key information such as registers, operands, labels, conditions
+ */
+
 object IR {
     sealed trait Line
 

@@ -10,6 +10,16 @@ import semAst._
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 
+
+/*
+ * This function takes in the AST, function and symbol table and generates the IR code
+ * 
+ * @param semanticInfo SemanticInfo contains the AST, function and symbol table
+ * codeGenerator is only used when semantic check is successful, so SemanticInfo is always present
+ * @param targetConfig TODO
+ * @return The IR code
+ */
+ 
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
