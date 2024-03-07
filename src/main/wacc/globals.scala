@@ -17,4 +17,6 @@ object globals {
 
     var useDocker = false
     var useWSL = false
+
+    var passTests = true
 }
