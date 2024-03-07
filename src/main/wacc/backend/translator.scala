@@ -284,6 +284,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateBinOp(binop: BinOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        buf += Comment(s"Begin expression $binop")
         binop match {
             case op@ArithmeticOp(lhs, rhs) =>
                 translateExpression(rhs)
@@ -298,6 +299,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                         }
 
                         buf += CmpASM(Imm(0), ScratchRegs(1), DWord)
+                        buf += JmpASM(CheckDivZeroLabel, Equal)
                         buf += DivASM(ScratchRegs.head, ScratchRegs.head, ScratchRegs(1)) // note that first 2 args are ignored for x86
 
                         (divMod: @unchecked) match {
@@ -356,6 +358,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 
             case _ => println("This should never happen")
         }
+
+        buf += Comment(s"End expression")
     }
 
     def translateUnOp(unop: UnOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
