@@ -14,6 +14,7 @@ import scala.concurrent.blocking
 import java.io.ByteArrayOutputStream
 import wacc.globals._
 import scala.sys.process._
+import wacc.X86Config
 
 
 
@@ -217,11 +218,11 @@ class BackendIntegrationTest extends AnyFlatSpec {
     def assembleSingle(path: Path): FileContents = {
         val input = Source.fromFile(path).mkString
 
-        val syntaxResult = parser.parser.parse(input).toEither
-        val semanticResult = semanticChecker.verify(syntaxResult).toOption.get
-        val translateResult = codeGenerator.translate(semanticResult)
+        val syntaxResult = parser.parse(input)
+        val semanticResult = semanticChecker.verify(syntaxResult)
+        val translateResult = codeGenerator.generateAssembly(semanticResult, X86Config)
 
-        translateResult.merge
+        translateResult
     }
 
     /**

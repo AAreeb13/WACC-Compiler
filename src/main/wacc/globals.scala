@@ -15,5 +15,6 @@ object globals {
     var acceptInput = false
     var enableColours = true
 
-    var useDocker = true
+    var useDocker = false
+    var useWSL = false
 }
