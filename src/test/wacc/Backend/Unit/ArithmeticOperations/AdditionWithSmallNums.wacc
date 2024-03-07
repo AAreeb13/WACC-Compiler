@@ -1,0 +1,16 @@
+# AdditionWithSmallNums
+
+# Output:
+# 10
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 1;
+  int y = 9;
+  int sum = x + y;
+  print sum
+end

@@ -1,0 +1,16 @@
+# SubtractionWithZero
+
+# Output:
+# 10
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 10;
+  int y = 0;
+  int sub = x - y;
+  print sub
+end

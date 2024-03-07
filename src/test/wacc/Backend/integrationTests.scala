@@ -85,6 +85,10 @@ class BackendIntegrationTest extends AnyFlatSpec {
         performTests(examplesDir + "while") 
     }
 
+    // "Arithmetic Unit Tests" should "match assembler output and exit code" in {
+    //     performTests("src/test/wacc/Backend/Unit/ArithmeticOperations") 
+    // }
+
     def hasDocker: Boolean = System.getProperty("os.arch").equals("aarch64") 
     def hasWsl: Boolean = {
         try {

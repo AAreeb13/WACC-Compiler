@@ -1,0 +1,16 @@
+# DivisionWithSmallNums
+
+# Output:
+# 3
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 6;
+  int y = 2;
+  int q = x / y;
+  print q
+end

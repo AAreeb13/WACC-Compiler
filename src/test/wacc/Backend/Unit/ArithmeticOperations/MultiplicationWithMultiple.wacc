@@ -1,0 +1,19 @@
+# MultiplicationWithMultiple
+
+# Output:
+# 9677250
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int a = 30;
+  int b = 55;
+  int x = 15;
+  int y = 23;
+  int z = 17;
+  int prod = a * b * x * y * z;
+  print prod
+end

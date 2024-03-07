@@ -1,0 +1,16 @@
+# DivisionWithOne
+
+# Output:
+# 150
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 150;
+  int y = 1;
+  int q = x / y;
+  print q
+end

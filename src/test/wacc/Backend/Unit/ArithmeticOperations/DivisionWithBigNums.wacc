@@ -1,0 +1,16 @@
+# DivisionWithBigNums
+
+# Output:
+# -1000000000
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = -2000000000;
+  int y = 2;
+  int q = x / y;
+  print q
+end
