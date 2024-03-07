@@ -3,6 +3,9 @@ package wacc
 import IR._
 import X86Config._
 
+/*
+ * This object defines how the IR code is to be translated into the X86 ATT architecture asm code
+ */
 object X86Generator {
     def assemble(ir: List[Line]): String = {
         ir.map { l => 

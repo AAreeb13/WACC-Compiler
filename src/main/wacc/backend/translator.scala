@@ -11,6 +11,16 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 import globals._
 
+
+/*
+ * This function takes in the AST, function and symbol table and generates the IR code
+ * 
+ * @param semanticInfo SemanticInfo contains the AST, function and symbol table
+ * codeGenerator is only used when semantic check is successful, so SemanticInfo is always present
+ * @param targetConfig TODO
+ * @return The IR code
+ */
+ 
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
@@ -20,7 +30,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     var stringSet: HashSet[StringLabel] = HashSet.empty
     var funcMap: HashMap[FuncLabel, ListBuffer[Line]] = HashMap.empty
 
-
+    // Main entry point for translating the whole code into IR
     def translate(): List[Line] = {
         // Generate Header
 
@@ -38,6 +48,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         asmList.toList
     }
 
+    
     def translateProg(prog: Prog) = {
         // prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), ListBuffer.empty)))
         // funcMap.addOne((MainLabel, translateMain(prog)))

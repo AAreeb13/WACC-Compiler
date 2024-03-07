@@ -2,6 +2,15 @@ package wacc
 
 import IR._
 import scala.language.implicitConversions
+
+/*
+ * This class encapsulates key information 
+ * related to how registers, sizes and operations
+ * are represented within architectures
+ */
+
+
+
 abstract class TargetConfig {
     val ReturnReg: Register
     val StackPointer: Register
@@ -21,6 +30,11 @@ abstract class TargetConfig {
     implicit def sizeStr(size: Size): String
     implicit def flagStr(flag: Condition): String
 }
+
+/*
+ * This object specifies how registers, sizes and operations 
+ * are represented in x86 ATT architecutre
+ */
 
 case object X86Config extends TargetConfig {
 
