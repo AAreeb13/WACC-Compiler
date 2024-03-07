@@ -1,0 +1,16 @@
+# MultiplicationWithSmallNums
+
+# Output:
+# 10
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 5;
+  int y = 2;
+  int prod = x * y;
+  print prod
+end

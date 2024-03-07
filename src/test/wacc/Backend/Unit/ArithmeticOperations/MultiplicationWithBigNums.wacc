@@ -1,0 +1,16 @@
+# MultiplicationWithBigNums
+
+# Output:
+# -2000000000
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = -1000000000;
+  int y = 2;
+  int prod = x * y;
+  print prod
+end

@@ -1,0 +1,19 @@
+#SubtractionWithMultipleNums
+
+# Output:
+# -21000085
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int a = -30;
+  int b = 55;
+  int x = 1000000;
+  int y = 5000000;
+  int z = 15000000;
+  int sub = a - b - x - y - z;
+  print sub
+end

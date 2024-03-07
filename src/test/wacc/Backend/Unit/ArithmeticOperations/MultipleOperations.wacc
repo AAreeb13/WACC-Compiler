@@ -1,0 +1,19 @@
+# MultipleOperations
+
+# Output:
+# 1520
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int a = 30;
+  int b = 55;
+  int x = 100;
+  int y = 15000;
+  int z = 500;
+  int sum = a * b - x + y / z;
+  print sum
+end

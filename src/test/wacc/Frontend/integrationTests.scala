@@ -11,7 +11,7 @@ import scala.io.Source
 import globals._
 
 
-class IntegrationTest extends AnyFlatSpec {
+class FrontendIntegrationTest extends AnyFlatSpec {
     "Valid examples" should "compile successfully" in {
         runTests("wacc_examples/valid", exitSuccess) 
     }
@@ -40,7 +40,7 @@ class IntegrationTest extends AnyFlatSpec {
             sb.append("\n\n")
         }
 
-        if (!(failed.isEmpty || ((expected == exitSemanticErr) && !fullTypeCheck))) {
+        if (!(failed.isEmpty || ((expected == exitSemanticErr) && onlyTypeCheck))) {
             fail(sb.toString())
         }
 
@@ -61,23 +61,26 @@ class IntegrationTest extends AnyFlatSpec {
     def compileSingle(path: String): (String, String, Int) = {
         val input = Source.fromFile(path).mkString
 
-        var result = parser.parse(input).toEither
-        val ec = new SemanticErrorCollector(Some(path), input)
-        result match {
+        val syntaxResult = parser.parse(input).toEither
+
+        syntaxResult match {
             case Left(err) =>
                 return (path, input ++ aBunchOfDashes(path) ++ err, exitSyntaxErr)
 
             case Right(_) =>
-                result = semanticChecker.verify(result, Some(ec))
         }
 
-        result match {
+        val errorCollector = Some(new SemanticErrorCollector(Some(path), input))
+        val semanticResult = semanticChecker.verify(syntaxResult, errorCollector)
+
+        semanticResult match {
             case Left(err) =>
                 return (path, input ++ aBunchOfDashes(path) ++ err, exitSemanticErr)
 
-            case Right(output) =>
-                return (path, output.toString, exitSuccess)
-        }
+            case Right((ast, _)) => 
+                return (path, ast.toString, exitSuccess)
+        }    
+
     }
 
     def getAllFiles(dir: File): Array[File] = {

@@ -1,0 +1,19 @@
+# DivisionWithMultipleNums
+
+# Output:
+# 1
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int a = 2500;
+  int b = 50;
+  int x = 10;
+  int y = 5;
+  int z = 1;
+  int q = a / b / x / y / z;
+  print q
+end

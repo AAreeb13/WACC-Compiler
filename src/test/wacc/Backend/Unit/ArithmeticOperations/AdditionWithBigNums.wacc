@@ -1,0 +1,16 @@
+# AdditionWithBigNums
+
+# Output:
+# 2147483647
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int x = 2100000000;
+  int y = 47483647;
+  int sum = x + y;
+  print sum
+end

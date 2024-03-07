@@ -6,3 +6,6 @@
 target/
 project/
 wacc-compiler
+Dockerfile
+in.txt
+.DS_Store
