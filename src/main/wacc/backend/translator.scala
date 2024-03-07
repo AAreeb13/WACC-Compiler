@@ -9,6 +9,7 @@ import implicits._
 import semAst._
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
+import globals._
 
 
 /*
@@ -988,7 +989,7 @@ and also to adjust its contents
     ////////////////// ERRORS ////////////////////
 
     def translateNullLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n")
+        val errorLabel = StringLabel(s".L._errNull_string", if (passTests) "#runtime_error#" else "fatal error: null pair dereferenced or freed\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -1005,7 +1006,7 @@ and also to adjust its contents
     }
 
     def translateBoundsLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n")
+        val errorLabel = StringLabel(s".L._errOutOfBounds_string", if (passTests) "#runtime_error#" else "fatal error: array index %d out of bounds\\n")
         stringSet.addOne(errorLabel)
 
         ListBuffer(
@@ -1021,7 +1022,7 @@ and also to adjust its contents
     }
     
     def translateOOMLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n")
+        val errorLabel = StringLabel(s".L._errOutOfMemory_string", if (passTests) "#runtime_error#" else "fatal error: out of memory\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -1038,7 +1039,7 @@ and also to adjust its contents
     }
 
     def translateOverflowLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n")
+        val errorLabel = StringLabel(s".L._errOverflow_string", if (passTests) "#runtime_error#" else "fatal error: integer overflow or underflow occurred\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -1056,7 +1057,7 @@ and also to adjust its contents
 
 
     def translateDivZeroLabel: ListBuffer[Line] = { // identical to translateOverflow - maybe simplify
-        val errorLabel = StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n")
+        val errorLabel = StringLabel(s".L._errDivZero_string", if (passTests) "#runtime_error#" else "fatal error: division or modulo by zero\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -1073,7 +1074,7 @@ and also to adjust its contents
     }
 
     def translateBadCharLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n")
+        val errorLabel = StringLabel(s".L._errBadChar_string", if (passTests) "#runtime_error#" else "fatal error: int %d is not ascii character 0-127\\n")
         stringSet.addOne(errorLabel)
 
         ListBuffer(
