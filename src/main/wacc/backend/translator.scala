@@ -30,7 +30,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     var stringSet: HashSet[StringLabel] = HashSet.empty
     var funcMap: HashMap[FuncLabel, ListBuffer[Line]] = HashMap.empty
 
-
+    // Main entry point for translating the whole code into IR
     def translate(): List[Line] = {
         // Generate Header
 
@@ -48,6 +48,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         asmList.toList
     }
 
+    
     def translateProg(prog: Prog) = {
         // prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), ListBuffer.empty)))
         // funcMap.addOne((MainLabel, translateMain(prog)))
