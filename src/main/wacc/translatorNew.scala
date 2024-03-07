@@ -600,35 +600,160 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
   }
     */
 
-    def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        // only 1D case, not nested yet
-        val location = node.lvalue match {
-            case Var(name) => st.getLocation(name).get
-            case _ => ???
+    def getPairAddress(lvalue: LValue)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        lvalue match {
+            case Var(name) => 
+                buf += MovASM(st.getLocation(name).get, ScratchRegs.head)
+            case node@ArrayVal(name, exprs)  =>
+                buf += MovASM(st.getLocation(name).get, ScratchRegs.head)   // memory location of array saved to RAX
+                exprs.zipWithIndex.foreach { case (expr, index) =>
+                    val size = if (index == exprs.size - 1) semanticToSize(node.enclosingType) else QWord
+                    val loadLabel = ArrayLoadLabel(size)
+
+                    if (!funcMap.contains(loadLabel)) {
+                        funcMap.addOne((loadLabel, translateArrayElemLabel(size, false)))
+                    }
+
+                    buf += PushASM(ScratchRegs.head) // save previous location
+                    translateExpression(expr)        // translate expression
+                    buf += MovASM(ScratchRegs.head, IndexPointer, DWord) // move result of expression to index pointer
+
+                    buf += PopASM(ArrayPointer)
+                    // buf += PopASM(ScratchRegs.head)
+                    // buf += MovASM(RegisterOffset(ScratchRegs.head), ArrayPointer)      // save previous location to array pointer
+                    buf += CallASM(loadLabel)
+                }
+            case p@PairElem(lvalue) =>
+                getPairAddress(lvalue)
+
+                if (!funcMap.contains(CheckNullLabel)) {
+                    funcMap.addOne((CheckNullLabel, translateNullLabel))
+                }
+
+                buf += CmpASM(NullImm, ScratchRegs.head)
+                buf += JmpASM(CheckNullLabel, Equal)
+                
+                p match {
+                    // dereference the inner pointer to get the inner lvalue
+                    case _: FstPair => buf += MovASM(RegisterOffset(ScratchRegs.head), ScratchRegs.head)
+                    case _: SndPair => buf += MovASM(RegisterImmediateOffset(ScratchRegs.head, 8), ScratchRegs.head)
+                }
+            case _ =>
+        }
+    }
+
+    // fst x[2]
+    // the heap address is stored in rax
+    /*
+    arrLoad loads the value of the operand and stores the value held in Rax
+    we want it to return a pointer to the location of the array value
+
+    pre: 
+    we know that this is only called by pairs. Everything is a pointer.
+    */
+    def getLValueAddress(lvalue: LValue)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        (lvalue: @unchecked) match {
+            case node@ArrayVal(name, exprs) => 
+                buf += LeaASM(st.getLocation(name).get, ScratchRegs.head)   // memory location of array saved to RAX
+                exprs.zipWithIndex.foreach { case (expr, index) =>
+                    val size = if (index == exprs.size - 1) semanticToSize(node.enclosingType) else QWord
+                    val loadLabel = ArrayLoadLabel(size)
+
+                    if (!funcMap.contains(loadLabel)) {
+                        funcMap.addOne((loadLabel, translateArrayElemLabel(size, false)))
+                    }
+
+                    buf += PushASM(ScratchRegs.head) // save previous location
+                    translateExpression(expr)        // translate expression
+                    buf += MovASM(ScratchRegs.head, IndexPointer, DWord) // move result of expression to index pointer
+
+                    buf += PopASM(ArrayPointer)
+                    // buf += PopASM(ScratchRegs.head)
+                    // buf += MovASM(RegisterOffset(ScratchRegs.head), ArrayPointer)      // save previous location to array pointer
+                    buf += CallASM(loadLabel)
+                }
+
+/*
+leaq <mem> <reg>
+the value of reg is memory address itself
+dereference reg to get the value of what is held in mem
+and also to adjust its contents
+*/
+            case p@PairElem(lvalue) =>
+                getLValueAddress(lvalue) // address of the inner LValue is stored in RAX
+                buf += MovASM(RegisterOffset(ScratchRegs.head), ScratchRegs.head)
+
+                // doesn't hurt to put here, although currently only called by translatePairElem which adds this anyway by default
+                if (!funcMap.contains(CheckNullLabel)) {
+                    funcMap.addOne((CheckNullLabel, translateNullLabel))
+                }
+
+                buf += CmpASM(NullImm, ScratchRegs.head)
+                buf += JmpASM(CheckNullLabel, Equal)
+                
+                p match {
+                    // dereference the inner pointer to get the inner lvalue
+                    case _: FstPair => 
+                    case _: SndPair => buf += AddASM(Imm(sizeToInt(QWord)), ScratchRegs.head, ScratchRegs.head)
+                }
+
+            case Var(name) =>
+                // -4(%rbp) -> %rax
+                buf += LeaASM(st.getLocation(name).get, ScratchRegs.head)
         }
 
-        val memReg = node match {
-            case _: FstPair => RegisterOffset(ScratchRegs.head)
-            case _: SndPair => RegisterImmediateOffset(ScratchRegs.head, 8)
-        }
-        
-        val (src, dst) = if (writeTo) (ScratchRegs(1), memReg)
-                         else         (memReg, ScratchRegs.head)
+    }
+
+    // nested pair: fst fst p
+    def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        // only 1D case, not nested yet
+        /*
+        If is not a variable, then the location is stored on the heap.
+        We need a way to find what the location is for the inner pair elem
+
+        So far translating anything doesn't return anything, it 
+        */
 
         if (!funcMap.contains(CheckNullLabel)) {
             funcMap.addOne((CheckNullLabel, translateNullLabel))
         }
 
+        // Rax contains (heap) address
+        // Rbx contains the value to overwrite with
+        
+        val memLocation = RegisterOffset(ScratchRegs(0))
+        val (src, dst) = if (writeTo) (ScratchRegs(1), memLocation)
+                         else         (memLocation, ScratchRegs(0))
+
+        if (writeTo) buf += PushASM(ScratchRegs.head)
+        getPairAddress(node)
+        if (writeTo) buf += PopASM(ScratchRegs(1))
+
         buf += Comment(s"Begin Pair Elem $node")
 
-        if (writeTo) buf += MovASM(ScratchRegs(0), ScratchRegs(1))
-        buf += MovASM(location, ScratchRegs.head)
-        buf += CmpASM(NullImm, ScratchRegs.head)
-        buf += JmpASM(CheckNullLabel, Equal)
+        // buf += CmpASM(NullImm, memLocation)
+        // buf += JmpASM(CheckNullLabel, Equal)
         buf += MovASM(src, dst)
 
         buf += Comment(s"End Pair Elem")
     }
+
+    def translatePairElem2(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        if (!funcMap.contains(CheckNullLabel)) {
+            funcMap.addOne((CheckNullLabel, translateNullLabel))
+        }
+        
+        val memLocation = ScratchRegs(0)
+        val (src, dst) = if (writeTo) (ScratchRegs(1), memLocation)
+                         else         (memLocation, ScratchRegs(0))
+
+        if (writeTo) buf += PushASM(ScratchRegs.head)
+        getPairAddress(node)
+        if (writeTo) buf += PopASM(ScratchRegs(1))
+
+        buf += MovASM(src, dst)
+    }
+    
 
 
     def translateFunction(func: Func)(implicit buf: ListBuffer[Line] = ListBuffer.empty): ListBuffer[Line] = {

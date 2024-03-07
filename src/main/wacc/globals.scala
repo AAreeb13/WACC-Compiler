@@ -11,7 +11,7 @@ object globals {
 
     var syntaxCheckOnly = false
     var semanticCheckOnly = false
-    var executeAssembly = true
+    var executeAssembly = false
     var acceptInput = false
     var enableColours = true
 
