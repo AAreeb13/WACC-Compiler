@@ -30,10 +30,20 @@ class BackendIntegrationTest extends AnyFlatSpec {
 
     val examplesDir = "wacc_examples/valid/"
     val asmDir = "backend_output"
+    val executionTimeout: Long = 2
 
     /**
       * Compiles all the files in a given path
       */
+
+    "Valid scope examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "scope") 
+    }
+
+    "Valid function examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "function") 
+    }
+
     "Valid IO examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "IO") 
     }
@@ -46,16 +56,14 @@ class BackendIntegrationTest extends AnyFlatSpec {
         performTests(examplesDir + "array") 
     }
 
+    // everything should work from this point on
+
     "Valid basic examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "basic") 
     }
 
     "Valid expressions examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "expressions") 
-    }
-
-    "Valid function examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "function") 
     }
 
     "Valid if examples" should "match assembler output and exit code" in {
@@ -68,10 +76,6 @@ class BackendIntegrationTest extends AnyFlatSpec {
 
     "Valid runtimeErr examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "runtimeErr") 
-    }
-
-    "Valid scope examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "scope") 
     }
 
     "Valid sequence examples" should "match assembler output and exit code" in {
@@ -100,7 +104,6 @@ class BackendIntegrationTest extends AnyFlatSpec {
         }
     }
 
-
     def performTests(dir: Path) = {
         val assembledFiles = assembleAll(dir)
 
@@ -117,14 +120,22 @@ class BackendIntegrationTest extends AnyFlatSpec {
             runCommand(Seq("docker", "run", "-di", "--platform", "linux/amd64", "--name", "my-container", "my-x86-image"))
         }
 
+        val totalCount = assembledFiles.size
+        counter = 0
+
         val failed = assembledFiles.map { case fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)) =>
             // gcc -x assembler - -z noexecstack -o out (input is piped so no need to create .s file)
+            displayProgress(examplePath, totalCount)
             runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
-
             val outStream = new ByteArrayOutputStream 
             val actualExit = runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
-            val actualOut: Output = outStream.toString().split("\n").toList.filter(!_.isEmpty()) // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
+            val actualOut: Output = outStream.toString().split("\n").toList.filter(!_.isEmpty()).map { s =>
+                if (s.startsWith("0x")) s.replaceFirst("\\S+", "#addrs#")
+                else if (s.startsWith("fatal")) "#runtime_error#"
+                else s
+            } // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
 
+            
             (examplePath, asmOutput, in, expectedOut, expectedExit, actualOut, actualExit)
         }.filter { case (_, _, _, expectedOut, expectedExit, actualOut, actualExit) =>
             !((actualExit == expectedExit) && (actualOut.equals(expectedOut))) 
@@ -147,7 +158,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
             sb.append(s"\nActual exit: ${actualExit}")
             sb.append(s"\nExpected exit: ${expectedExit}")
             sb.append(s"\nSupplied Input: ${in}")
-            sb.append(s"\nAssembler Output:\n${asmRaw}\n")
+            // sb.append(s"\nAssembler Output:\n${asmRaw}\n")
         }
 
         if (!(failed.isEmpty)) {
@@ -158,9 +169,58 @@ class BackendIntegrationTest extends AnyFlatSpec {
         }
     }
 
+    var counter = 0;
+
+    // def displayProgress(fileName: String, totalCount: Int): Unit = {
+    //     counter += 1
+    //     val bar = "====================="
+    //     var progressBar = ""
+    //     var countUp = 0
+    //     while (countUp < counter) {
+    //         progressBar += "-"
+    //         countUp += totalCount / 20
+    //     }
+    
+    //     for (i <- 0 to 4) {
+    //         print("\u001b[2K") // Clear the line
+    //         print("\u001b[1A") // Move cursor up one line
+    //         print("\r") // move left
+    //     }
+
+    //     println(bar)
+    //     println(Console.GREEN_B + Console.INVISIBLE + progressBar + Console.RESET)
+    //     println(bar)
+    //     println(s"($counter/$totalCount) $fileName")
+    //     println()
+    // }
+
+    def displayProgress(fileName: String, totalCount: Int): Unit = {
+        val progressBarWidth = 50
+        counter += 1
+
+        // Calculate progress percentage
+        val progressPercentage = (counter.toDouble / totalCount.toDouble) * 100
+
+        // Calculate number of characters to represent progress in the progress bar
+        val progressChars = (progressPercentage / 100 * progressBarWidth).toInt
+
+        // Build progress bar string
+        val progressBar = "[" + "#" * progressChars + " " * (progressBarWidth - progressChars) + "]"
+
+        // Print progress information
+        //println(s"\rProgress: $progressBar ($counter/$totalCount)")
+        println(s"Processing: $fileName ($counter/$totalCount)\r")
+        
+        if (counter == totalCount) {
+            println() // Print newline when progress is completed
+        }
+
+        Console.out.flush()
+    }
+
     def runCustomCommand(command: Seq[String],
-                             inp: Array[Byte] = Array.emptyByteArray,
-                             pout: ByteArrayOutputStream = new ByteArrayOutputStream): Int = {
+                         inp: Array[Byte] = Array.emptyByteArray,
+                         pout: ByteArrayOutputStream = new ByteArrayOutputStream): Int = {
         if (useDocker) {
             runCommand(Seq("docker", "exec", "-i", "my-container") ++ command, inp, pout)
         } else if (useWSL) {
@@ -177,7 +237,8 @@ class BackendIntegrationTest extends AnyFlatSpec {
         blocking(p.getOutputStream.write(inp))
         p.getOutputStream.close()
         blocking(pout.write(p.getInputStream().readAllBytes()))
-        blocking(p.waitFor())
+        blocking(if (p.waitFor(executionTimeout, java.util.concurrent.TimeUnit.SECONDS)) p.destroy())
+        blocking(p.exitValue())
     }
 
     def assembleAll(path: String): List[FileInfo] = {
@@ -240,7 +301,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
         try {
             val fileContents = Source.fromFile(path).getLines()
 
-            val inputRegex = "# Input: [^\\s]+".r
+            val inputRegex = "# Input: .+".r
             val exitRegex = "# \\d+".r
             val outputRegex = "# .+".r
 

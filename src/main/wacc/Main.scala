@@ -115,8 +115,9 @@ object Main {
             println(errStream.toString())
         } else {
             val outStream = new ByteArrayOutputStream
-            val inStream = if (acceptInput) Source.stdin.map(_.toByte).toArray else Array.emptyByteArray
-            val actualExit = runCustomCommand(Seq("./out"), inStream, outStream)
+            val inArray = if (acceptInput) scala.io.StdIn.readLine().getBytes else Array.emptyByteArray
+            //val inArray = if (acceptInput) Source.stdin.map(_.toByte).toArray else Array.emptyByteArray
+            val actualExit = runCustomCommand(Seq("./out"), inArray, outStream)
             println("Output:")
             println(outStream.toString())
             println(s"Executable finished with exit code $actualExit")

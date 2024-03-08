@@ -177,7 +177,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateRead(node: Read)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Read statement here
         val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
-            case SemChar => (ReadCharLabel, "%c")
+            case SemChar => (ReadCharLabel, " %c")
             case SemInt => (ReadIntLabel, "%d")
         }
 
@@ -185,7 +185,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne(wrapperLabel, translateReadLabel(wrapperLabel, fstring, semanticToSize(node.enclosingType)))
         }
 
+        // get the lvalue
+        translateLValue(node.lvalue)
+        buf += MovASM(ScratchRegs.head, ParamRegs.head)
         buf += CallASM(wrapperLabel)
+        translateLValue(node.lvalue, true)
     }
 
     def translateWhile(node: While)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -635,7 +639,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case '\u0000' => "\\\u0000"
             case '\\' => "\\\\"
             case '\"' => "\\\""
-            case '\'' => "\\\'"
             case '\n' => "\\n"
             case '\t' => "\\t"
             case '\f' => "\\f"
@@ -831,7 +834,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     ////////////////// ERRORS ////////////////////
 
     def translateNullLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errNull_string", if (passTests) "#runtime_error#" else "fatal error: null pair dereferenced or freed\\n")
+        val errorLabel = StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -848,7 +851,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateBoundsLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfBounds_string", if (passTests) "#runtime_error#" else "fatal error: array index %d out of bounds\\n")
+        val errorLabel = StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n")
         stringSet.addOne(errorLabel)
 
         ListBuffer(
@@ -864,7 +867,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
     
     def translateOOMLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfMemory_string", if (passTests) "#runtime_error#" else "fatal error: out of memory\\n")
+        val errorLabel = StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -881,7 +884,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateOverflowLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOverflow_string", if (passTests) "#runtime_error#" else "fatal error: integer overflow or underflow occurred\\n")
+        val errorLabel = StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -899,7 +902,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
 
     def translateDivZeroLabel: ListBuffer[Line] = { // identical to translateOverflow - maybe simplify
-        val errorLabel = StringLabel(s".L._errDivZero_string", if (passTests) "#runtime_error#" else "fatal error: division or modulo by zero\\n")
+        val errorLabel = StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n")
         stringSet.addOne(errorLabel)
 
         if (!funcMap.contains(PrintStrLabel)) {
@@ -916,7 +919,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateBadCharLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errBadChar_string", if (passTests) "#runtime_error#" else "fatal error: int %d is not ascii character 0-127\\n")
+        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n")
         stringSet.addOne(errorLabel)
 
         ListBuffer(
