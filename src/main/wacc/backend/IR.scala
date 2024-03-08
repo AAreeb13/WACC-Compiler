@@ -173,6 +173,11 @@ object IR {
 
     case class Comment(contents: String) extends Line
 
+    object Comment {
+        def apply(contents: String): Comment = 
+            Comment(utils.toRaw(contents, false))
+    }
+
     sealed trait Tag extends Line
     case object TextTag   extends Tag
     case object GlobalTag extends Tag
