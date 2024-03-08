@@ -593,7 +593,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 }
 
             case Var(name) =>
-                buf += LeaASM(st.getLocation(name).get, ScratchRegs.head)
+                st.getLocation(name).get match {
+                    case mem: Memory => buf += LeaASM(mem, ScratchRegs.head)
+                    case reg: Register => buf += MovASM(reg, ScratchRegs.head)
+                }
         }
 
     }

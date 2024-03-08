@@ -12,7 +12,14 @@ object X86Generator {
             l match {
                 case StringLabel(name, value) => s"\t.int ${value.length}\n${name}:\n\t.asciz \"${value}\""
                 case label: Label => s"${label.name}:"
-                case tag: Tag => s".${tag.name}"
+                case tag: Tag =>
+                    val prefix = "."
+                    val name = tag match {
+                        case TextTag => "text"
+                        case GlobalTag => "globl"
+                        case ReadonlyTag => "section .readonly"
+                    }
+                    s"$prefix$name"
                 case other =>
                     val repr = other match {
                         case Comment(contents) => s"# ${utils.toRaw(contents)}"
