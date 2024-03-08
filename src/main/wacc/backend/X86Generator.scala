@@ -15,7 +15,7 @@ object X86Generator {
                 case tag: Tag => s".${tag.name}"
                 case other =>
                     val repr = other match {
-                        case Comment(contents) => s"# $contents"
+                        case Comment(contents) => s"# ${utils.toRaw(contents)}"
                         case MovASM(src, dst, flag, size) => flag match {
                             case Unconditional => s"mov${sizeStr(size)} ${opStr(src)(size)}, ${opStr(dst)(size)}"
                             case other => s"cmov${flagStr(flag)} ${opStr(src)(size)}, ${opStr(dst)(size)}"
