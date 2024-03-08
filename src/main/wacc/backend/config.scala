@@ -16,6 +16,7 @@ abstract class TargetConfig {
     val StackPointer: Register
     val BasePointer: Register
     val ArrayPointer: Register
+    val ArrayPointerPointer: Register
     val IndexPointer: Register
     val ScratchRegs: List[Register]
     val InstructionPointer: Register
@@ -71,6 +72,8 @@ case object X86Config extends TargetConfig {
     val Rip = PC
 
     override val ArrayPointer: Register = R9
+    
+    override val ArrayPointerPointer: Register = R15
 
     override val IndexPointer: Register = R10
 

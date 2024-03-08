@@ -170,5 +170,6 @@ object IR {
     val AlignmentMaskImm = Imm(-16)
     val ReadOffsetImm = Imm(16)
     val DefaultExitCode = Imm(0)
+    val ExitFailureImm = Imm(-1)
 
 }

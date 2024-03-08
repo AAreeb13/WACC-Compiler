@@ -126,14 +126,18 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateAssign(node: Assign)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Assign statement here
+        buf += Comment(s"Begin Assign $node")
         translateRValue(node.rvalue)
         translateLValue(node.lvalue, true)
+        buf += Comment(s"End Assign")
     }
 
     def translateDeclaration(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
+        buf += Comment(s"Begin Declaration $node")
         translateRValue(node.rvalue)
         assignLocation(node)
+        buf += Comment(s"End Declaration")
     }
 
     def assignLocation(node: Declarable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -512,13 +516,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        /*
-        Need to unwrap array one by one
-        Only call store on the last label
-        Store result of array load in array pointer (Rax -> R9)
-        Get array location
-        */
-
+        
         var location = st.getLocation(node.v).get
         var innerSize = semanticToSize(node.enclosingType)
 
@@ -554,149 +552,14 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     }
 
-    /*
-    /**
-  * Retrieves the address of a pair element, performing null checks and potentially dereferencing the pointer.
-  * Supports accessing the first or second element of a pair variable or an expression.
-  * @param x The pair element (first or second) to be accessed.
-  * @param st The symbol table for current scope variable and type information.
-  * @param target The list of assembly instructions being generated.
-  * @param dereference Indicates whether the address should be dereferenced to obtain the value.
-  * @return The type of the element accessed, or ErrorType in case of an array element access attempt.
-  */
-  def getPairElemAddr(x: PairElem, st: symbolTable, target: ListBuffer[ASMInstr], dereference: Boolean): Type = {
-    x match {
-        case FstPairElem(f) => f match {
-          case PairLValue(p)   => {
-            val t = getPairElemAddr(p, st, target, dereference)
-            target += Mov(RETURN_REG, MemAddr(RETURN_REG), 8)
-            t
-          }
-          case VarLValue(v)    => {
-            val (PairType(t, _), _, Some(mem)) = st.lookupAllIR(v.str).get
-            target += Mov(SCRATCH_REG_1, mem, 8)
-            target += Cmp(SCRATCH_REG_1, ImmVal(0), 8)
-            target += Jump(Comp.Eq, LabelCall("_nullNaughtiness"))
-            addNullDereferenceLabel()
-            if (dereference) {
-              target += Mov(RETURN_REG, MemAddr(SCRATCH_REG_1), 8)
-            } else {
-              target += Mov(RETURN_REG, SCRATCH_REG_1, 8)
-            }
-            t
-          }
-          case ArrLValue(ArrElem(v, ls)) => ErrorType.default
-        }
-
-
-      case SndPairElem(f) => f match {
-          case PairLValue(p)   => {
-            val t = getPairElemAddr(p, st, target, dereference)
-            target += AddInstr(RETURN_REG, ImmVal(8), 8)
-            target += Mov(RETURN_REG, MemAddr(RETURN_REG), 8)
-            t
-          }
-          case VarLValue(v)    => {
-            val (PairType(_, t), _, Some(mem)) = st.lookupAllIR(v.str).get
-            target += Mov(SCRATCH_REG_1, mem, 8)
-            target += Cmp(SCRATCH_REG_1, ImmVal(0), 8)
-            target += Jump(Comp.Eq, LabelCall("_nullNaughtiness"))
-            addNullDereferenceLabel()
-            if (dereference) {
-              target += Mov(RETURN_REG, MemAddr(SCRATCH_REG_1, 8), 8)
-            } else {
-              target += Mov(RETURN_REG, SCRATCH_REG_1, 8)
-              target += AddInstr(RETURN_REG, ImmVal(8), 8)
-            }
-            t
-          }
-          case ArrLValue(ArrElem(v, ls)) => ErrorType.default
-        }
-    }
-  }
-    */
-
     def getPairAddress(lvalue: LValue)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        lvalue match {
-            case Var(name) => 
-                buf += MovASM(st.getLocation(name).get, ScratchRegs.head)
-            case node@ArrayVal(name, exprs)  =>
-                buf += MovASM(st.getLocation(name).get, ScratchRegs.head)   // memory location of array saved to RAX
-                exprs.zipWithIndex.foreach { case (expr, index) =>
-                    val size = if (index == exprs.size - 1) semanticToSize(node.enclosingType) else QWord
-                    val loadLabel = ArrayLoadLabel(size)
-
-                    if (!funcMap.contains(loadLabel)) {
-                        funcMap.addOne((loadLabel, translateArrayElemLabel(size, false)))
-                    }
-
-                    buf += PushASM(ScratchRegs.head) // save previous location
-                    translateExpression(expr)        // translate expression
-                    buf += MovASM(ScratchRegs.head, IndexPointer, DWord) // move result of expression to index pointer
-
-                    buf += PopASM(ArrayPointer)
-                    // buf += PopASM(ScratchRegs.head)
-                    // buf += MovASM(RegisterOffset(ScratchRegs.head), ArrayPointer)      // save previous location to array pointer
-                    buf += CallASM(loadLabel)
-                }
-            case p@PairElem(lvalue) =>
-                getPairAddress(lvalue)
-
-                if (!funcMap.contains(CheckNullLabel)) {
-                    funcMap.addOne((CheckNullLabel, translateNullLabel))
-                }
-
-                buf += CmpASM(NullImm, ScratchRegs.head)
-                buf += JmpASM(CheckNullLabel, Equal)
-                
-                p match {
-                    // dereference the inner pointer to get the inner lvalue
-                    case _: FstPair => buf += MovASM(RegisterOffset(ScratchRegs.head), ScratchRegs.head)
-                    case _: SndPair => buf += MovASM(RegisterImmediateOffset(ScratchRegs.head, 8), ScratchRegs.head)
-                }
-            case _ =>
-        }
-    }
-
-    // fst x[2]
-    // the heap address is stored in rax
-    /*
-    arrLoad loads the value of the operand and stores the value held in Rax
-    we want it to return a pointer to the location of the array value
-
-    pre: 
-    we know that this is only called by pairs. Everything is a pointer.
-    */
-    def getLValueAddress(lvalue: LValue)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         (lvalue: @unchecked) match {
             case node@ArrayVal(name, exprs) => 
-                buf += LeaASM(st.getLocation(name).get, ScratchRegs.head)   // memory location of array saved to RAX
-                exprs.zipWithIndex.foreach { case (expr, index) =>
-                    val size = if (index == exprs.size - 1) semanticToSize(node.enclosingType) else QWord
-                    val loadLabel = ArrayLoadLabel(size)
+                translateArrayElem(node)
+                buf += MovASM(ArrayPointerPointer, ScratchRegs.head) // super bad sorry
 
-                    if (!funcMap.contains(loadLabel)) {
-                        funcMap.addOne((loadLabel, translateArrayElemLabel(size, false)))
-                    }
-
-                    buf += PushASM(ScratchRegs.head) // save previous location
-                    translateExpression(expr)        // translate expression
-                    buf += MovASM(ScratchRegs.head, IndexPointer, DWord) // move result of expression to index pointer
-
-                    buf += PopASM(ArrayPointer)
-                    // buf += PopASM(ScratchRegs.head)
-                    // buf += MovASM(RegisterOffset(ScratchRegs.head), ArrayPointer)      // save previous location to array pointer
-                    buf += CallASM(loadLabel)
-                }
-
-/*
-leaq <mem> <reg>
-the value of reg is memory address itself
-dereference reg to get the value of what is held in mem
-and also to adjust its contents
-*/
             case p@PairElem(lvalue) =>
-                getLValueAddress(lvalue) // address of the inner LValue is stored in RAX
+                getPairAddress(lvalue)
                 buf += MovASM(RegisterOffset(ScratchRegs.head), ScratchRegs.head)
 
                 // doesn't hurt to put here, although currently only called by translatePairElem which adds this anyway by default
@@ -708,69 +571,35 @@ and also to adjust its contents
                 buf += JmpASM(CheckNullLabel, Equal)
                 
                 p match {
-                    // dereference the inner pointer to get the inner lvalue
                     case _: FstPair => 
                     case _: SndPair => buf += AddASM(Imm(sizeToInt(QWord)), ScratchRegs.head, ScratchRegs.head)
                 }
 
             case Var(name) =>
-                // -4(%rbp) -> %rax
                 buf += LeaASM(st.getLocation(name).get, ScratchRegs.head)
         }
 
     }
 
-    // nested pair: fst fst p
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        // only 1D case, not nested yet
-        /*
-        If is not a variable, then the location is stored on the heap.
-        We need a way to find what the location is for the inner pair elem
-
-        So far translating anything doesn't return anything, it 
-        */
-
         if (!funcMap.contains(CheckNullLabel)) {
             funcMap.addOne((CheckNullLabel, translateNullLabel))
         }
-
-        // Rax contains (heap) address
-        // Rbx contains the value to overwrite with
         
         val memLocation = RegisterOffset(ScratchRegs(0))
         val (src, dst) = if (writeTo) (ScratchRegs(1), memLocation)
                          else         (memLocation, ScratchRegs(0))
 
+        buf += Comment(s"Begin Pair Elem $node")
+
         if (writeTo) buf += PushASM(ScratchRegs.head)
         getPairAddress(node)
         if (writeTo) buf += PopASM(ScratchRegs(1))
 
-        buf += Comment(s"Begin Pair Elem $node")
-
-        // buf += CmpASM(NullImm, memLocation)
-        // buf += JmpASM(CheckNullLabel, Equal)
         buf += MovASM(src, dst)
 
         buf += Comment(s"End Pair Elem")
     }
-
-    def translatePairElem2(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        if (!funcMap.contains(CheckNullLabel)) {
-            funcMap.addOne((CheckNullLabel, translateNullLabel))
-        }
-        
-        val memLocation = ScratchRegs(0)
-        val (src, dst) = if (writeTo) (ScratchRegs(1), memLocation)
-                         else         (memLocation, ScratchRegs(0))
-
-        if (writeTo) buf += PushASM(ScratchRegs.head)
-        getPairAddress(node)
-        if (writeTo) buf += PopASM(ScratchRegs(1))
-
-        buf += MovASM(src, dst)
-    }
-    
-
 
     def translateFunction(func: Func)(implicit buf: ListBuffer[Line] = ListBuffer.empty): ListBuffer[Line] = {
         // init variables
@@ -849,8 +678,9 @@ and also to adjust its contents
 
         val (src, dst) = if (store) (ScratchRegs.head, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size))
                          else (RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ScratchRegs.head)
-
-        ListBuffer(
+        
+        
+        val buf: ListBuffer[Line] = ListBuffer(
             Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, ${if (store) "value to store in" else "and return into"} ${ScratchRegs.head}"),
             PushASM(ScratchRegs(1)),
             CmpASM(Imm(0), IndexPointer, DWord),
@@ -860,11 +690,18 @@ and also to adjust its contents
             CmpASM(ScratchRegs(1), IndexPointer, DWord),
             MovASM(IndexPointer, ParamRegs(1), GreaterEqual),
             JmpASM(CheckBoundsLabel, GreaterEqual),
+        )
+
+        if (!store) buf += LeaASM(RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ArrayPointerPointer)
+
+        buf ++= ListBuffer(
             if (store || size == QWord) MovASM(src, dst, size)
             else MovsASM(src, dst, size),
             PopASM(ScratchRegs(1)),
             RetASM
         )
+
+        buf
     }
 
     def translateMallocLabel: ListBuffer[Line] = {
@@ -1005,7 +842,7 @@ and also to adjust its contents
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
             LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
-            MovASM(Imm(-1), ParamRegs.head, Byte),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
         )
     }
@@ -1021,7 +858,7 @@ and also to adjust its contents
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
             CallASM(FileFlush),
-            MovASM(Imm(-1), ParamRegs.head, Byte),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
         )
     }
@@ -1038,7 +875,7 @@ and also to adjust its contents
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
             LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
-            MovASM(Imm(-1), ParamRegs.head, Byte),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
         )
     }
@@ -1055,7 +892,7 @@ and also to adjust its contents
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
             LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
-            MovASM(Imm(-1), ParamRegs.head, Byte),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
         )
     }
@@ -1073,7 +910,7 @@ and also to adjust its contents
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
             LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
-            MovASM(Imm(-1), ParamRegs.head, Byte),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
         )
     }
@@ -1089,7 +926,7 @@ and also to adjust its contents
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
             CallASM(FileFlush),
-            MovASM(Imm(-1), ParamRegs.head, Byte),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
         )
     }
