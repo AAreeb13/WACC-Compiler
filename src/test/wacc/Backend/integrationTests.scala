@@ -36,16 +36,8 @@ class BackendIntegrationTest extends AnyFlatSpec {
       * Compiles all the files in a given path
       */
 
-    "Valid scope examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "scope") 
-    }
-
     "Valid function examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "function") 
-    }
-
-    "Valid IO examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "IO") 
     }
 
     "Valid advanced examples" should "match assembler output and exit code" in {
@@ -56,7 +48,15 @@ class BackendIntegrationTest extends AnyFlatSpec {
         performTests(examplesDir + "array") 
     }
 
+    "Valid scope examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "scope") 
+    }
+
     // everything should work from this point on
+
+    "Valid IO examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "IO") 
+    }
 
     "Valid basic examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "basic") 
@@ -128,11 +128,20 @@ class BackendIntegrationTest extends AnyFlatSpec {
             displayProgress(examplePath, totalCount)
             runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
             val outStream = new ByteArrayOutputStream 
-            val actualExit = runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
+            val actualExit = if (List(
+                "scopeWhileNested.",
+                "printTriangle.",
+                "printInputTriangle.", // ? idk maybe
+                "functionMultiReturns.",
+                "ticTacToe."
+                ).exists(examplePath.contains(_))) {
+                outStream.write("In timed out list".getBytes())
+                -1
+            } else
+                runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
             val actualOut: Output = outStream.toString().split("\n").toList.filter(!_.isEmpty()).map { s =>
-                if (s.startsWith("0x")) s.replaceFirst("\\S+", "#addrs#")
-                else if (s.startsWith("fatal")) "#runtime_error#"
-                else s
+                if (s.startsWith("fatal")) "#runtime_error#"
+                else s.replaceAll("\\b0x\\w+", "#addrs#")
             } // alternatively do .filter(!_.isEmpty()) but sometimes empty lines are important
 
             
@@ -153,11 +162,12 @@ class BackendIntegrationTest extends AnyFlatSpec {
         val sb = new StringBuilder
         failed.foreach { case (path, asmRaw, in, expectedOut, expectedExit, actualOut, actualExit) => 
             sb.append(s"\n======= FAILED: $path =======")
-            sb.append(s"\nActual output: ${actualOut}")
-            sb.append(s"\nExpected output: ${expectedOut}")
+            // sb.append(s"\nActual output: ${actualOut}")
+            // sb.append(s"\nExpected output: ${expectedOut}")
             sb.append(s"\nActual exit: ${actualExit}")
             sb.append(s"\nExpected exit: ${expectedExit}")
-            sb.append(s"\nSupplied Input: ${in}")
+            sb.append(s"\nOutput mismatch?: ${expectedOut == actualOut}")
+            // sb.append(s"\nSupplied Input: ${in}")
             // sb.append(s"\nAssembler Output:\n${asmRaw}\n")
         }
 

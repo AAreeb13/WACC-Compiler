@@ -140,34 +140,39 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += Comment(s"End Declaration")
     }
 
-    def assignLocation(node: Declarable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def assignLocation(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        node match {
-            case _: AssignNew => 
-                val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getScopeSize())
+        val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getScopeSize())
 
-                val size = semanticToSize(syntaxToSemanticType(node.declType))
+        val size = semanticToSize(syntaxToSemanticType(node.declType))
 
-                st.updateLocation(node.name, memLocation)
-                incrementStackOffset(sizeToInt(size)) // should this be a - or +?
+        st.updateLocation(node.name, memLocation)
+        incrementStackOffset(sizeToInt(size)) // should this be a - or +?
 
-                buf += MovASM(ScratchRegs.head, memLocation, size)
-            
-            case _: Param => 
-                val size = semanticToSize(syntaxToSemanticType(node.declType))
-
-                val localMemLocation = RegisterImmediateOffset(StackPointer, st.getScopeSize() - size - stackOffsets.head) // todo
-                val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
-
-                st.updateLocation(node.name, funcMemLocation)
-                
-                incrementStackOffset(sizeToInt(size))
-                buf += MovASM(ScratchRegs.head, localMemLocation, size)
-
-        }
-            
-
+        buf += MovASM(ScratchRegs.head, memLocation, size)
     }
+
+    def assignParam(node: Param)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        val size = semanticToSize(syntaxToSemanticType(node.declType))
+
+        val localMemLocation = RegisterImmediateOffset(StackPointer, st.getScopeSize() - size - stackOffsets.head) // todo
+        // val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
+
+        // st.updateLocation(node.name, funcMemLocation)
+        
+        incrementStackOffset(sizeToInt(size))
+        buf += MovASM(ScratchRegs.head, localMemLocation, size)
+    }
+
+    /*
+    TODO:
+        - Make it so that order of function/main prog translation is non-deterministic
+        - In assignLocation -> move the placement of assigning parameters on stack from assignLoc to translateFunction
+        - For function calls -> Only need to mov parameter to where it is relative to stack pointer
+
+        - (Optionally?) for nested function calls -> if the function doesn't exist then translate that? but due to above decomposition it should not pose a problem anymore
+    */
+
 
     def incrementStackOffset(size: Int) = {
         assert(!stackOffsets.isEmpty, "Stack offsets should not be empty")
@@ -282,7 +287,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateReturn(node: Return)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         translateExpression(node.expr)
-        //buf += MovASM(ScratchRegs, ReturnReg)
+        buf += MovASM(ScratchRegs.head, ReturnReg)
     }
 
     def translateExpression(expr: Expr)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -493,9 +498,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         stackOffsets.push(0)
         node.args.zip(node.funcInfo.func.params).foreach { case (expr, param) =>
             translateExpression(expr)
-            assignLocation(param)(buf, node.funcInfo.func.scope)
+            assignParam(param)(buf, node.funcInfo.func.scope)
         }
         buf += CallASM(WaccFuncLabel(node.ident))
+        buf += MovASM(ReturnReg, ScratchRegs.head)
         stackOffsets.pop()
         popStackVariables()(buf, node.funcInfo.func.scope)
     }
@@ -612,8 +618,23 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += PushASM(BasePointer)
         buf += MovASM(StackPointer, BasePointer)
 
-        translateBlock(func.stats)(buf, func.scope)
-        //func.stats.foreach(translateStatement(_))
+        implicit val paramScope = func.scope
+        val bodyScope = paramScope.children.head
+
+        // allocate parameters for the function - idk if this is necessary
+        // allocateStackVariables()
+
+        func.params.foreach { param =>
+            System.err.println(param)
+            val size = semanticToSize(syntaxToSemanticType(param.declType))
+            val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + paramScope.getScopeSize() - stackOffsets.head - sizeToInt(size))
+            System.err.println(funcMemLocation)
+            paramScope.updateLocation(param.name, funcMemLocation)
+        }
+
+        translateBlock(func.stats)(buf, bodyScope)
+
+        // popStackVariables()
 
         buf += MovASM(BasePointer, StackPointer)
         buf += PopASM(BasePointer)
