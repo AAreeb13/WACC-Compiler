@@ -209,7 +209,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
 
         // Print progress information
         //println(s"\rProgress: $progressBar ($counter/$totalCount)")
-        println(s"Processing: $fileName ($counter/$totalCount)\r")
+        println(s"Executing: $fileName ($counter/$totalCount)\r")
         
         if (counter == totalCount) {
             println() // Print newline when progress is completed
@@ -277,6 +277,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
     }
 
     def assembleSingle(path: Path): FileContents = {
+        println(s"Assembling: $path")
         val input = Source.fromFile(path).mkString
 
         val syntaxResult = parser.parse(input)
