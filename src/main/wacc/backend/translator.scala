@@ -159,7 +159,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def assignParam(node: Param)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
-        val localMemLocation = RegisterImmediateOffset(StackPointer, st.getScopeSize() - size - stackOffsets.head) // todo
+        val localMemLocation = RegisterImmediateOffset(StackPointer,  stackOffsets.head) // todo //st.getScopeSize() - size -
         // val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
 
         // st.updateLocation(node.name, funcMemLocation)
@@ -292,7 +292,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateReturn(node: Return)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         translateExpression(node.expr)
-        buf += MovASM(ScratchRegs.head, ReturnReg)
+        buf += MovASM(BasePointer, StackPointer)
+        buf += PopASM(BasePointer)
+        buf += RetASM
     }
 
     def translateExpression(expr: Expr)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
@@ -507,7 +509,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
         buf += CallASM(WaccFuncLabel(node.ident))
         buf += MovASM(ReturnReg, ScratchRegs.head)
-        stackOffsets.pop()
         popStackVariables()(buf, node.funcInfo.func.scope)
     }
 
@@ -629,21 +630,21 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         // allocate parameters for the function - idk if this is necessary
         // allocateStackVariables()
 
+        paramScope.isParamST = true
+        stackOffsets.push(0)
         func.params.foreach { param =>
             //System.err.println(param)
-            val size = semanticToSize(syntaxToSemanticType(param.declType))
-            val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + paramScope.getScopeSize() - stackOffsets.head - sizeToInt(size))
+            val size = sizeToInt(semanticToSize(syntaxToSemanticType(param.declType)))
+            val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + stackOffsets.head)
             //System.err.println(funcMemLocation)
+            incrementStackOffset(size)
             paramScope.updateLocation(param.name, funcMemLocation)
         }
+        stackOffsets.pop()
 
         translateBlock(func.stats)(buf, bodyScope)
 
         // popStackVariables()
-
-        buf += MovASM(BasePointer, StackPointer)
-        buf += PopASM(BasePointer)
-        buf += RetASM
 
         buf
     }

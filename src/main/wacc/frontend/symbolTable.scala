@@ -20,6 +20,7 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     
     // freeze variables?
     var scopeSize = 0
+    var isParamST = false
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
@@ -30,7 +31,7 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     // this is O(n) => should be simplified
     def getScopeSize(): Int = scopeSize
     def getAbsoluteScopeSize(): Int = parent match {
-        case None => scopeSize
+        case None => if (!isParamST) scopeSize else 0
         case Some(p) => scopeSize + p.getAbsoluteScopeSize()
     }
 
