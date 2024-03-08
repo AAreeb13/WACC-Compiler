@@ -19,7 +19,7 @@ unit-test-job:
   stage: test   
   script:
     - echo "Running unit tests..."
-    - scala-cli --power test . --server=false --test-only 'wacc.unit*'
+    - scala-cli test . --test-only 'wacc.unit*'
     - echo "Unit tests complete."
 
 integration-test-job:  
@@ -27,7 +27,7 @@ integration-test-job:
   script:
     - git submodule update --init --recursive
     - echo "Running integration tests..."
-    - scala-cli --power test . --test-only --server=false 'wacc.integration*'
+    - scala-cli test . --test-only 'wacc.integration*'
     - echo "Integation tests complete."
 
 style-test-job:
