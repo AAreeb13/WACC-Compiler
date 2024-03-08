@@ -27,7 +27,6 @@ integration-test-job:
   script:
     - git submodule update --init --recursive
     - echo "Running integration tests..."
-    - scala-cli --power test . --test-only --server=false 'wacc.backend*'
     - scala-cli --power test . --test-only --server=false 'wacc.integration*'
     - echo "Integation tests complete."
 

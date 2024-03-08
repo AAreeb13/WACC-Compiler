@@ -1,4 +1,4 @@
-package wacc.backend.integration
+package wacc.integration
 
 import org.scalatest.flatspec.AnyFlatSpec
 import java.io.File
@@ -128,11 +128,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
             displayProgress(examplePath, totalCount)
             runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
             val outStream = new ByteArrayOutputStream 
-            val actualExit = if (List().exists(examplePath.contains(_))) {
-                outStream.write("In timed out list".getBytes())
-                -1
-            } else
-                runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
+            val actualExit = runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
             val actualOut: Output = outStream.toString().split("\n").toList.filter(!_.isEmpty()).map { s =>
                 if (s.startsWith("fatal")) "#runtime_error#"
                 else s.replaceAll("\\b0x\\w+", "#addrs#")
