@@ -10,6 +10,7 @@ import semAst._
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 import globals._
+import utils._
 
 
 /*
@@ -660,19 +661,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         if (!stringSet.contains(retVal)) stringSet.add(retVal)
         retVal
     }
-
-    def toRaw(s: String): String =
-        s.flatMap(_ match {
-            case '\u0000' => "\\\u0000"
-            case '\\' => "\\\\"
-            case '\"' => "\\\""
-            case '\n' => "\\n"
-            case '\t' => "\\t"
-            case '\f' => "\\f"
-            case '\r' => "\\r"
-            case '\b' => "\\b"
-            case other => other.toString
-        })
 
 
     def translateFreeLabel(isArray: Boolean): ListBuffer[Line] = {
