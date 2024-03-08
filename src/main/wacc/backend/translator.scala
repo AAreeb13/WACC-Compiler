@@ -89,6 +89,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateStatement(stat: Stat)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+        //println(s"st: $st, stat: $stat")
         stat match {
             case node: If         => translateIf(node)
             case node: Assign     => translateAssign(node)
@@ -99,7 +100,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: Println    => translatePrintln(node)
             case Skip()           => 
             case node: Exit       => translateExit(node)
-            case node: Scope      => translateBlock(node.stats)(buf, st.children(0))
+            case node: Scope      => translateBlock(node.stats)(buf, node.enclosingScopes(0))
             case node: Free       => translateFree(node)
             case node: Return     => translateReturn(node)
         }
@@ -112,15 +113,15 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         branchCounter += 1
 
         buf += Comment("Begin IF")
-        System.err.println(st)
+
 
         translateExpression(node.cond)
         buf += CmpASM(TrueImm, ScratchRegs.head)
         buf += JmpASM(trueLabel, Equal)
-        translateBlock(node.elseStat)(buf, st.children(1))
+        translateBlock(node.elseStat)(buf, node.enclosingScopes(1))
         buf += JmpASM(endLabel)
         buf += trueLabel
-        translateBlock(node.ifStat)(buf, st.children(0))
+        translateBlock(node.ifStat)(buf, node.enclosingScopes(0))
         buf += endLabel
 
         buf += Comment("End IF")
@@ -211,7 +212,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         buf += JmpASM(doneLabel)
         buf += repeatLabel
-        translateBlock(node.stats)(buf, st.children(0))
+        translateBlock(node.stats)(buf, node.enclosingScopes(0))
         buf += doneLabel
         translateExpression(node.cond)
         buf += CmpASM(TrueImm, ScratchRegs.head, Byte)

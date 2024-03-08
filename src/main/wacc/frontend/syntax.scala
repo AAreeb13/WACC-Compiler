@@ -3,6 +3,7 @@ package wacc
 
 import bridges._
 import semanticChecker.FuncInfo
+import scala.collection.mutable.ListBuffer
 
 /**
   * This file is concerned with the literal syntactical AST types. They are
@@ -73,6 +74,10 @@ object ast {
         var enclosingType: semAst.SemType = null
     }
 
+    sealed trait Scopable {
+        var enclosingScopes: ListBuffer[SymbolTable] = ListBuffer.empty
+    }
+
     sealed trait Printable extends TypeCapture {
         val expr: Expr
     }
@@ -104,9 +109,9 @@ object ast {
     case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
     case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with Printable
     case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with Printable
-    case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat
-    case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat
-    case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat
+    case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat with Scopable
+    case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat with Scopable
+    case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat with Scopable
 
     sealed trait LValue extends Node
     sealed trait RValue extends Node

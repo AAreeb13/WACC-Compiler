@@ -48,51 +48,51 @@ class BackendIntegrationTest extends AnyFlatSpec {
         performTests(examplesDir + "array") 
     }
 
-    // "Valid scope examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "scope") 
-    // }
+    "Valid scope examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "scope") 
+    }
 
     // everything should work from this point on
 
-    // "Valid IO examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "IO") 
-    // }
+    "Valid IO examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "IO") 
+    }
 
-    // "Valid basic examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "basic") 
-    // }
+    "Valid basic examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "basic") 
+    }
 
-    // "Valid expressions examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "expressions") 
-    // }
+    "Valid expressions examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "expressions") 
+    }
 
-    // "Valid if examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "if") 
-    // }
+    "Valid if examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "if") 
+    }
 
-    // "Valid pairs examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "pairs") 
-    // }
+    "Valid pairs examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "pairs") 
+    }
 
-    // "Valid runtimeErr examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "runtimeErr") 
-    // }
+    "Valid runtimeErr examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "runtimeErr") 
+    }
 
-    // "Valid sequence examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "sequence") 
-    // }
+    "Valid sequence examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "sequence") 
+    }
 
-    // "Valid variables examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "variables") 
-    // }
+    "Valid variables examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "variables") 
+    }
 
-    // "Valid while examples" should "match assembler output and exit code" in {
-    //     performTests(examplesDir + "while") 
-    // }
+    "Valid while examples" should "match assembler output and exit code" in {
+        performTests(examplesDir + "while") 
+    }
 
-    // "Arithmetic Unit Tests" should "match assembler output and exit code" in {
-    //     performTests("src/test/wacc/Backend/Unit/ArithmeticOperations") 
-    // }
+    "Arithmetic Unit Tests" should "match assembler output and exit code" in {
+        performTests("src/test/wacc/Backend/Unit/ArithmeticOperations") 
+    }
 
     def hasDocker: Boolean = System.getProperty("os.arch").equals("aarch64") 
     def hasWsl: Boolean = {
@@ -219,7 +219,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
 
         // Print progress information
         //println(s"\rProgress: $progressBar ($counter/$totalCount)")
-        println(s"Executing: $fileName ($counter/$totalCount)\r")
+        //println(s"Executing: $fileName ($counter/$totalCount)\r")
         
         if (counter == totalCount) {
             println() // Print newline when progress is completed
@@ -287,7 +287,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
     }
 
     def assembleSingle(path: Path): FileContents = {
-        println(s"Assembling: $path")
+        //println(s"Assembling: $path")
         val input = Source.fromFile(path).mkString
 
         val syntaxResult = parser.parse(input)

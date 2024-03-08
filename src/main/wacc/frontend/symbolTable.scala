@@ -21,18 +21,18 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     // freeze variables?
     var scopeSize = 0
 
+    // add child to parent so we don't need to explictly do this
+    if (parent.isDefined) parent.get.addChild(this)
+
+    private def addChild(childTable: SymbolTable) =
+        children.addOne(childTable)
+
     // this is O(n) => should be simplified
     def getScopeSize(): Int = scopeSize
     def getAbsoluteScopeSize(): Int = parent match {
         case None => scopeSize
         case Some(p) => scopeSize + p.getAbsoluteScopeSize()
     }
-
-    // add child to parent so we don't need to explictly do this
-    if (parent.isDefined) parent.get.addChild(this)
-
-    private def addChild(childTable: SymbolTable) =
-        children.addOne(childTable)
 
     // Add an entry to the symbol table
     def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {

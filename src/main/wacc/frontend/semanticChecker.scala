@@ -127,12 +127,14 @@ object semanticChecker {
          */
         def checkStatement(stat: Stat, expectedType: SemType)(implicit currentScope: SymbolTable): Unit = {
             // To pass implicitly into error statements
+            //println(s"$currentScope, $stat")
             implicit val node: Node = stat
             stat match {
-                case While(cond, stats) => 
+                case w@While(cond, stats) => 
                     // Checks that condition is a boolean type
                     matchesType(checkExpression(cond), SemBool)(cond)
                     val childScope = new SymbolTable(Some(currentScope))
+                    w.enclosingScopes += childScope
                     stats.foreach(checkStatement(_, expectedType)(childScope))
 
                 case Assign(lvalue, rvalue) => 
@@ -160,19 +162,22 @@ object semanticChecker {
                 // Exit must be an integer
                 case Exit(expr) => matchesType(checkExpression(expr), SemInt)(expr)
 
-                case Scope(stats) =>
+                case s@Scope(stats) =>
                     val childScope = new SymbolTable(Some(currentScope))
+                    s.enclosingScopes += childScope
                     stats.foreach(checkStatement(_, expectedType)(childScope))
 
                 
 
-                case If(cond, ifStats, elseStats) =>
+                case i@If(cond, ifStats, elseStats) =>
                     matchesType(checkExpression(cond), SemBool)
                 
                     val ifChild = new SymbolTable(Some(currentScope))
+                    i.enclosingScopes += ifChild
                     ifStats.foreach(checkStatement(_, expectedType)(ifChild))
 
                     val elseChild = new SymbolTable(Some(currentScope))
+                    i.enclosingScopes += elseChild
                     elseStats.foreach(checkStatement(_, expectedType)(elseChild))
 
                 case Return(expr) => expectedType match {
