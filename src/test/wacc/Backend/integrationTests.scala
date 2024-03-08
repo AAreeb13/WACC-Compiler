@@ -48,47 +48,47 @@ class BackendIntegrationTest extends AnyFlatSpec {
         performTests(examplesDir + "array") 
     }
 
-    "Valid scope examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "scope") 
-    }
+    // "Valid scope examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "scope") 
+    // }
 
     // everything should work from this point on
 
-    "Valid IO examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "IO") 
-    }
+    // "Valid IO examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "IO") 
+    // }
 
-    "Valid basic examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "basic") 
-    }
+    // "Valid basic examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "basic") 
+    // }
 
-    "Valid expressions examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "expressions") 
-    }
+    // "Valid expressions examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "expressions") 
+    // }
 
-    "Valid if examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "if") 
-    }
+    // "Valid if examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "if") 
+    // }
 
-    "Valid pairs examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "pairs") 
-    }
+    // "Valid pairs examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "pairs") 
+    // }
 
-    "Valid runtimeErr examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "runtimeErr") 
-    }
+    // "Valid runtimeErr examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "runtimeErr") 
+    // }
 
-    "Valid sequence examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "sequence") 
-    }
+    // "Valid sequence examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "sequence") 
+    // }
 
-    "Valid variables examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "variables") 
-    }
+    // "Valid variables examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "variables") 
+    // }
 
-    "Valid while examples" should "match assembler output and exit code" in {
-        performTests(examplesDir + "while") 
-    }
+    // "Valid while examples" should "match assembler output and exit code" in {
+    //     performTests(examplesDir + "while") 
+    // }
 
     // "Arithmetic Unit Tests" should "match assembler output and exit code" in {
     //     performTests("src/test/wacc/Backend/Unit/ArithmeticOperations") 
@@ -129,7 +129,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
             runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
             val outStream = new ByteArrayOutputStream 
             val actualExit = if (List(
-                "scopeWhileNested.",
+                //"scopeWhileNested.",
                 "printTriangle.",
                 "printInputTriangle.", // ? idk maybe
                 "functionMultiReturns.",

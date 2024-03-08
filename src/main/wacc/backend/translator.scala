@@ -24,7 +24,7 @@ import globals._
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
-    var stackOffsets: Stack[Int] = Stack(0)
+    var stackOffsets: Stack[Int] = Stack.empty
     var branchCounter: Int = 0
     var asmList: ListBuffer[Line] = ListBuffer.empty
     var stringSet: HashSet[StringLabel] = HashSet.empty
@@ -74,6 +74,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def allocateStackVariables()(implicit buf: ListBuffer[Line], st: SymbolTable) = {
+        stackOffsets.push(0)
         if (st.getScopeSize() > 0) {
             buf += Comment(s"The current scope size is ${st.getScopeSize()}")
             buf += SubASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
@@ -81,6 +82,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def popStackVariables()(implicit buf: ListBuffer[Line], st: SymbolTable) = {
+        stackOffsets.pop()
         if (st.getScopeSize() > 0) {
             buf += AddASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
         }
@@ -110,6 +112,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         branchCounter += 1
 
         buf += Comment("Begin IF")
+        System.err.println(st)
 
         translateExpression(node.cond)
         buf += CmpASM(TrueImm, ScratchRegs.head)
@@ -142,7 +145,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def assignLocation(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getScopeSize())
+        val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getAbsoluteScopeSize())
 
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
@@ -175,6 +178,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
 
     def incrementStackOffset(size: Int) = {
+        //System.err.println(s"Stack offset is: ${stackOffsets.head}")
         assert(!stackOffsets.isEmpty, "Stack offsets should not be empty")
         stackOffsets.push(stackOffsets.pop() + size)
     }
@@ -495,7 +499,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateFuncCall(node: FuncCall)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for FuncCall statement here
         allocateStackVariables()(buf, node.funcInfo.func.scope)
-        stackOffsets.push(0)
+        //stackOffsets.push(0)
         node.args.zip(node.funcInfo.func.params).foreach { case (expr, param) =>
             translateExpression(expr)
             assignParam(param)(buf, node.funcInfo.func.scope)
@@ -625,10 +629,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         // allocateStackVariables()
 
         func.params.foreach { param =>
-            System.err.println(param)
+            //System.err.println(param)
             val size = semanticToSize(syntaxToSemanticType(param.declType))
             val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + paramScope.getScopeSize() - stackOffsets.head - sizeToInt(size))
-            System.err.println(funcMemLocation)
+            //System.err.println(funcMemLocation)
             paramScope.updateLocation(param.name, funcMemLocation)
         }
 

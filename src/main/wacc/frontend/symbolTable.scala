@@ -17,9 +17,16 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     var table: HashMap[String, (SemType, Node)] = HashMap.empty
     var locationTable: HashMap[String, IR.Location] = HashMap.empty
     var children: ListBuffer[SymbolTable] = ListBuffer.empty
+    
+    // freeze variables?
     var scopeSize = 0
 
+    // this is O(n) => should be simplified
     def getScopeSize(): Int = scopeSize
+    def getAbsoluteScopeSize(): Int = parent match {
+        case None => scopeSize
+        case Some(p) => scopeSize + p.getAbsoluteScopeSize()
+    }
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
