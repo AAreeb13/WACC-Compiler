@@ -8,6 +8,9 @@ import scala.annotation.switch
 import scala.concurrent.blocking
 
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.BufferedWriter
+import java.io.FileWriter
 
 
 
@@ -87,7 +90,16 @@ object Main {
         // Code Generation
         val assemblyResult = codeGenerator.generateAssembly(semanticResult, X86Config)
 
-        println(assemblyResult)
+        if (path.equals("in.txt")) {
+            println(assemblyResult)
+        } else {
+            val outputFileName = path.split("/").last.replace("wacc","s")
+            val outputFile = new File(outputFileName)
+            val writer = new BufferedWriter(new FileWriter(outputFile))
+            writer.write(assemblyResult)
+            writer.newLine()
+            writer.close()
+        }
 
         // Code execution
         if (executeAssembly) {
