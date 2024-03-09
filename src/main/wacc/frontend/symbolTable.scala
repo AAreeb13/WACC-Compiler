@@ -12,15 +12,16 @@ import implicits._
   *
   * @param parent Optional ST for parent scopes
   */
-class SymbolTable(val parent: Option[SymbolTable] = None) {
+
+class SymbolTable(val parent: Option[SymbolTable] = None, val isArgTable: Boolean = false) {
     //  (ident, (semantic type, reference to original node))
-    var table: HashMap[String, (SemType, Node)] = HashMap.empty
-    var locationTable: HashMap[String, IR.Location] = HashMap.empty
-    var children: ListBuffer[SymbolTable] = ListBuffer.empty
+    private var table: HashMap[String, (SemType, Node)] = HashMap.empty
+    private var locationTable: HashMap[String, IR.Location] = HashMap.empty
+    private var children: ListBuffer[SymbolTable] = ListBuffer.empty
     
     // freeze variables?
-    var scopeSize = 0
-    var isParamST = false
+    private var scopeSize = 0
+    private var basePointerOffset = 0
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)
@@ -28,12 +29,16 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
     private def addChild(childTable: SymbolTable) =
         children.addOne(childTable)
 
-    // this is O(n) => should be simplified
-    def getScopeSize(): Int = scopeSize
-    def getAbsoluteScopeSize(): Int = parent match {
-        case None => if (!isParamST) scopeSize else 0
-        case Some(p) => scopeSize + p.getAbsoluteScopeSize()
+    def calculateBasePointerOffsets(): Unit = {
+        basePointerOffset = parent match {
+            case None => if (isArgTable) 0 else scopeSize
+            case Some(p) => scopeSize + p.getBasePointerOffset()
+        }
+        children.foreach(_.calculateBasePointerOffsets())
     }
+
+    def getScopeSize(): Int = scopeSize
+    def getBasePointerOffset(): Int = basePointerOffset
 
     // Add an entry to the symbol table
     def addOne(name: String, declType: SemType)(implicit node: Node): Unit = {
@@ -42,8 +47,15 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
         node.scope = this
     }
 
-    def getLocation(name: String): Option[IR.Location] = 
-        locationTable.get(name).orElse(parent.flatMap(_.getLocation(name)))
+    def getChild(index: Int = 0): SymbolTable = {
+        children(index)
+    }
+
+    def getLocationOption(name: String): Option[IR.Location] = 
+        locationTable.get(name).orElse(parent.flatMap(_.getLocationOption(name)))
+
+    def getLocation(name: String): IR.Location = 
+        getLocationOption(name).get
 
     def hasLocation(name: String): Boolean =
         locationTable.contains(name) || parent.exists(_.hasLocation(name))
@@ -71,10 +83,12 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
 
     // Gets the type of the identifier (if it exists) in this scope
     // or parent scopes
-    def typeof(name: String): Option[SemType] = table
+    def typeof(name: String): SemType = typeofOption(name).get
+
+    def typeofOption(name: String): Option[SemType] = table
         .get(name)
         .map(_._1)
-        .orElse(parent.flatMap(_.typeof(name)))
+        .orElse(parent.flatMap(_.typeofOption(name)))
 
     // Gets the node of the identifier (if it exists) in this scope
     // or parent scopes

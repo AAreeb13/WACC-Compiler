@@ -147,12 +147,12 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def assignLocation(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        val memLocation = Memory(BasePointer, stackOffsets.head - st.getAbsoluteScopeSize())
+        val memLocation = Memory(BasePointer, stackOffsets.head - st.getBasePointerOffset())
 
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
         st.updateLocation(node.name, memLocation)
-        incrementStackOffset(sizeToInt(size)) // should this be a - or +?
+        incrementStackOffset(sizeToInt(size))
 
         buf += MovASM(ScratchRegs.head, memLocation, size)
     }
@@ -167,7 +167,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def incrementStackOffset(size: Int) = {
-        //System.err.println(s"Stack offset is: ${stackOffsets.head}")
         assert(!stackOffsets.isEmpty, "Stack offsets should not be empty")
         stackOffsets.push(stackOffsets.pop() + size)
     }
@@ -504,8 +503,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         assert(st.contains(node.v), s"Variable ${node.v} was not contained in the symbol table")
         assert(st.hasLocation(node.v), s"The location of variable ${node.v} was not contained in the symbol table")
 
-        val location = st.getLocation(node.v).get
-        val declType = st.typeof(node.v).get
+        val location = st.getLocation(node.v)
+        val declType = st.typeof(node.v)
         val size = semanticToSize(declType)
 
         if (writeTo) {
@@ -521,7 +520,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         
-        var location = st.getLocation(node.v).get
+        var location = st.getLocation(node.v)
         var innerSize = semanticToSize(node.enclosingType)
 
         if (writeTo) buf += PushASM(ScratchRegs.head)
@@ -580,7 +579,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 }
 
             case Var(name) =>
-                st.getLocation(name).get match {
+                st.getLocation(name) match {
                     case mem: Memory => buf += LeaASM(mem, ScratchRegs.head)
                     case reg: Register => buf += MovASM(reg, ScratchRegs.head)
                 }
@@ -609,33 +608,23 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     def translateFunction(func: Func)(implicit buf: ListBuffer[Line] = ListBuffer.empty): ListBuffer[Line] = {
-        // init variables
-        // translate each variable
-
         buf += PushASM(BasePointer)
         buf += MovASM(StackPointer, BasePointer)
 
         implicit val paramScope = func.scope
-        val bodyScope = paramScope.children.head
+        val bodyScope = paramScope.getChild()
 
-        // allocate parameters for the function - idk if this is necessary
-        // allocateStackVariables()
-
-        paramScope.isParamST = true
         stackOffsets.push(0)
         func.params.foreach { param =>
-            //System.err.println(param)
             val size = sizeToInt(semanticToSize(syntaxToSemanticType(param.declType)))
             val funcMemLocation = Memory(BasePointer, 16 + stackOffsets.head)
-            //System.err.println(funcMemLocation)
+
             incrementStackOffset(size)
             paramScope.updateLocation(param.name, funcMemLocation)
         }
         stackOffsets.pop()
 
         translateBlock(func.stats)(buf, bodyScope)
-
-        // popStackVariables()
 
         buf
     }
@@ -689,7 +678,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         
         
         val buf: ListBuffer[Line] = ListBuffer(
-            Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, ${if (store) "value to store in" else "and return into"} ${ScratchRegs.head}"),
+            Comment(s"Special calling convention: array ptr passed in ${targetConfig.opStr(ArrayPointer)}, index in ${targetConfig.opStr(IndexPointer)}, ${if (store) "value to store in" else "and return into"} ${targetConfig.opStr(ScratchRegs.head)}"),
             PushASM(ScratchRegs(1)),
             CmpASM(Imm(0), IndexPointer, DWord),
             MovASM(IndexPointer, ParamRegs(1), IR.Less),
