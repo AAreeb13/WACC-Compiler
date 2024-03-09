@@ -39,8 +39,8 @@ object ast {
         override def toString = "StringType"
     }
 
-    case class ArrayType(t: Type)(val pos: (Int, Int)) extends Type
-    case class PairType(t1: Type, t2: Type)(val pos: (Int, Int)) extends Type
+    case class ArrayType(innerType: Type)(val pos: (Int, Int)) extends Type
+    case class PairType(fstType: Type, sndType: Type)(val pos: (Int, Int)) extends Type
     case class ErasedPair()(val pos: (Int, Int)) extends Type {
         override def toString = "ErasedPair"
     }
@@ -128,10 +128,10 @@ object ast {
     case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 
     case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue with TypeCapture
-    case class PairCons(fst: Expr, snd: Expr)(val pos: (Int, Int))            extends RValue
-    case class FuncCall(ident: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
-        var funcInfo: FuncInfo = null
-        override def toString = s"FuncCall(\"$ident\",$args)"
+    case class PairCons(fstExpr: Expr, sndExpr: Expr)(val pos: (Int, Int))            extends RValue
+    case class FuncCall(name: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
+        var func: Func = null
+        override def toString = s"FuncCall(\"$name\",$args)"
     }
 
     /*--------------------------------------- Expressions ---------------------------------------*/
@@ -151,12 +151,12 @@ object ast {
     case class PairVal()(val pos: (Int, Int))       extends Expr {
         override def toString = "PairVal"
     }
-    case class Var(v: String)(val pos: (Int, Int)) extends Expr with LValue {
-        override def toString = s"Var(\"$v\")"
+    case class Var(name: String)(val pos: (Int, Int)) extends Expr with LValue {
+        override def toString = s"Var(\"$name\")"
     }
 
-    case class ArrayVal(v: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue with TypeCapture {
-        override def toString = s"ArrayVal(\"$v\",$exprs)"
+    case class ArrayVal(name: String, exprs: List[Expr])(val pos: (Int, Int)) extends Expr with LValue with TypeCapture {
+        override def toString = s"ArrayVal(\"$name\",$exprs)"
     }
 
         /*------------------------------- Binary Operators -------------------------------*/

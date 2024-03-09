@@ -66,6 +66,7 @@ object semanticChecker {
             // Checks each statment in global scope and also in each statement
             prog.funcs.foreach(checkFunction(_))
             prog.stats.foreach(checkStatement(_, SemNone)(mainScope))
+            topLevelScopes.foreach(_.calculateBasePointerOffsets())
         }
 
         /**
@@ -95,7 +96,7 @@ object semanticChecker {
          */
         def checkFunction(func: Func): Unit = {
             // A new symbol table for the function is created and added to the list
-            val funcArgSymbolTable = new SymbolTable()
+            val funcArgSymbolTable = new SymbolTable(None, true)
             func.scope = funcArgSymbolTable
             topLevelScopes.addOne(funcArgSymbolTable)
 
@@ -271,7 +272,7 @@ object semanticChecker {
                             args.zip(paramTypes).foreach{ case (arg, paramType) => 
                                 matchesType(checkExpression(arg), paramType)
                             }
-                            funcCall.funcInfo = funcInfo
+                            funcCall.func = func
                             retType
                         }
                     }
@@ -285,7 +286,7 @@ object semanticChecker {
          */
         def checkVar(v: Var)(implicit currentScope: SymbolTable) = 
             // Return the type of the variable if it exists, otherwise throw an error
-            currentScope.typeof(v.v).getOrElse {
+            currentScope.typeofOption(v.name).getOrElse {
                 errorCollector.addError(v, UndeclaredVarError(v))
                 SemNone
             }
@@ -339,7 +340,7 @@ object semanticChecker {
         def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): SemType = {
             // Checks each array element index has overall type integer
             arrayElem.exprs.foreach(e => matchesType(checkExpression(e), SemInt)(e))
-            currentScope.typeof(arrayElem.v) match {
+            currentScope.typeofOption(arrayElem.name) match {
                 case None => 
                     errorCollector.addError(arrayElem, UndeclaredVarError(arrayElem))
                     SemNone

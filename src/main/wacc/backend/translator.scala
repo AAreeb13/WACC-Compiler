@@ -25,11 +25,18 @@ import utils._
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
+    //type LabelInfo = (ListBuffer[Line], ListBuffer[StringLabel])
+    case class LabelInfo(buf: ListBuffer[Line], readonlys: HashSet[StringLabel])
+
+    object LabelInfo {
+        def empty: LabelInfo = LabelInfo(ListBuffer.empty, HashSet.empty)
+
+        def apply(buf: ListBuffer[Line]): LabelInfo = new LabelInfo(buf, HashSet.empty)
+    }
+
     var stackOffsets: Stack[Int] = Stack.empty
     var branchCounter: Int = 0
-    var asmList: ListBuffer[Line] = ListBuffer.empty
-    var stringSet: HashSet[StringLabel] = HashSet.empty
-    var funcMap: HashMap[FuncLabel, ListBuffer[Line]] = HashMap.empty
+    var funcMap: HashMap[FuncLabel, LabelInfo] = HashMap.empty
 
     // Main entry point for translating the whole code into IR
     def translate(): List[Line] = {
@@ -37,59 +44,80 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         translateProg(semanticInfo.ast)
 
-        asmList += GlobalTag
-        if (!stringSet.isEmpty) {
-            asmList += ReadonlyTag
-            asmList ++= stringSet
-        }
-        asmList += TextTag
+        var asmList: ListBuffer[Line] = ListBuffer.empty
 
-        asmList ++= funcMap.toList.flatMap{ case (func, instrs) => func :: instrs.toList }
+        asmList += GlobalTag
+
+        def groupFunc(funcLabelPair: (FuncLabel, LabelInfo)): Int = funcLabelPair._1 match {
+            case MainLabel => 0
+            case WaccFuncLabel(_name) => 1
+            case _: WrapperFuncLabel => 2
+            case _: ErrorFuncLabel => 3
+            case _ => -1
+        }
+
+        var stringSet: HashSet[StringLabel] = HashSet.empty
+        asmList ++= funcMap.toList.sortBy(groupFunc).flatMap{ case (func, LabelInfo(body, readonlys)) =>
+            val buf: ListBuffer[Line] = ListBuffer.empty 
+            
+            if (!readonlys.isEmpty) {
+                buf += ReadonlyTag
+                readonlys.foreach { ro =>
+                    if (!stringSet.contains(ro)) {
+                        stringSet.addOne(ro)
+                        buf += ro
+                    }
+                }
+                buf += TextTag
+            }
+
+            buf += func
+            buf ++= body
+            buf += EmptyLine
+            buf
+        }
 
         asmList.toList
     }
 
     
     def translateProg(prog: Prog) = {
-        // prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), ListBuffer.empty)))
-        // funcMap.addOne((MainLabel, translateMain(prog)))
-        // prog.funcs.foreach(f => funcMap.update(WaccFuncLabel(f.name), translateFunction(f)))
         funcMap.addOne((MainLabel, translateMain(prog)))
         prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), translateFunction(f))))
     }
 
-    def translateMain(prog: Prog)(implicit buf: ListBuffer[Line] = ListBuffer.empty): ListBuffer[Line] = {
+    def translateMain(prog: Prog)(implicit currentLabel: LabelInfo = LabelInfo.empty): LabelInfo = {
         // init variables
         // translate each variable
 
-        buf += PushASM(BasePointer)
-        buf += MovASM(StackPointer, BasePointer)
+        currentLabel.buf += PushASM(BasePointer)
+        currentLabel.buf += MovASM(StackPointer, BasePointer)
 
-        translateBlock(prog.stats)(buf, prog.scope)
+        translateBlock(prog.stats)(currentLabel, prog.scope)
 
-        buf += MovASM(DefaultExitCode, ReturnReg)
-        buf += PopASM(BasePointer)
-        buf += RetASM
+        currentLabel.buf += MovASM(DefaultExitCode, ReturnReg)
+        currentLabel.buf += PopASM(BasePointer)
+        currentLabel.buf += RetASM
 
-        buf
+        currentLabel
     }
 
-    def allocateStackVariables()(implicit buf: ListBuffer[Line], st: SymbolTable) = {
+    def allocateStackVariables()(implicit currentLabel: LabelInfo, st: SymbolTable) = {
         stackOffsets.push(0)
         if (st.getScopeSize() > 0) {
-            buf += Comment(s"The current scope size is ${st.getScopeSize()}")
-            buf += SubASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
+            currentLabel.buf += Comment(s"The current scope size is ${st.getScopeSize()}")
+            currentLabel.buf += SubASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
         }
     }
 
-    def popStackVariables()(implicit buf: ListBuffer[Line], st: SymbolTable) = {
+    def popStackVariables()(implicit currentLabel: LabelInfo, st: SymbolTable) = {
         stackOffsets.pop()
         if (st.getScopeSize() > 0) {
-            buf += AddASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
+            currentLabel.buf += AddASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
         }
     }
 
-    def translateStatement(stat: Stat)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateStatement(stat: Stat)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         //println(s"st: $st, stat: $stat")
         stat match {
             case node: If         => translateIf(node)
@@ -101,91 +129,77 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: Println    => translatePrintln(node)
             case Skip()           => 
             case node: Exit       => translateExit(node)
-            case node: Scope      => translateBlock(node.stats)(buf, node.enclosingScopes(0))
+            case node: Scope      => translateBlock(node.stats)(currentLabel, node.enclosingScopes(0))
             case node: Free       => translateFree(node)
             case node: Return     => translateReturn(node)
         }
     }
 
-    def translateIf(node: If)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateIf(node: If)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for If statement here
         val trueLabel = JumpLabel(s".L_if_true_$branchCounter")
         val endLabel = JumpLabel(s".L_if_end_$branchCounter")
         branchCounter += 1
 
-        buf += Comment("Begin IF")
+        currentLabel.buf += Comment("Begin IF")
 
 
         translateExpression(node.cond)
-        buf += CmpASM(TrueImm, ScratchRegs.head)
-        buf += JmpASM(trueLabel, Equal)
-        translateBlock(node.elseStat)(buf, node.enclosingScopes(1))
-        buf += JmpASM(endLabel)
-        buf += trueLabel
-        translateBlock(node.ifStat)(buf, node.enclosingScopes(0))
-        buf += endLabel
+        currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head)
+        currentLabel.buf += JmpASM(trueLabel, Equal)
+        translateBlock(node.elseStat)(currentLabel, node.enclosingScopes(1))
+        currentLabel.buf += JmpASM(endLabel)
+        currentLabel.buf += trueLabel
+        translateBlock(node.ifStat)(currentLabel, node.enclosingScopes(0))
+        currentLabel.buf += endLabel
 
-        buf += Comment("End IF")
+        currentLabel.buf += Comment("End IF")
         
     }
 
-    def translateAssign(node: Assign)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateAssign(node: Assign)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Assign statement here
-        buf += Comment(s"Begin Assign $node")
+        currentLabel.buf += Comment(s"Begin Assign $node")
         translateRValue(node.rvalue)
         translateLValue(node.lvalue, true)
-        buf += Comment(s"End Assign")
+        currentLabel.buf += Comment(s"End Assign")
     }
 
-    def translateDeclaration(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateDeclaration(node: AssignNew)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        buf += Comment(s"Begin Declaration $node")
+        currentLabel.buf += Comment(s"Begin Declaration $node")
         translateRValue(node.rvalue)
         assignLocation(node)
-        buf += Comment(s"End Declaration")
+        currentLabel.buf += Comment(s"End Declaration")
     }
 
-    def assignLocation(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def assignLocation(node: AssignNew)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getAbsoluteScopeSize())
+        val memLocation = Memory(BasePointer, stackOffsets.head - st.getBasePointerOffset())
 
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
         st.updateLocation(node.name, memLocation)
-        incrementStackOffset(sizeToInt(size)) // should this be a - or +?
+        incrementStackOffset(sizeToInt(size))
 
-        buf += MovASM(ScratchRegs.head, memLocation, size)
+        currentLabel.buf += MovASM(ScratchRegs.head, memLocation, size)
     }
 
-    def assignParam(node: Param)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def assignParam(node: Param)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
-        val localMemLocation = RegisterImmediateOffset(StackPointer,  stackOffsets.head) // todo //st.getScopeSize() - size -
-        // val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
-
-        // st.updateLocation(node.name, funcMemLocation)
+        val localMemLocation = Memory(StackPointer,  stackOffsets.head)
         
         incrementStackOffset(sizeToInt(size))
-        buf += MovASM(ScratchRegs.head, localMemLocation, size)
+        currentLabel.buf += MovASM(ScratchRegs.head, localMemLocation, size)
     }
 
-    /*
-    TODO:
-        - Make it so that order of function/main prog translation is non-deterministic
-        - In assignLocation -> move the placement of assigning parameters on stack from assignLoc to translateFunction
-        - For function calls -> Only need to mov parameter to where it is relative to stack pointer
-
-        - (Optionally?) for nested function calls -> if the function doesn't exist then translate that? but due to above decomposition it should not pose a problem anymore
-    */
-
-
     def incrementStackOffset(size: Int) = {
-        //System.err.println(s"Stack offset is: ${stackOffsets.head}")
         assert(!stackOffsets.isEmpty, "Stack offsets should not be empty")
         stackOffsets.push(stackOffsets.pop() + size)
     }
 
-    def translateRead(node: Read)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateRead(node: Read)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Read statement here
         val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
             case SemChar => (ReadCharLabel, " %c")
@@ -198,34 +212,34 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         // get the lvalue
         translateLValue(node.lvalue)
-        buf += MovASM(ScratchRegs.head, ParamRegs.head)
-        buf += CallASM(wrapperLabel)
+        currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs.head)
+        currentLabel.buf += CallASM(wrapperLabel)
         translateLValue(node.lvalue, true)
     }
 
-    def translateWhile(node: While)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateWhile(node: While)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for While statement here
         val doneLabel = JumpLabel(s".L_while_done_$branchCounter")
         val repeatLabel = JumpLabel(s".L_while_repeat_$branchCounter")
         branchCounter += 1
 
-        buf += Comment("Begin WHILE")
+        currentLabel.buf += Comment("Begin WHILE")
 
-        buf += JmpASM(doneLabel)
-        buf += repeatLabel
-        translateBlock(node.stats)(buf, node.enclosingScopes(0))
-        buf += doneLabel
+        currentLabel.buf += JmpASM(doneLabel)
+        currentLabel.buf += repeatLabel
+        translateBlock(node.stats)(currentLabel, node.enclosingScopes(0))
+        currentLabel.buf += doneLabel
         translateExpression(node.cond)
-        buf += CmpASM(TrueImm, ScratchRegs.head, Byte)
-        buf += JmpASM(repeatLabel, Equal)
+        currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head, Byte)
+        currentLabel.buf += JmpASM(repeatLabel, Equal)
 
-        buf += Comment("End WHILE")
+        currentLabel.buf += Comment("End WHILE")
     }
 
-    def translatePrint(node: Printable)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translatePrint(node: Printable)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Print statement here
         translateExpression(node.expr)
-        buf += MovASM(ScratchRegs.head, ParamRegs.head)
+        currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs.head)
         val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
             case SemBool => (PrintBoolLabel, "%.*s")
             case SemInt => (PrintIntLabel, "%d")
@@ -239,11 +253,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne(wrapperLabel, translatePrintLabel(wrapperLabel, fstring, node.enclosingType))
         }
 
-        buf += CallASM(wrapperLabel)
+        currentLabel.buf += CallASM(wrapperLabel)
 
     }
 
-    def translatePrintln(node: Println)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translatePrintln(node: Println)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Println statement here
         translatePrint(node)
 
@@ -251,27 +265,27 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne((PrintlnLabel, translatePrintlnLabel))
         }
 
-        buf += CallASM(PrintlnLabel)
+        currentLabel.buf += CallASM(PrintlnLabel)
     }
 
-    def translateExit(node: Exit)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateExit(node: Exit)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Exit statement here
         if (!funcMap.contains(ExitWrapperLabel)) {
             funcMap.addOne(ExitWrapperLabel, translateExitLabel)
         }
 
         translateExpression(node.expr)
-        buf += MovASM(ReturnReg, ParamRegs.head)
-        buf += CallASM(ExitWrapperLabel)
+        currentLabel.buf += MovASM(ReturnReg, ParamRegs.head)
+        currentLabel.buf += CallASM(ExitWrapperLabel)
     }
 
-    def translateBlock(stats: List[Stat])(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateBlock(stats: List[Stat])(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         allocateStackVariables()
         stats.foreach(translateStatement(_))
         popStackVariables()
     }
 
-    def translateFree(node: Free)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateFree(node: Free)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Free statement here
         val freeLabel = if (node.isArray) FreeArrayLabel else FreePairLabel
         
@@ -282,47 +296,47 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateExpression(node.expr)
 
         if (node.isArray) {
-            buf += Comment(s"array pointers are shifted forward by ${sizeToInt(DWord)} bytes, so correct it back to original pointer before free")
-            buf += SubASM(Imm(sizeToInt(DWord)), ScratchRegs.head, ScratchRegs.head)
+            currentLabel.buf += Comment(s"array pointers are shifted forward by ${sizeToInt(DWord)} bytes, so correct it back to original pointer before free")
+            currentLabel.buf += SubASM(Imm(sizeToInt(DWord)), ScratchRegs.head, ScratchRegs.head)
         }
 
-        buf += MovASM(ScratchRegs.head, ParamRegs.head)
-        buf += CallASM(freeLabel)
+        currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs.head)
+        currentLabel.buf += CallASM(freeLabel)
     }
 
-    def translateReturn(node: Return)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateReturn(node: Return)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         translateExpression(node.expr)
-        buf += MovASM(BasePointer, StackPointer)
-        buf += PopASM(BasePointer)
-        buf += RetASM
+        currentLabel.buf += MovASM(BasePointer, StackPointer)
+        currentLabel.buf += PopASM(BasePointer)
+        currentLabel.buf += RetASM
     }
 
-    def translateExpression(expr: Expr)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateExpression(expr: Expr)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         expr match {
             case v: Var => translateVar(v)
-            case CharVal(c) => buf += MovASM(Imm(c.toInt), ScratchRegs.head)
+            case CharVal(c) => currentLabel.buf += MovASM(Imm(c.toInt), ScratchRegs.head)
             case StrVal(s) =>
                 val stringLabel = addStringConstant(s)
-                buf += LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ScratchRegs.head)
-            case BoolVal(b) => buf += MovASM(Imm(if (b) 1 else 0), ScratchRegs.head)
-            case PairVal() => buf += MovASM(NullImm, ScratchRegs.head)
+                currentLabel.buf += LeaASM(Memory(InstructionPointer, stringLabel), ScratchRegs.head)
+            case BoolVal(b) => currentLabel.buf += MovASM(Imm(if (b) 1 else 0), ScratchRegs.head)
+            case PairVal() => currentLabel.buf += MovASM(NullImm, ScratchRegs.head)
             case v: ArrayVal => translateArrayElem(v)
-            case IntVal(x) => buf += MovASM(Imm(x), ScratchRegs.head)
+            case IntVal(x) => currentLabel.buf += MovASM(Imm(x), ScratchRegs.head)
             case node: BinOp => translateBinOp(node)
             case node: UnOp => translateUnOp(node)
             
         }
     }
 
-    def translateBinOp(binop: BinOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        buf += Comment(s"Begin expression $binop")
+    def translateBinOp(binop: BinOp)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+        currentLabel.buf += Comment(s"Begin expression $binop")
         binop match {
             case op@ArithmeticOp(lhs, rhs) =>
                 translateExpression(rhs)
-                buf += PushASM(ScratchRegs.head) // also maybe specify dword/long size for push/pop
+                currentLabel.buf += PushASM(ScratchRegs.head) // also maybe specify dword/long size for push/pop
                 translateExpression(lhs)
-                buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
+                currentLabel.buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
 
                 op match {
                     case divMod @ (Mod(_, _) | Div(_, _)) =>
@@ -330,35 +344,35 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                             funcMap.addOne((CheckDivZeroLabel, translateDivZeroLabel))
                         }
 
-                        buf += CmpASM(Imm(0), ScratchRegs(1), DWord)
-                        buf += JmpASM(CheckDivZeroLabel, Equal)
-                        buf += DivASM(ScratchRegs.head, ScratchRegs.head, ScratchRegs(1)) // note that first 2 args are ignored for x86
+                        currentLabel.buf += CmpASM(Imm(0), ScratchRegs(1), DWord)
+                        currentLabel.buf += JmpASM(CheckDivZeroLabel, Equal)
+                        currentLabel.buf += DivASM(ScratchRegs.head, ScratchRegs.head, ScratchRegs(1)) // note that first 2 args are ignored for x86
 
                         (divMod: @unchecked) match {
-                            case _: Div =>// buf += MovASM(ScratchRegs.head, ScratchRegs.head, DWord)
-                            case _: Mod => buf += MovASM(R3, ScratchRegs.head, DWord) // todo: specify divMod register in config
+                            case _: Div => currentLabel.buf += MovASM(DivRegister, ScratchRegs.head, DWord)
+                            case _: Mod => currentLabel.buf += MovASM(ModRegister, ScratchRegs.head, DWord) // todo: specify divMod register in config
                         }
-                        buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
+                        currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
                     case other =>
                         if (!funcMap.contains(CheckOverflowLabel)) {
                             funcMap.addOne((CheckOverflowLabel, translateOverflowLabel))
                         }
 
                         (other: @unchecked) match {
-                            case _: Add => buf += AddASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
-                            case _: Sub => buf += SubASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord) // check commutativity
-                            case _: Mul => buf += MulASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
+                            case _: Add => currentLabel.buf += AddASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
+                            case _: Sub => currentLabel.buf += SubASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord) // check commutativity
+                            case _: Mul => currentLabel.buf += MulASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                         }
-                        buf += JmpASM(CheckOverflowLabel, Overflow)
-                        buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
+                        currentLabel.buf += JmpASM(CheckOverflowLabel, Overflow)
+                        currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
                 }
 
             case op@ComparativeOp(lhs, rhs) =>  // covers both equality and comparison operators
                 translateExpression(lhs)
-                buf += PushASM(ScratchRegs(0))
+                currentLabel.buf += PushASM(ScratchRegs(0))
                 translateExpression(rhs)
-                buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
-                buf += CmpASM(ScratchRegs(0), ScratchRegs(1))
+                currentLabel.buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
+                currentLabel.buf += CmpASM(ScratchRegs(0), ScratchRegs(1))
                 val flag = op match {
                     case _: Eql => Equal
                     case _: NotEql => NotEqual
@@ -367,8 +381,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                     case _: LessEql => LessEqual
                     case _: Less => IR.Less
                 }
-                buf += SetASM(ScratchRegs(0), flag)
-                buf += MovsASM(ScratchRegs(0), ScratchRegs(0), Byte)
+                currentLabel.buf += SetASM(ScratchRegs(0), flag)
+                currentLabel.buf += MovsASM(ScratchRegs(0), ScratchRegs(0), Byte)
 
             case op@LogicalOp(lhs, rhs) =>
                 translateExpression(lhs)
@@ -376,36 +390,36 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 val endLabel = JumpLabel(s".L_logical_op_$branchCounter")
                 branchCounter += 1
                 
-                buf += CmpASM(TrueImm, ScratchRegs.head)
+                currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head)
                 val flag = op match {
                     case _: And => NotEqual
                     case _: Or => Equal
                 }
-                buf += JmpASM(endLabel, flag)
+                currentLabel.buf += JmpASM(endLabel, flag)
                 translateExpression(rhs)
-                buf += CmpASM(TrueImm, ScratchRegs.head)
-                buf += endLabel
-                buf += SetASM(ScratchRegs.head, Equal)
-                buf += MovsASM(ScratchRegs.head, ScratchRegs.head, Byte)
+                currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head)
+                currentLabel.buf += endLabel
+                currentLabel.buf += SetASM(ScratchRegs.head, Equal)
+                currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, Byte)
                 
             case _ => println("This should never happen")
         }
 
-        buf += Comment(s"End expression")
+        currentLabel.buf += Comment(s"End expression")
     }
 
-    def translateUnOp(unop: UnOp)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateUnOp(unop: UnOp)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         unop match {
             case Len(expr) => 
                 translateExpression(expr)
-                buf += MovASM(ScratchRegs.head, ScratchRegs(1)) // can this be optimised out?
-                buf += MovsASM(RegisterImmediateOffset(ScratchRegs(1), -sizeToInt(DWord)), ScratchRegs.head, DWord)
+                currentLabel.buf += MovASM(ScratchRegs.head, ScratchRegs(1)) // can this be optimised out?
+                currentLabel.buf += MovsASM(Memory(ScratchRegs(1), -sizeToInt(DWord)), ScratchRegs.head, DWord)
 
             case Not(expr) =>
                 translateExpression(expr)
-                buf += CmpASM(TrueImm, ScratchRegs.head) // idk if this one is necessary
-                buf += SetASM(ScratchRegs.head, NotEqual, Byte)
-                buf += MovsASM(ScratchRegs.head, ScratchRegs.head, Byte)
+                currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head) // idk if this one is necessary
+                currentLabel.buf += SetASM(ScratchRegs.head, NotEqual, Byte)
+                currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, Byte)
             case Ord(expr) => translateExpression(expr)
             case Chr(expr) =>
                 translateExpression(expr)
@@ -414,7 +428,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                     funcMap.addOne((CheckBadCharLabel, translateBadCharLabel))
                 }
 
-                buf ++= ListBuffer(
+                currentLabel.buf ++= ListBuffer(
                     TestASM(Imm(-128), ScratchRegs.head),
                     MovASM(ScratchRegs.head, ParamRegs(1), NotEqual, QWord),
                     JmpASM(CheckBadCharLabel, NotEqual)
@@ -426,7 +440,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                     funcMap.addOne((CheckOverflowLabel, translateOverflowLabel))
                 }
 
-                buf ++= ListBuffer(
+                currentLabel.buf ++= ListBuffer(
                     MovsASM(ScratchRegs(0), ScratchRegs(0), DWord),
                     MovASM(ScratchRegs(0), ScratchRegs(1)), // next scratch reg
                     MovASM(Imm(0), ScratchRegs(0), DWord),
@@ -437,7 +451,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
-    def translateLValue(lvalue: LValue, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateLValue(lvalue: LValue, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for LValues here
         lvalue match {
             case node: ArrayVal => translateArrayElem(node, writeTo)
@@ -446,7 +460,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
-    def translateRValue(rvalue: RValue)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateRValue(rvalue: RValue)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         rvalue match {
             case node: ArrayLiteral => translateArrayLiteral(node)
@@ -457,7 +471,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
-    def translateArrayLiteral(node: ArrayLiteral)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateArrayLiteral(node: ArrayLiteral)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Array Literals here
         if (!funcMap.contains(MallocWrapperLabel)) {
             funcMap.addOne((MallocWrapperLabel, translateMallocLabel))
@@ -465,79 +479,78 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         val singleSize = semanticToSize(node.enclosingType)
         val totalSize = sizeToInt(DWord) + singleSize * node.exprs.size
-        buf += MovASM(Imm(totalSize), ParamRegs.head, DWord)
-        buf += CallASM(MallocWrapperLabel)
-        buf += MovASM(ScratchRegs(0), ArrayPointer)
-        buf += AddASM(Imm(sizeToInt(DWord)), ArrayPointer, ArrayPointer)
-        buf += MovASM(Imm(node.exprs.size), ScratchRegs(0))
-        buf += MovASM(ScratchRegs(0), RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)))
+        currentLabel.buf += MovASM(Imm(totalSize), ParamRegs.head, DWord)
+        currentLabel.buf += CallASM(MallocWrapperLabel)
+        currentLabel.buf += MovASM(ScratchRegs(0), ArrayPointer)
+        currentLabel.buf += AddASM(Imm(sizeToInt(DWord)), ArrayPointer, ArrayPointer)
+        currentLabel.buf += MovASM(Imm(node.exprs.size), ScratchRegs(0))
+        currentLabel.buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, -sizeToInt(DWord)))
         node.exprs.zipWithIndex.foreach { case (expr, index) =>
             translateExpression(expr)
-            buf += MovASM(ScratchRegs(0), RegisterImmediateOffset(ArrayPointer, index * singleSize))
+            currentLabel.buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, index * singleSize))
         }
-        buf += MovASM(ArrayPointer, ScratchRegs(0))
+        currentLabel.buf += MovASM(ArrayPointer, ScratchRegs(0))
     }
 
-    def translatePairCons(node: PairCons)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translatePairCons(node: PairCons)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Free statement here
         if (!funcMap.contains(MallocWrapperLabel)) {
             funcMap.addOne((MallocWrapperLabel, translateMallocLabel))
         }
 
-        buf += Comment(s"Begin Pair Cons $node")
+        currentLabel.buf += Comment(s"Begin Pair Cons $node")
 
         val PairSize = Imm(16)
-        buf += MovASM(PairSize, ParamRegs.head, DWord)
-        buf += CallASM(MallocWrapperLabel)
-        buf += MovASM(ScratchRegs.head, ArrayPointer)
-        translateExpression(node.fst)
-        buf += MovASM(ScratchRegs.head, RegisterOffset(ArrayPointer))
-        translateExpression(node.snd)
-        buf += MovASM(ScratchRegs.head, RegisterImmediateOffset(ArrayPointer, sizeToInt(QWord)))
-        buf += MovASM(ArrayPointer, ScratchRegs.head)
+        currentLabel.buf += MovASM(PairSize, ParamRegs.head, DWord)
+        currentLabel.buf += CallASM(MallocWrapperLabel)
+        currentLabel.buf += MovASM(ScratchRegs.head, ArrayPointer)
+        translateExpression(node.fstExpr)
+        currentLabel.buf += MovASM(ScratchRegs.head, Memory(ArrayPointer))
+        translateExpression(node.sndExpr)
+        currentLabel.buf += MovASM(ScratchRegs.head, Memory(ArrayPointer, sizeToInt(QWord)))
+        currentLabel.buf += MovASM(ArrayPointer, ScratchRegs.head)
 
-        buf += Comment("End Pair Cons")
+        currentLabel.buf += Comment("End Pair Cons")
         
     }
     
-    def translateFuncCall(node: FuncCall)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateFuncCall(node: FuncCall)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for FuncCall statement here
-        allocateStackVariables()(buf, node.funcInfo.func.scope)
-        //stackOffsets.push(0)
-        node.args.zip(node.funcInfo.func.params).foreach { case (expr, param) =>
+        allocateStackVariables()(currentLabel, node.func.scope)
+        node.args.zip(node.func.params).foreach { case (expr, param) =>
             translateExpression(expr)
-            assignParam(param)(buf, node.funcInfo.func.scope)
+            assignParam(param)(currentLabel, node.func.scope)
         }
-        buf += CallASM(WaccFuncLabel(node.ident))
-        buf += MovASM(ReturnReg, ScratchRegs.head)
-        popStackVariables()(buf, node.funcInfo.func.scope)
+        currentLabel.buf += CallASM(WaccFuncLabel(node.name))
+        currentLabel.buf += MovASM(ReturnReg, ScratchRegs.head)
+        popStackVariables()(currentLabel, node.func.scope)
     }
 
-    def translateVar(node: Var, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
-        assert(st.contains(node.v), s"Variable ${node.v} was not contained in the symbol table")
-        assert(st.hasLocation(node.v), s"The location of variable ${node.v} was not contained in the symbol table")
+    def translateVar(node: Var, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+        assert(st.contains(node.name), s"Variable ${node.name} was not contained in the symbol table")
+        assert(st.hasLocation(node.name), s"The location of variable ${node.name} was not contained in the symbol table")
 
-        val location = st.getLocation(node.v).get
-        val declType = st.typeof(node.v).get
+        val location = st.getLocation(node.name)
+        val declType = st.typeof(node.name)
         val size = semanticToSize(declType)
 
         if (writeTo) {
-            buf += MovASM(ScratchRegs.head, location, size)
+            currentLabel.buf += MovASM(ScratchRegs.head, location, size)
         } else {
             size match {
-                case QWord => buf += MovASM(location, ScratchRegs.head, size)
-                case size => buf += MovsASM(location, ScratchRegs.head, size)
+                case QWord => currentLabel.buf += MovASM(location, ScratchRegs.head, size)
+                case size => currentLabel.buf += MovsASM(location, ScratchRegs.head, size)
             }
         }
 
     }
 
-    def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translateArrayElem(node: ArrayVal, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         
-        var location = st.getLocation(node.v).get
+        var location = st.getLocation(node.name)
         var innerSize = semanticToSize(node.enclosingType)
 
-        if (writeTo) buf += PushASM(ScratchRegs.head)
+        if (writeTo) currentLabel.buf += PushASM(ScratchRegs.head)
 
         node.exprs.zipWithIndex.foreach { case (expr, index) =>
             val store = writeTo && index == node.exprs.size - 1
@@ -549,105 +562,99 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             }
 
             translateExpression(expr)
-            buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
+            currentLabel.buf += MovASM(ScratchRegs.head, IndexPointer, DWord)
 
 
-            if (index != 0) buf += PopASM(location)
+            if (index != 0) currentLabel.buf += PopASM(location)
 
-            buf += MovASM(location, ArrayPointer)
+            currentLabel.buf += MovASM(location, ArrayPointer)
 
-            if (store) buf += PopASM(ScratchRegs.head)
+            if (store) currentLabel.buf += PopASM(ScratchRegs.head)
 
-            buf += CallASM(label)
+            currentLabel.buf += CallASM(label)
 
             if (index != node.exprs.size - 1) {
                 location = ScratchRegs.head
-                buf += PushASM(location)
+                currentLabel.buf += PushASM(location)
             }
             
         }
 
     }
 
-    def getPairAddress(lvalue: LValue)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def getPairAddress(lvalue: LValue)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         (lvalue: @unchecked) match {
             case node@ArrayVal(name, exprs) => 
                 translateArrayElem(node)
-                buf += MovASM(ArrayPointerPointer, ScratchRegs.head) // super bad sorry
+                currentLabel.buf += MovASM(ArrayPointerPointer, ScratchRegs.head)
+                // todo: either remove array pointer or make translateArrayElem take in a boolean flag for pointer
 
             case p@PairElem(lvalue) =>
                 getPairAddress(lvalue)
-                buf += MovASM(RegisterOffset(ScratchRegs.head), ScratchRegs.head)
+                currentLabel.buf += MovASM(Memory(ScratchRegs.head), ScratchRegs.head)
 
                 // doesn't hurt to put here, although currently only called by translatePairElem which adds this anyway by default
                 if (!funcMap.contains(CheckNullLabel)) {
                     funcMap.addOne((CheckNullLabel, translateNullLabel))
                 }
 
-                buf += CmpASM(NullImm, ScratchRegs.head)
-                buf += JmpASM(CheckNullLabel, Equal)
+                currentLabel.buf += CmpASM(NullImm, ScratchRegs.head)
+                currentLabel.buf += JmpASM(CheckNullLabel, Equal)
                 
                 p match {
                     case _: FstPair => 
-                    case _: SndPair => buf += AddASM(Imm(sizeToInt(QWord)), ScratchRegs.head, ScratchRegs.head)
+                    case _: SndPair => currentLabel.buf += AddASM(Imm(sizeToInt(QWord)), ScratchRegs.head, ScratchRegs.head)
                 }
 
             case Var(name) =>
-                buf += LeaASM(st.getLocation(name).get, ScratchRegs.head)
+                st.getLocation(name) match {
+                    case mem: Memory => currentLabel.buf += LeaASM(mem, ScratchRegs.head)
+                    case reg: Register => currentLabel.buf += MovASM(reg, ScratchRegs.head)
+                }
         }
 
     }
 
-    def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
+    def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         if (!funcMap.contains(CheckNullLabel)) {
             funcMap.addOne((CheckNullLabel, translateNullLabel))
         }
         
-        val memLocation = RegisterOffset(ScratchRegs(0))
+        val memLocation = Memory(ScratchRegs(0))
         val (src, dst) = if (writeTo) (ScratchRegs(1), memLocation)
                          else         (memLocation, ScratchRegs(0))
 
-        buf += Comment(s"Begin Pair Elem $node")
+        currentLabel.buf += Comment(s"Begin Pair Elem $node")
 
-        if (writeTo) buf += PushASM(ScratchRegs.head)
+        if (writeTo) currentLabel.buf += PushASM(ScratchRegs.head)
         getPairAddress(node)
-        if (writeTo) buf += PopASM(ScratchRegs(1))
+        if (writeTo) currentLabel.buf += PopASM(ScratchRegs(1))
 
-        buf += MovASM(src, dst)
+        currentLabel.buf += MovASM(src, dst)
 
-        buf += Comment(s"End Pair Elem")
+        currentLabel.buf += Comment(s"End Pair Elem")
     }
 
-    def translateFunction(func: Func)(implicit buf: ListBuffer[Line] = ListBuffer.empty): ListBuffer[Line] = {
-        // init variables
-        // translate each variable
-
-        buf += PushASM(BasePointer)
-        buf += MovASM(StackPointer, BasePointer)
+    def translateFunction(func: Func)(implicit currentLabel: LabelInfo = LabelInfo.empty): LabelInfo = {
+        currentLabel.buf += PushASM(BasePointer)
+        currentLabel.buf += MovASM(StackPointer, BasePointer)
 
         implicit val paramScope = func.scope
-        val bodyScope = paramScope.children.head
+        val bodyScope = paramScope.getChild()
 
-        // allocate parameters for the function - idk if this is necessary
-        // allocateStackVariables()
-
-        paramScope.isParamST = true
         stackOffsets.push(0)
         func.params.foreach { param =>
-            //System.err.println(param)
             val size = sizeToInt(semanticToSize(syntaxToSemanticType(param.declType)))
-            val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + stackOffsets.head)
-            //System.err.println(funcMemLocation)
+            val funcMemLocation = Memory(BasePointer, 16 + stackOffsets.head)
+
             incrementStackOffset(size)
             paramScope.updateLocation(param.name, funcMemLocation)
         }
         stackOffsets.pop()
 
-        translateBlock(func.stats)(buf, bodyScope)
+        translateBlock(func.stats)(currentLabel, bodyScope)
 
-        // popStackVariables()
-
-        buf
+        currentLabel
     }
 
 
@@ -656,15 +663,17 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     ///////////////// UTILITY FUNCTIONS ///////////////////
 
-    def addStringConstant(string: String): StringLabel = {
-        val retVal = StringLabel(s".L.str${stringSet.size}", toRaw(string))
-        if (!stringSet.contains(retVal)) stringSet.add(retVal)
+    def addStringConstant(string: String)(implicit currentLabel: LabelInfo, st: SymbolTable): StringLabel = {
+        val retVal = StringLabel(s".L.str$branchCounter", toRaw(string))
+        branchCounter += 1;
+        if (!currentLabel.readonlys.contains(retVal)) currentLabel.readonlys.add(retVal)
         retVal
     }
 
 
-    def translateFreeLabel(isArray: Boolean): ListBuffer[Line] = {
-        var buf: ListBuffer[Line] = ListBuffer(
+    def translateFreeLabel(isArray: Boolean): LabelInfo = {
+        var currentLabel: LabelInfo = LabelInfo.empty
+        currentLabel.buf ++ ListBuffer(
             PushASM(BasePointer),
             MovASM(StackPointer, BasePointer),
             AndASM(AlignmentMaskImm, StackPointer, StackPointer)
@@ -675,59 +684,59 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 funcMap.addOne((CheckNullLabel, translateNullLabel))
             }
 
-            buf += CmpASM(NullImm, ParamRegs.head)
-            buf += JmpASM(CheckNullLabel, Equal)
+            currentLabel.buf += CmpASM(NullImm, ParamRegs.head)
+            currentLabel.buf += JmpASM(CheckNullLabel, Equal)
         }
         
-        buf ++= ListBuffer(
+        currentLabel.buf ++= ListBuffer(
             CallASM(FreeLabel),
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM
         )
 
-        buf
+        currentLabel
     }
     
-    def translateArrayElemLabel(size: Size, store: Boolean): ListBuffer[Line] = {
+    def translateArrayElemLabel(size: Size, store: Boolean): LabelInfo = {
         if (!funcMap.contains(CheckBoundsLabel)) {
             funcMap.addOne((CheckBoundsLabel, translateBoundsLabel))
         }
 
-        val (src, dst) = if (store) (ScratchRegs.head, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size))
-                         else (RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ScratchRegs.head)
+        val (src, dst) = if (store) (ScratchRegs.head, Memory(ArrayPointer, IndexPointer, size))
+                         else (Memory(ArrayPointer, IndexPointer, size), ScratchRegs.head)
         
         
-        val buf: ListBuffer[Line] = ListBuffer(
-            Comment(s"Special calling convention: array ptr passed in $ArrayPointer, index in $IndexPointer, ${if (store) "value to store in" else "and return into"} ${ScratchRegs.head}"),
+        val currentLabel: LabelInfo = LabelInfo(ListBuffer(
+            Comment(s"Special calling convention: array ptr passed in ${targetConfig.opStr(ArrayPointer)}, index in ${targetConfig.opStr(IndexPointer)}, ${if (store) "value to store in" else "and return into"} ${targetConfig.opStr(ScratchRegs.head)}"),
             PushASM(ScratchRegs(1)),
             CmpASM(Imm(0), IndexPointer, DWord),
             MovASM(IndexPointer, ParamRegs(1), IR.Less),
             JmpASM(CheckBoundsLabel, IR.Less),
-            MovASM(RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
+            MovASM(Memory(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
             CmpASM(ScratchRegs(1), IndexPointer, DWord),
             MovASM(IndexPointer, ParamRegs(1), GreaterEqual),
             JmpASM(CheckBoundsLabel, GreaterEqual),
-        )
+        ))
 
-        if (!store) buf += LeaASM(RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ArrayPointerPointer)
+        if (!store) currentLabel.buf += LeaASM(Memory(ArrayPointer, IndexPointer, size), ArrayPointerPointer)
 
-        buf ++= ListBuffer(
+        currentLabel.buf ++= ListBuffer(
             if (store || size == QWord) MovASM(src, dst, size)
             else MovsASM(src, dst, size),
             PopASM(ScratchRegs(1)),
             RetASM
         )
 
-        buf
+        currentLabel
     }
 
-    def translateMallocLabel: ListBuffer[Line] = {
+    def translateMallocLabel: LabelInfo = {
         if (!funcMap.contains(CheckOOMLabel)) {
             funcMap.addOne((CheckOOMLabel, translateOOMLabel))
         }
 
-        ListBuffer(
+        LabelInfo(ListBuffer(
             PushASM(BasePointer),
             MovASM(StackPointer, BasePointer),
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
@@ -737,11 +746,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM
-        )
+        ))
     }
 
-    def translateExitLabel: ListBuffer[Line] = {
-        ListBuffer(
+    def translateExitLabel: LabelInfo = {
+        LabelInfo(ListBuffer(
             PushASM(BasePointer),
             MovASM(StackPointer, BasePointer),
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
@@ -749,37 +758,42 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM
-        )
+        ))
     }
 
-    def translateReadLabel(label: WrapperFuncLabel, fstring: String, size: Size): ListBuffer[Line] = {
+    def translateReadLabel(label: WrapperFuncLabel, fstring: String, size: Size): LabelInfo = {
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
 
-        stringSet.addOne(stringLabel)
 
-        ListBuffer(
-            PushASM(BasePointer),
-            MovASM(StackPointer, BasePointer),
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            SubASM(ReadOffsetImm, StackPointer, StackPointer),
-            MovASM(ParamRegs(0), RegisterOffset(StackPointer), size),
-            LeaASM(RegisterOffset(StackPointer), ParamRegs(1)),
-            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs(0)),
-            MovASM(Imm(0), R0, Byte), // for SIMD purposes
-            CallASM(ScanFormatted),
-            MovsASM(RegisterOffset(StackPointer), ReturnReg, size),
-            AddASM(ReadOffsetImm, StackPointer, StackPointer),
-            MovASM(BasePointer, StackPointer),
-            PopASM(BasePointer),
-            RetASM
+        LabelInfo(
+            ListBuffer(
+                PushASM(BasePointer),
+                MovASM(StackPointer, BasePointer),
+                AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+                SubASM(ReadOffsetImm, StackPointer, StackPointer),
+                MovASM(ParamRegs(0), Memory(StackPointer), size),
+                LeaASM(Memory(StackPointer), ParamRegs(1)),
+                LeaASM(Memory(InstructionPointer, stringLabel), ParamRegs(0)),
+                MovASM(Imm(0), R0, Byte), // for SIMD purposes
+                CallASM(ScanFormatted),
+                MovsASM(Memory(StackPointer), ReturnReg, size),
+                AddASM(ReadOffsetImm, StackPointer, StackPointer),
+                MovASM(BasePointer, StackPointer),
+                PopASM(BasePointer),
+                RetASM
+            ),
+            HashSet(stringLabel)
         )
     }
 
-    def translatePrintLabel(label: WrapperFuncLabel, fstring: String, _type: SemType): ListBuffer[Line] = {
+    def translatePrintLabel(label: WrapperFuncLabel, fstring: String, _type: SemType): LabelInfo = {
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
         val size = semanticToSize(_type)
+        val stringOffset = -4
 
-        stringSet.addOne(stringLabel)
+        val currentLabel: LabelInfo = LabelInfo.empty
+
+        currentLabel.readonlys.addOne(stringLabel)
 
         val buf: ListBuffer[Line] = ListBuffer(
             PushASM(BasePointer),
@@ -794,28 +808,28 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 val trueStringLabel = StringLabel(s".L.${label.name}_string_true", "true")
                 val falseStringLabel = StringLabel(s".L.${label.name}_string_false", "false")
 
-                stringSet.addOne(trueStringLabel)
-                stringSet.addOne(falseStringLabel)
+                currentLabel.readonlys.addOne(trueStringLabel)
+                currentLabel.readonlys.addOne(falseStringLabel)
 
                 buf ++= ListBuffer(
                     CmpASM(FalseImm, ParamRegs.head),
                     JmpASM(falseLabel, NotEqual),
-                    LeaASM(RegisterLabelOffset(InstructionPointer, falseStringLabel), ParamRegs(2)),
+                    LeaASM(Memory(InstructionPointer, falseStringLabel), ParamRegs(2)),
                     JmpASM(trueLabel),
                     falseLabel,
-                    LeaASM(RegisterLabelOffset(InstructionPointer, trueStringLabel), ParamRegs(2)),
+                    LeaASM(Memory(InstructionPointer, trueStringLabel), ParamRegs(2)),
                     trueLabel,
-                    MovASM(RegisterImmediateOffset(ParamRegs(2), -4), ParamRegs(1), DWord)
+                    MovASM(Memory(ParamRegs(2), stringOffset), ParamRegs(1), DWord)
                 )
             case SemString | SemArray(SemChar) =>
                 buf += MovASM(ParamRegs(0), ParamRegs(2))
-                buf += MovASM(RegisterImmediateOffset(ParamRegs(0), -4), ParamRegs(1), DWord)
+                buf += MovASM(Memory(ParamRegs(0), stringOffset), ParamRegs(1), DWord)
             case other =>
                 buf += MovASM(ParamRegs(0), ParamRegs(1), size)
         }
 
         buf ++= ListBuffer(
-            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, stringLabel), ParamRegs.head),
             MovASM(Imm(0), R0, Byte), // for SIMD purposes
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
@@ -825,127 +839,82 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             RetASM
         )
 
-        buf
+        currentLabel.buf ++= buf
+
+        currentLabel
     }
 
-    def translatePrintlnLabel: ListBuffer[Line] = {
+    def translatePrintlnLabel: LabelInfo = {
         val stringLabel = StringLabel(s".L.println_string", "")
-        stringSet.addOne(stringLabel)
 
-        ListBuffer(
+        LabelInfo(ListBuffer(
             PushASM(BasePointer),
             MovASM(StackPointer, BasePointer),
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, stringLabel), ParamRegs.head),
             CallASM(Puts),
             MovASM(Imm(0), ParamRegs.head),
             CallASM(FileFlush),
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
             RetASM
-        )
+        ), HashSet(stringLabel))
     }
 
     ////////////////// ERRORS ////////////////////
 
-    def translateNullLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n")
-        stringSet.addOne(errorLabel)
-
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
+    def translateNullLabel: LabelInfo = {
+        translateErrorString(StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n"))
     }
 
-    def translateBoundsLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n")
-        stringSet.addOne(errorLabel)
+    def translateBadCharLabel: LabelInfo = {
+        translateErrorInt(StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n"))
+    }
 
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
-            MovASM(Imm(0), R0, Byte),
-            CallASM(PrintFormatted),
-            MovASM(Imm(0), ParamRegs.head),
-            CallASM(FileFlush),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
+    def translateBoundsLabel: LabelInfo = {
+        translateErrorInt(StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n"))
     }
     
-    def translateOOMLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n")
-        stringSet.addOne(errorLabel)
+    def translateOOMLabel: LabelInfo = {
+        translateErrorString(StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n"))
+    }
 
+    def translateOverflowLabel: LabelInfo = {
+        translateErrorString(StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n"))
+    }
+
+    def translateDivZeroLabel: LabelInfo = {
+        translateErrorString(StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n"))
+    }
+
+    ////////// ERROR HELPERS ///////////
+
+    def translateErrorString(errorLabel: StringLabel): LabelInfo = {
         if (!funcMap.contains(PrintStrLabel)) {
             funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
         }
 
-        ListBuffer(
+
+        LabelInfo(ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
             MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
-        )
+        ), HashSet(errorLabel))
     }
 
-    def translateOverflowLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n")
-        stringSet.addOne(errorLabel)
+    def translateErrorInt(errorLabel: StringLabel): LabelInfo = {
 
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
+        LabelInfo(ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
-    }
-
-
-    def translateDivZeroLabel: ListBuffer[Line] = { // identical to translateOverflow - maybe simplify
-        val errorLabel = StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n")
-        stringSet.addOne(errorLabel)
-
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
-    }
-
-    def translateBadCharLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n")
-        stringSet.addOne(errorLabel)
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             MovASM(Imm(0), R0, Byte),
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
             CallASM(FileFlush),
             MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
-        )
+        ), HashSet(errorLabel))
     }
 }

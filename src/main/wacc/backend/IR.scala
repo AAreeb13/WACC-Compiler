@@ -17,11 +17,12 @@ object IR {
 
     sealed trait Operand
 
-    case class Imm(value: BigInt) extends Operand
-
+    sealed trait NonMemory extends Operand
     sealed trait Location extends Operand
 
-    sealed trait Register extends Location {
+    case class Imm(value: BigInt) extends Operand with NonMemory
+
+    sealed trait Register extends Location with NonMemory {
         val size: Size = QWord
     }
 
@@ -44,6 +45,15 @@ object IR {
     case object R15 extends Register
 
     sealed trait Memory extends Location
+
+    object Memory {
+        def apply(reg: Register): Memory = new RegisterOffset(reg)
+        def apply(reg: Register, offset: Int): Memory = new RegisterImmediateOffset(reg, offset)
+        def apply(reg: Register, offsetLabel: Label): Memory = new RegisterLabelOffset(reg, offsetLabel)
+        def apply(reg: Register, offsetReg: Register): Memory = new RegisterRegisterOffset(reg, offsetReg)
+        def apply(reg: Register, offsetReg: Register, multiplier: Int): Memory = new RegisterMultiplierOffset(reg, offsetReg, multiplier)
+    }
+
     case class RegisterOffset(reg: Register) extends Memory
     case class RegisterImmediateOffset(reg: Register, offset: Int) extends Memory
     case class RegisterLabelOffset(reg: Register, offsetLabel: Label) extends Memory
@@ -72,6 +82,8 @@ object IR {
     sealed class LibFuncLabel(override val name: String) extends Label(name) with FuncLabel
     sealed class WrapperFuncLabel(override val name: String) extends Label(name) with FuncLabel
 
+    sealed class ErrorFuncLabel(override val name: String) extends Label(name) with FuncLabel
+
     case object MainLabel extends Label("main") with FuncLabel
 
     case object MallocLabel    extends LibFuncLabel("malloc")
@@ -94,12 +106,12 @@ object IR {
     case object ExitWrapperLabel extends WrapperFuncLabel("_exit")
     case object MallocWrapperLabel extends WrapperFuncLabel("_malloc")
 
-    case object CheckNullLabel     extends WrapperFuncLabel("_errNull")
-    case object CheckOverflowLabel extends WrapperFuncLabel("_errOverflow")
-    case object CheckDivZeroLabel  extends WrapperFuncLabel("_errDivZero")
-    case object CheckBoundsLabel    extends WrapperFuncLabel("_boundsCheck")
-    case object CheckBadCharLabel  extends WrapperFuncLabel("_errBadChar")
-    case object CheckOOMLabel     extends WrapperFuncLabel("_errOutOfMemory")
+    case object CheckNullLabel     extends ErrorFuncLabel("_errNull")
+    case object CheckOverflowLabel extends ErrorFuncLabel("_errOverflow")
+    case object CheckDivZeroLabel  extends ErrorFuncLabel("_errDivZero")
+    case object CheckBoundsLabel    extends ErrorFuncLabel("_boundsCheck")
+    case object CheckBadCharLabel  extends ErrorFuncLabel("_errBadChar")
+    case object CheckOOMLabel     extends ErrorFuncLabel("_errOutOfMemory")
 
     case class ArrayStoreLabel(size: Size)  extends WrapperFuncLabel("_arrStore") {
         override val name = s"_arrStore${sizeToInt(size)}"
@@ -109,8 +121,6 @@ object IR {
         override val name = s"_arrLoad${sizeToInt(size)}"
     }
 
-    case object ArrayStoreBLabel extends WrapperFuncLabel("_arrStoreB")
-    case object ArrayLoadBLabel  extends WrapperFuncLabel("_arrLoadB")
     case object FreePairLabel    extends WrapperFuncLabel("_freepair")
     case object FreeArrayLabel   extends WrapperFuncLabel("_free")
 
@@ -118,20 +128,34 @@ object IR {
 
     sealed trait Instruction extends Line
 
-    case class PushASM(op: Operand, size: Size = QWord) extends Instruction
-    case class PopASM(op: Operand, size: Size = QWord) extends Instruction // although immediates should not be popped to
+    case class PushASM(op: Location, size: Size = QWord) extends Instruction
+    case class PopASM(op: Location, size: Size = QWord) extends Instruction
     
-    case class SubASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
-    case class MulASM(op1: Operand, op2: Operand, dst: Location, size: Size = DWord) extends Instruction
-    case class DivASM(op1: Operand, op2: Operand, dst: Location, size: Size = DWord) extends Instruction
-    case class AddASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
-    case class AndASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
-    case class OrASM(op1: Operand, op2: Operand, dst: Location, size: Size = QWord) extends Instruction
+    case class SubASM(op1: NonMemory, op2: NonMemory, dst: Register, size: Size = QWord) extends Instruction
+    case class MulASM(op1: NonMemory, op2: NonMemory, dst: Register, size: Size = DWord) extends Instruction
+    case class DivASM(op1: NonMemory, op2: NonMemory, dst: Register, size: Size = DWord) extends Instruction
+    case class AddASM(op1: NonMemory, op2: NonMemory, dst: Register, size: Size = QWord) extends Instruction
+    case class AndASM(op1: NonMemory, op2: NonMemory, dst: Register, size: Size = QWord) extends Instruction
+    case class OrASM(op1: NonMemory, op2: NonMemory, dst: Register, size: Size = QWord) extends Instruction
 
-    case class TestASM(src: Operand, dst: Operand, size: Size = QWord) extends Instruction // todo: check if src/dst are operands or locations
+    abstract class NonDoubleMem(src: Operand, dst: Operand) extends Instruction {
+        require((src, dst) match {
+            case (_: Memory, _: Memory) => false
+            case _ => true
+        }, "Either src or dst can be an instance of a memory location, but not both")
+    }
 
-    case class MovsASM(src: Operand, dst: Location, sizeFrom: Size, sizeTo: Size = QWord) extends Instruction
-    case class MovASM(src: Operand, dst: Location, flag: Condition, size: Size) extends Instruction
+    abstract class NonDoubleImm(src: Operand, dst: Operand) extends Instruction {
+        require((src, dst) match {
+            case (_: Imm, _: Imm) => false
+            case _ => true
+        }, s"Either src or dst can be an instance of an immediate value, but not both")
+    }
+
+    case class TestASM(src: Operand, dst: Operand, size: Size = QWord) extends NonDoubleMem(src, dst) // todo: check if src/dst are operands or locations
+
+    case class MovsASM(src: Operand, dst: Location, sizeFrom: Size, sizeTo: Size = QWord) extends NonDoubleMem(src, dst)
+    case class MovASM(src: Operand, dst: Location, flag: Condition, size: Size) extends NonDoubleMem(src, dst)
 
     object MovASM {
         def apply(src: Operand, dst: Location, flag: Condition): MovASM = 
@@ -141,10 +165,11 @@ object IR {
             MovASM(src, dst, Unconditional, size)
     }
 
-    case class CmpASM(src: Operand, dst: Location, size: Size = QWord) extends Instruction
-    case class SetASM(dst: Operand, flag: Condition, size: Size = Byte) extends Instruction
+    case class CmpASM(src: Operand, dst: Location, size: Size = QWord) extends NonDoubleImm(src, dst)
+    case class SetASM(dst: Operand, flag: Condition, private val size: Size = Byte) extends Instruction
+
     case class JmpASM(label: Label, flag: Condition = Unconditional) extends Instruction
-    case class LeaASM(src: Operand, dst: Register, size: Size = QWord) extends Instruction
+    case class LeaASM(src: Memory, dst: Register, size: Size = QWord) extends Instruction
     case class CallASM(label: FuncLabel) extends Instruction
 
     sealed trait Condition
@@ -159,10 +184,17 @@ object IR {
 
     case class Comment(contents: String) extends Line
 
-    sealed class Tag(val name: String) extends Line
-    case object TextTag   extends Tag("text")
-    case object GlobalTag extends Tag("globl main")
-    case object ReadonlyTag  extends Tag("section .rodata")
+    object Comment {
+        def apply(contents: String): Comment = 
+            new Comment(utils.toRaw(contents, false))
+    }
+
+    sealed trait Tag extends Line
+    case object TextTag   extends Tag
+    case object GlobalTag extends Tag
+    case object ReadonlyTag  extends Tag
+
+    case object EmptyLine extends Line
 
     val TrueImm = Imm(1)
     val FalseImm = Imm(0)
