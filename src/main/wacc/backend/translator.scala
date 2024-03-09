@@ -18,36 +18,38 @@ import utils._
  * 
  * @param semanticInfo SemanticInfo contains the AST, function and symbol table
  * codeGenerator is only used when semantic check is successful, so SemanticInfo is always present
- * @param targetConfig TODO
+ * @param targetConfig The configuration for the specified architecture
  * @return The IR code
  */
  
 class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig) {
     import targetConfig._
 
-    //type LabelInfo = (ListBuffer[Line], ListBuffer[StringLabel])
+    // Class that represents the list of instructions per function label and associated string labels with it
     case class LabelInfo(buf: ListBuffer[Line], readonlys: HashSet[StringLabel])
 
     object LabelInfo {
         def empty: LabelInfo = LabelInfo(ListBuffer.empty, HashSet.empty)
-
         def apply(buf: ListBuffer[Line]): LabelInfo = new LabelInfo(buf, HashSet.empty)
     }
 
+    // Stack data structure that store the location of where the next variable 
+    // will be stored relative to base pointer
     var stackOffsets: Stack[Int] = Stack.empty
+    // Counter to distinguish between different labels -> todo: maybe use a set or something else
     var branchCounter: Int = 0
+    // Map which contains all the function labels and their instructions
     var funcMap: HashMap[FuncLabel, LabelInfo] = HashMap.empty
 
-    // Main entry point for translating the whole code into IR
-    def translate(): List[Line] = {
-        // Generate Header
-
-        translateProg(semanticInfo.ast)
-
+    /**
+      * Function that flattens the funcMap into a list of instructions
+      */
+    def flattenToAssembly(): List[Line] = {
         var asmList: ListBuffer[Line] = ListBuffer.empty
 
         asmList += GlobalTag
 
+        // Helper function to group ASM output into Main, Wacc functions, Wrapper functions, Errors respectively
         def groupFunc(funcLabelPair: (FuncLabel, LabelInfo)): Int = funcLabelPair._1 match {
             case MainLabel => 0
             case WaccFuncLabel(_name) => 1
@@ -56,7 +58,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case _ => -1
         }
 
+        // Set that holds already defined strings so there are no repeats
         var stringSet: HashSet[StringLabel] = HashSet.empty
+
         asmList ++= funcMap.toList.sortBy(groupFunc).flatMap{ case (func, LabelInfo(body, readonlys)) =>
             val buf: ListBuffer[Line] = ListBuffer.empty 
             
@@ -80,16 +84,24 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         asmList.toList
     }
 
+    /**
+      * Function that translate the ast into assembly
+      */
+    def translate(): List[Line] = {
+        translateProg(semanticInfo.ast)
+        flattenToAssembly()
+    }
+
     
     def translateProg(prog: Prog) = {
         funcMap.addOne((MainLabel, translateMain(prog)))
         prog.funcs.foreach(f => funcMap.addOne((WaccFuncLabel(f.name), translateFunction(f))))
     }
 
+    /**
+      * Generates code for main scope of program
+      */
     def translateMain(prog: Prog)(implicit currentLabel: LabelInfo = LabelInfo.empty): LabelInfo = {
-        // init variables
-        // translate each variable
-
         currentLabel.buf += PushASM(BasePointer)
         currentLabel.buf += MovASM(StackPointer, BasePointer)
 
@@ -102,7 +114,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel
     }
 
-    def allocateStackVariables()(implicit currentLabel: LabelInfo, st: SymbolTable) = {
+    /**
+      * Allocation variables on the stack by subtracting scope size from Stack Pointer
+      */
+    def allocateStackVariables()(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         stackOffsets.push(0)
         if (st.getScopeSize() > 0) {
             currentLabel.buf += Comment(s"The current scope size is ${st.getScopeSize()}")
@@ -110,15 +125,20 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
-    def popStackVariables()(implicit currentLabel: LabelInfo, st: SymbolTable) = {
+    /**
+      * Deallocation of variables on the stack by adding scope size to Stack Pointer
+      */
+    def popStackVariables()(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         stackOffsets.pop()
         if (st.getScopeSize() > 0) {
             currentLabel.buf += AddASM(Imm(st.getScopeSize()), StackPointer, StackPointer)
         }
     }
 
+    /**
+      * Generates code for statements
+      */
     def translateStatement(stat: Stat)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
-        //println(s"st: $st, stat: $stat")
         stat match {
             case node: If         => translateIf(node)
             case node: Assign     => translateAssign(node)
@@ -135,6 +155,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
+    /**
+      * Generates code for 'if' statements
+      */
     def translateIf(node: If)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for If statement here
         val trueLabel = JumpLabel(s".L_if_true_$branchCounter")
@@ -173,6 +196,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += Comment(s"End Declaration")
     }
 
+    /**
+      * Assigns the next location of a variable declaration into memory by checking relative to
+      * base pointer and stackOffsets
+      */
     def assignLocation(node: AssignNew)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
         val memLocation = Memory(BasePointer, stackOffsets.head - st.getBasePointerOffset())
@@ -185,6 +212,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += MovASM(ScratchRegs.head, memLocation, size)
     }
 
+    /**
+      * Similar to above but parameters don't update their location in symbol table, 
+      */
     def assignParam(node: Param)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
@@ -199,6 +229,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         stackOffsets.push(stackOffsets.pop() + size)
     }
 
+    /**
+      * Generates code for 'read'
+      */
     def translateRead(node: Read)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Read statement here
         val (wrapperLabel, fstring) = (node.enclosingType: @unchecked) match {
@@ -217,6 +250,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         translateLValue(node.lvalue, true)
     }
 
+    /**
+      * Generates code for 'while' statements
+      */
     def translateWhile(node: While)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for While statement here
         val doneLabel = JumpLabel(s".L_while_done_$branchCounter")
@@ -236,6 +272,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += Comment("End WHILE")
     }
 
+    /**
+      * Generates code for 'print'
+      */
     def translatePrint(node: Printable)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Print statement here
         translateExpression(node.expr)
@@ -257,6 +296,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     }
 
+    /**
+      * Generates code for 'println' by calling translatePrint() and adding code for a new line
+      */
     def translatePrintln(node: Println)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Println statement here
         translatePrint(node)
@@ -268,6 +310,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += CallASM(PrintlnLabel)
     }
 
+    /**
+      * Generates code for 'exit'
+      */
     def translateExit(node: Exit)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Exit statement here
         if (!funcMap.contains(ExitWrapperLabel)) {
@@ -279,12 +324,18 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += CallASM(ExitWrapperLabel)
     }
 
+    /**
+      * Translates code block in scopes such as 'if' and 'while'
+      */
     def translateBlock(stats: List[Stat])(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         allocateStackVariables()
         stats.foreach(translateStatement(_))
         popStackVariables()
     }
 
+    /**
+      * Generates code for freeing of arrays or pairs
+      */
     def translateFree(node: Free)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Free statement here
         val freeLabel = if (node.isArray) FreeArrayLabel else FreePairLabel
@@ -304,6 +355,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += CallASM(freeLabel)
     }
 
+    /**
+      * Generates code for 'return' statements in functions
+      */
     def translateReturn(node: Return)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         translateExpression(node.expr)
@@ -312,6 +366,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += RetASM
     }
 
+    /**
+      * Generates code for expressions and atoms
+      */
     def translateExpression(expr: Expr)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         expr match {
             case v: Var => translateVar(v)
@@ -329,14 +386,17 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
+    /**
+      * Generates code for arithmetic and logical binary operations and comparisons
+      */
     def translateBinOp(binop: BinOp)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         currentLabel.buf += Comment(s"Begin expression $binop")
         binop match {
             case op@ArithmeticOp(lhs, rhs) =>
                 translateExpression(rhs)
-                currentLabel.buf += PushASM(ScratchRegs.head) // also maybe specify dword/long size for push/pop
+                currentLabel.buf += PushASM(ScratchRegs.head)
                 translateExpression(lhs)
-                currentLabel.buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
+                currentLabel.buf += PopASM(ScratchRegs(1))
 
                 op match {
                     case divMod @ (Mod(_, _) | Div(_, _)) =>
@@ -350,7 +410,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
                         (divMod: @unchecked) match {
                             case _: Div => currentLabel.buf += MovASM(DivRegister, ScratchRegs.head, DWord)
-                            case _: Mod => currentLabel.buf += MovASM(ModRegister, ScratchRegs.head, DWord) // todo: specify divMod register in config
+                            case _: Mod => currentLabel.buf += MovASM(ModRegister, ScratchRegs.head, DWord)
                         }
                         currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
                     case other =>
@@ -360,7 +420,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
                         (other: @unchecked) match {
                             case _: Add => currentLabel.buf += AddASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
-                            case _: Sub => currentLabel.buf += SubASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord) // check commutativity
+                            case _: Sub => currentLabel.buf += SubASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                             case _: Mul => currentLabel.buf += MulASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                         }
                         currentLabel.buf += JmpASM(CheckOverflowLabel, Overflow)
@@ -371,7 +431,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 translateExpression(lhs)
                 currentLabel.buf += PushASM(ScratchRegs(0))
                 translateExpression(rhs)
-                currentLabel.buf += PopASM(ScratchRegs(1)) // could be wrong, need to save lhs value
+                currentLabel.buf += PopASM(ScratchRegs(1))
                 currentLabel.buf += CmpASM(ScratchRegs(0), ScratchRegs(1))
                 val flag = op match {
                     case _: Eql => Equal
@@ -408,6 +468,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += Comment(s"End expression")
     }
 
+    /**
+      * Generates code for arithmetic and logical unary operations
+      */
     def translateUnOp(unop: UnOp)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         unop match {
             case Len(expr) => 
@@ -451,6 +514,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
+    /**
+      * Generates code for lvalues
+      */
     def translateLValue(lvalue: LValue, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for LValues here
         lvalue match {
@@ -460,6 +526,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         }
     }
 
+    /**
+      * Generates code for rvalues
+      */
     def translateRValue(rvalue: RValue)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Return statement here
         rvalue match {
@@ -514,18 +583,26 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         
     }
     
+    /**
+      * Generate code for 'call'
+      * All parameters are put on the stack during function call function is called
+      */
     def translateFuncCall(node: FuncCall)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for FuncCall statement here
-        allocateStackVariables()(currentLabel, node.func.scope)
+        val paramScope = node.func.scope
+        allocateStackVariables()(currentLabel, paramScope)
         node.args.zip(node.func.params).foreach { case (expr, param) =>
             translateExpression(expr)
-            assignParam(param)(currentLabel, node.func.scope)
+            assignParam(param)(currentLabel, paramScope)
         }
         currentLabel.buf += CallASM(WaccFuncLabel(node.name))
         currentLabel.buf += MovASM(ReturnReg, ScratchRegs.head)
-        popStackVariables()(currentLabel, node.func.scope)
+        popStackVariables()(currentLabel, paramScope)
     }
 
+    /**
+      * Gets the value of variable from ST and possibly overrwrites based on @param writeTo
+      */
     def translateVar(node: Var, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         assert(st.contains(node.name), s"Variable ${node.name} was not contained in the symbol table")
         assert(st.hasLocation(node.name), s"The location of variable ${node.name} was not contained in the symbol table")
@@ -552,6 +629,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         if (writeTo) currentLabel.buf += PushASM(ScratchRegs.head)
 
+        /**
+          * Iterate through each of the expressions
+          */
         node.exprs.zipWithIndex.foreach { case (expr, index) =>
             val store = writeTo && index == node.exprs.size - 1
             val size = if (index == node.exprs.size - 1) innerSize else QWord
@@ -582,6 +662,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     }
 
+    /**
+      * Get the pointer to the address of an LValue so that it can be directly modifed.
+      * For now it is only used for pairs
+      */
     def getPairAddress(lvalue: LValue)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         (lvalue: @unchecked) match {
             case node@ArrayVal(name, exprs) => 
@@ -615,6 +699,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     }
 
+    /**
+      * Pair elems are translated by calling getPairAddress and dereferencing the location
+      */
     def translatePairElem(node: PairElem, writeTo: Boolean = false)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         if (!funcMap.contains(CheckNullLabel)) {
             funcMap.addOne((CheckNullLabel, translateNullLabel))
@@ -642,6 +729,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         implicit val paramScope = func.scope
         val bodyScope = paramScope.getChild()
 
+        // Translate the function parameters and assign locations into ST
         stackOffsets.push(0)
         func.params.foreach { param =>
             val size = sizeToInt(semanticToSize(syntaxToSemanticType(param.declType)))
@@ -663,6 +751,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     ///////////////// UTILITY FUNCTIONS ///////////////////
 
+    /**
+      * Adds a string constant, also makes sure to translate escape characters 
+      */
     def addStringConstant(string: String)(implicit currentLabel: LabelInfo, st: SymbolTable): StringLabel = {
         val retVal = StringLabel(s".L.str$branchCounter", toRaw(string))
         branchCounter += 1;
@@ -670,7 +761,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         retVal
     }
 
-
+    /**
+      * Generates 'free' label 
+      */
     def translateFreeLabel(isArray: Boolean): LabelInfo = {
         var currentLabel: LabelInfo = LabelInfo.empty
         currentLabel.buf ++ ListBuffer(
@@ -679,6 +772,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             AndASM(AlignmentMaskImm, StackPointer, StackPointer)
         )
         
+        // Based on flag, pair or array is free so null check is performed
         if (!isArray) {
             if (!funcMap.contains(CheckNullLabel)) {
                 funcMap.addOne((CheckNullLabel, translateNullLabel))
@@ -731,6 +825,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel
     }
 
+    /**
+      * Generates 'malloc' label for allocating space for arrays and pairs
+      */
     def translateMallocLabel: LabelInfo = {
         if (!funcMap.contains(CheckOOMLabel)) {
             funcMap.addOne((CheckOOMLabel, translateOOMLabel))
@@ -761,9 +858,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         ))
     }
 
+    /**
+      * Generate 'read' label depending on 'size' parameter which depends on whether we are reading into a 'char' or 'int'
+      */
     def translateReadLabel(label: WrapperFuncLabel, fstring: String, size: Size): LabelInfo = {
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
-
 
         LabelInfo(
             ListBuffer(
@@ -786,6 +885,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         )
     }
 
+    /**
+      * Generates 'print' label depending on the type of what it is printing
+      */
     def translatePrintLabel(label: WrapperFuncLabel, fstring: String, _type: SemType): LabelInfo = {
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
         val size = semanticToSize(_type)
@@ -844,6 +946,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel
     }
 
+    /**
+      * Label for 'println' which just prints a new line, usually called in conjunction with 'print'
+      */
     def translatePrintlnLabel: LabelInfo = {
         val stringLabel = StringLabel(s".L.println_string", "")
 
@@ -862,6 +967,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     }
 
     ////////////////// ERRORS ////////////////////
+
+    /**
+      * This section generates labels for each error type and then uses the 
+      * corresponding error generator helper function
+      */
 
     def translateNullLabel: LabelInfo = {
         translateErrorString(StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n"))
@@ -893,7 +1003,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         if (!funcMap.contains(PrintStrLabel)) {
             funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
         }
-
 
         LabelInfo(ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
