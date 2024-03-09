@@ -45,6 +45,15 @@ object IR {
     case object R15 extends Register
 
     sealed trait Memory extends Location
+
+    object Memory {
+        def apply(reg: Register): Memory = new RegisterOffset(reg)
+        def apply(reg: Register, offset: Int): Memory = new RegisterImmediateOffset(reg, offset)
+        def apply(reg: Register, offsetLabel: Label): Memory = new RegisterLabelOffset(reg, offsetLabel)
+        def apply(reg: Register, offsetReg: Register): Memory = new RegisterRegisterOffset(reg, offsetReg)
+        def apply(reg: Register, offsetReg: Register, multiplier: Int): Memory = new RegisterMultiplierOffset(reg, offsetReg, multiplier)
+    }
+
     case class RegisterOffset(reg: Register) extends Memory
     case class RegisterImmediateOffset(reg: Register, offset: Int) extends Memory
     case class RegisterLabelOffset(reg: Register, offsetLabel: Label) extends Memory
@@ -175,7 +184,7 @@ object IR {
 
     object Comment {
         def apply(contents: String): Comment = 
-            Comment(utils.toRaw(contents, false))
+            new Comment(utils.toRaw(contents, false))
     }
 
     sealed trait Tag extends Line

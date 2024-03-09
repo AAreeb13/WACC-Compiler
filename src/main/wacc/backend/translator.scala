@@ -147,7 +147,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def assignLocation(node: AssignNew)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         // Implement translation for Declaration statement here
-        val memLocation = RegisterImmediateOffset(BasePointer, stackOffsets.head - st.getAbsoluteScopeSize())
+        val memLocation = Memory(BasePointer, stackOffsets.head - st.getAbsoluteScopeSize())
 
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
@@ -160,8 +160,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def assignParam(node: Param)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
-        val localMemLocation = RegisterImmediateOffset(StackPointer,  stackOffsets.head) // todo //st.getScopeSize() - size -
-        // val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
+        val localMemLocation = Memory(StackPointer,  stackOffsets.head) // todo //st.getScopeSize() - size -
+        // val funcMemLocation = Memory(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
 
         // st.updateLocation(node.name, funcMemLocation)
         
@@ -304,7 +304,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case CharVal(c) => buf += MovASM(Imm(c.toInt), ScratchRegs.head)
             case StrVal(s) =>
                 val stringLabel = addStringConstant(s)
-                buf += LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ScratchRegs.head)
+                buf += LeaASM(Memory(InstructionPointer, stringLabel), ScratchRegs.head)
             case BoolVal(b) => buf += MovASM(Imm(if (b) 1 else 0), ScratchRegs.head)
             case PairVal() => buf += MovASM(NullImm, ScratchRegs.head)
             case v: ArrayVal => translateArrayElem(v)
@@ -399,7 +399,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case Len(expr) => 
                 translateExpression(expr)
                 buf += MovASM(ScratchRegs.head, ScratchRegs(1)) // can this be optimised out?
-                buf += MovsASM(RegisterImmediateOffset(ScratchRegs(1), -sizeToInt(DWord)), ScratchRegs.head, DWord)
+                buf += MovsASM(Memory(ScratchRegs(1), -sizeToInt(DWord)), ScratchRegs.head, DWord)
 
             case Not(expr) =>
                 translateExpression(expr)
@@ -470,10 +470,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += MovASM(ScratchRegs(0), ArrayPointer)
         buf += AddASM(Imm(sizeToInt(DWord)), ArrayPointer, ArrayPointer)
         buf += MovASM(Imm(node.exprs.size), ScratchRegs(0))
-        buf += MovASM(ScratchRegs(0), RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)))
+        buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, -sizeToInt(DWord)))
         node.exprs.zipWithIndex.foreach { case (expr, index) =>
             translateExpression(expr)
-            buf += MovASM(ScratchRegs(0), RegisterImmediateOffset(ArrayPointer, index * singleSize))
+            buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, index * singleSize))
         }
         buf += MovASM(ArrayPointer, ScratchRegs(0))
     }
@@ -491,9 +491,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         buf += CallASM(MallocWrapperLabel)
         buf += MovASM(ScratchRegs.head, ArrayPointer)
         translateExpression(node.fst)
-        buf += MovASM(ScratchRegs.head, RegisterOffset(ArrayPointer))
+        buf += MovASM(ScratchRegs.head, Memory(ArrayPointer))
         translateExpression(node.snd)
-        buf += MovASM(ScratchRegs.head, RegisterImmediateOffset(ArrayPointer, sizeToInt(QWord)))
+        buf += MovASM(ScratchRegs.head, Memory(ArrayPointer, sizeToInt(QWord)))
         buf += MovASM(ArrayPointer, ScratchRegs.head)
 
         buf += Comment("End Pair Cons")
@@ -577,7 +577,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
             case p@PairElem(lvalue) =>
                 getPairAddress(lvalue)
-                buf += MovASM(RegisterOffset(ScratchRegs.head), ScratchRegs.head)
+                buf += MovASM(Memory(ScratchRegs.head), ScratchRegs.head)
 
                 // doesn't hurt to put here, although currently only called by translatePairElem which adds this anyway by default
                 if (!funcMap.contains(CheckNullLabel)) {
@@ -606,7 +606,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne((CheckNullLabel, translateNullLabel))
         }
         
-        val memLocation = RegisterOffset(ScratchRegs(0))
+        val memLocation = Memory(ScratchRegs(0))
         val (src, dst) = if (writeTo) (ScratchRegs(1), memLocation)
                          else         (memLocation, ScratchRegs(0))
 
@@ -639,7 +639,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         func.params.foreach { param =>
             //System.err.println(param)
             val size = sizeToInt(semanticToSize(syntaxToSemanticType(param.declType)))
-            val funcMemLocation = RegisterImmediateOffset(BasePointer, 16 + stackOffsets.head)
+            val funcMemLocation = Memory(BasePointer, 16 + stackOffsets.head)
             //System.err.println(funcMemLocation)
             incrementStackOffset(size)
             paramScope.updateLocation(param.name, funcMemLocation)
@@ -697,8 +697,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             funcMap.addOne((CheckBoundsLabel, translateBoundsLabel))
         }
 
-        val (src, dst) = if (store) (ScratchRegs.head, RegisterMultiplierOffset(ArrayPointer, IndexPointer, size))
-                         else (RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ScratchRegs.head)
+        val (src, dst) = if (store) (ScratchRegs.head, Memory(ArrayPointer, IndexPointer, size))
+                         else (Memory(ArrayPointer, IndexPointer, size), ScratchRegs.head)
         
         
         val buf: ListBuffer[Line] = ListBuffer(
@@ -707,13 +707,13 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             CmpASM(Imm(0), IndexPointer, DWord),
             MovASM(IndexPointer, ParamRegs(1), IR.Less),
             JmpASM(CheckBoundsLabel, IR.Less),
-            MovASM(RegisterImmediateOffset(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
+            MovASM(Memory(ArrayPointer, -sizeToInt(DWord)), ScratchRegs(1), DWord),
             CmpASM(ScratchRegs(1), IndexPointer, DWord),
             MovASM(IndexPointer, ParamRegs(1), GreaterEqual),
             JmpASM(CheckBoundsLabel, GreaterEqual),
         )
 
-        if (!store) buf += LeaASM(RegisterMultiplierOffset(ArrayPointer, IndexPointer, size), ArrayPointerPointer)
+        if (!store) buf += LeaASM(Memory(ArrayPointer, IndexPointer, size), ArrayPointerPointer)
 
         buf ++= ListBuffer(
             if (store || size == QWord) MovASM(src, dst, size)
@@ -765,12 +765,12 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             MovASM(StackPointer, BasePointer),
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
             SubASM(ReadOffsetImm, StackPointer, StackPointer),
-            MovASM(ParamRegs(0), RegisterOffset(StackPointer), size),
-            LeaASM(RegisterOffset(StackPointer), ParamRegs(1)),
-            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs(0)),
+            MovASM(ParamRegs(0), Memory(StackPointer), size),
+            LeaASM(Memory(StackPointer), ParamRegs(1)),
+            LeaASM(Memory(InstructionPointer, stringLabel), ParamRegs(0)),
             MovASM(Imm(0), R0, Byte), // for SIMD purposes
             CallASM(ScanFormatted),
-            MovsASM(RegisterOffset(StackPointer), ReturnReg, size),
+            MovsASM(Memory(StackPointer), ReturnReg, size),
             AddASM(ReadOffsetImm, StackPointer, StackPointer),
             MovASM(BasePointer, StackPointer),
             PopASM(BasePointer),
@@ -803,22 +803,22 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                 buf ++= ListBuffer(
                     CmpASM(FalseImm, ParamRegs.head),
                     JmpASM(falseLabel, NotEqual),
-                    LeaASM(RegisterLabelOffset(InstructionPointer, falseStringLabel), ParamRegs(2)),
+                    LeaASM(Memory(InstructionPointer, falseStringLabel), ParamRegs(2)),
                     JmpASM(trueLabel),
                     falseLabel,
-                    LeaASM(RegisterLabelOffset(InstructionPointer, trueStringLabel), ParamRegs(2)),
+                    LeaASM(Memory(InstructionPointer, trueStringLabel), ParamRegs(2)),
                     trueLabel,
-                    MovASM(RegisterImmediateOffset(ParamRegs(2), -4), ParamRegs(1), DWord)
+                    MovASM(Memory(ParamRegs(2), -4), ParamRegs(1), DWord)
                 )
             case SemString | SemArray(SemChar) =>
                 buf += MovASM(ParamRegs(0), ParamRegs(2))
-                buf += MovASM(RegisterImmediateOffset(ParamRegs(0), -4), ParamRegs(1), DWord)
+                buf += MovASM(Memory(ParamRegs(0), -4), ParamRegs(1), DWord)
             case other =>
                 buf += MovASM(ParamRegs(0), ParamRegs(1), size)
         }
 
         buf ++= ListBuffer(
-            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, stringLabel), ParamRegs.head),
             MovASM(Imm(0), R0, Byte), // for SIMD purposes
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
@@ -839,7 +839,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             PushASM(BasePointer),
             MovASM(StackPointer, BasePointer),
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, stringLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, stringLabel), ParamRegs.head),
             CallASM(Puts),
             MovASM(Imm(0), ParamRegs.head),
             CallASM(FileFlush),
@@ -861,7 +861,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
             MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
@@ -874,7 +874,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             MovASM(Imm(0), R0, Byte),
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
@@ -894,7 +894,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
             MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
@@ -911,7 +911,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
             MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
@@ -929,7 +929,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             CallASM(PrintStrLabel),
             MovASM(ExitFailureImm, ParamRegs.head, Byte),
             CallASM(ExitLabel)
@@ -942,7 +942,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
         ListBuffer(
             AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(RegisterLabelOffset(InstructionPointer, errorLabel), ParamRegs.head),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
             MovASM(Imm(0), R0, Byte),
             CallASM(PrintFormatted),
             MovASM(Imm(0), ParamRegs.head),
