@@ -20,6 +20,8 @@ abstract class TargetConfig {
     val IndexPointer: Register
     val ScratchRegs: List[Register]
     val InstructionPointer: Register
+    val DivRegister: Register
+    val ModRegister: Register
 
     val ParamRegs: List[Register]
     val CallerSaved: List[Register]

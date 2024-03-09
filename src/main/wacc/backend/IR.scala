@@ -82,6 +82,8 @@ object IR {
     sealed class LibFuncLabel(override val name: String) extends Label(name) with FuncLabel
     sealed class WrapperFuncLabel(override val name: String) extends Label(name) with FuncLabel
 
+    sealed class ErrorFuncLabel(override val name: String) extends Label(name) with FuncLabel
+
     case object MainLabel extends Label("main") with FuncLabel
 
     case object MallocLabel    extends LibFuncLabel("malloc")
@@ -104,12 +106,12 @@ object IR {
     case object ExitWrapperLabel extends WrapperFuncLabel("_exit")
     case object MallocWrapperLabel extends WrapperFuncLabel("_malloc")
 
-    case object CheckNullLabel     extends WrapperFuncLabel("_errNull")
-    case object CheckOverflowLabel extends WrapperFuncLabel("_errOverflow")
-    case object CheckDivZeroLabel  extends WrapperFuncLabel("_errDivZero")
-    case object CheckBoundsLabel    extends WrapperFuncLabel("_boundsCheck")
-    case object CheckBadCharLabel  extends WrapperFuncLabel("_errBadChar")
-    case object CheckOOMLabel     extends WrapperFuncLabel("_errOutOfMemory")
+    case object CheckNullLabel     extends ErrorFuncLabel("_errNull")
+    case object CheckOverflowLabel extends ErrorFuncLabel("_errOverflow")
+    case object CheckDivZeroLabel  extends ErrorFuncLabel("_errDivZero")
+    case object CheckBoundsLabel    extends ErrorFuncLabel("_boundsCheck")
+    case object CheckBadCharLabel  extends ErrorFuncLabel("_errBadChar")
+    case object CheckOOMLabel     extends ErrorFuncLabel("_errOutOfMemory")
 
     case class ArrayStoreLabel(size: Size)  extends WrapperFuncLabel("_arrStore") {
         override val name = s"_arrStore${sizeToInt(size)}"
@@ -191,6 +193,8 @@ object IR {
     case object TextTag   extends Tag
     case object GlobalTag extends Tag
     case object ReadonlyTag  extends Tag
+
+    case object EmptyLine extends Line
 
     val TrueImm = Imm(1)
     val FalseImm = Imm(0)

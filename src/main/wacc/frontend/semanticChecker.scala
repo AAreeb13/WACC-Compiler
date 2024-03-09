@@ -272,7 +272,7 @@ object semanticChecker {
                             args.zip(paramTypes).foreach{ case (arg, paramType) => 
                                 matchesType(checkExpression(arg), paramType)
                             }
-                            funcCall.funcInfo = funcInfo
+                            funcCall.func = func
                             retType
                         }
                     }
@@ -286,7 +286,7 @@ object semanticChecker {
          */
         def checkVar(v: Var)(implicit currentScope: SymbolTable) = 
             // Return the type of the variable if it exists, otherwise throw an error
-            currentScope.typeofOption(v.v).getOrElse {
+            currentScope.typeofOption(v.name).getOrElse {
                 errorCollector.addError(v, UndeclaredVarError(v))
                 SemNone
             }
@@ -340,7 +340,7 @@ object semanticChecker {
         def checkArray(arrayElem: ArrayVal)(implicit currentScope: SymbolTable): SemType = {
             // Checks each array element index has overall type integer
             arrayElem.exprs.foreach(e => matchesType(checkExpression(e), SemInt)(e))
-            currentScope.typeofOption(arrayElem.v) match {
+            currentScope.typeofOption(arrayElem.name) match {
                 case None => 
                     errorCollector.addError(arrayElem, UndeclaredVarError(arrayElem))
                     SemNone

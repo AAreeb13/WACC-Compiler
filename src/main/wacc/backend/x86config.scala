@@ -21,6 +21,8 @@ case object X86Config extends TargetConfig {
     val Rip = PC
 
     override val ArrayPointer: Register = R9
+    override val DivRegister: Register = Rax
+    override val ModRegister: Register = R3
     
     override val ArrayPointerPointer: Register = R15
 
@@ -142,6 +144,7 @@ case object X86Config extends TargetConfig {
     override def assemble(ir: List[Line]): String = {
         ir.map { l => 
             l match {
+                case EmptyLine => ""
                 case StringLabel(name, value) => s"\t.int ${value.length}\n${name}:\n\t.asciz \"${value}\""
                 case label: Label => s"${label.name}:"
                 case tag: Tag =>
