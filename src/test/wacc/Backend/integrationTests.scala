@@ -15,6 +15,8 @@ import java.io.ByteArrayOutputStream
 import wacc.globals._
 import scala.sys.process._
 import wacc.X86Config
+import wacc.IntelConfig
+import wacc.TargetConfig
 
 
 
@@ -31,6 +33,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
     val examplesDir = "wacc_examples/valid/"
     val asmDir = "backend_output"
     val executionTimeout: Long = 2
+    val config: TargetConfig = IntelConfig
 
     /**
       * Compiles all the files in a given path
@@ -51,8 +54,6 @@ class BackendIntegrationTest extends AnyFlatSpec {
     "Valid scope examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "scope") 
     }
-
-    // everything should work from this point on
 
     "Valid IO examples" should "match assembler output and exit code" in {
         performTests(examplesDir + "IO") 
@@ -232,7 +233,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
 
         val syntaxResult = parser.parse(input)
         val semanticResult = semanticChecker.verify(syntaxResult)
-        val translateResult = codeGenerator.generateAssembly(semanticResult, X86Config)
+        val translateResult = codeGenerator.generateAssembly(semanticResult, config)
 
         translateResult
     }

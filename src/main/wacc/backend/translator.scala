@@ -73,6 +73,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                     }
                 }
                 buf += TextTag
+            } else if (func == MainLabel) {
+                buf += TextTag
             }
 
             buf += func
