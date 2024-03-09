@@ -121,11 +121,10 @@ class BackendIntegrationTest extends AnyFlatSpec {
         }
 
         val totalCount = assembledFiles.size
-        counter = 0
 
-        val failed = assembledFiles.map { case fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)) =>
+        val failed = assembledFiles.zipWithIndex.map { case (fileInfo@(examplePath, asmOutput, (in, expectedOut, expectedExit)), counter) =>
             // gcc -x assembler - -z noexecstack -o out (input is piped so no need to create .s file)
-            displayProgress(examplePath, totalCount)
+            println("\r" + s"Executing: $examplePath (${counter + 1}/$totalCount)")
             runCustomCommand(Seq("gcc", "-x", "assembler", "-", "-z", "noexecstack", "-o", "out"), asmOutput.getBytes())
             val outStream = new ByteArrayOutputStream 
             val actualExit = runCustomCommand(Seq("./out"), in.fold(Array.emptyByteArray)(_.getBytes()), outStream)
@@ -152,11 +151,11 @@ class BackendIntegrationTest extends AnyFlatSpec {
         val sb = new StringBuilder
         failed.foreach { case (path, asmRaw, in, expectedOut, expectedExit, actualOut, actualExit) => 
             sb.append(s"\n======= FAILED: $path =======")
-            // sb.append(s"\nActual output: ${actualOut}")
-            // sb.append(s"\nExpected output: ${expectedOut}")
+            sb.append(s"\nActual output: ${actualOut}")
+            sb.append(s"\nExpected output: ${expectedOut}")
             sb.append(s"\nActual exit: ${actualExit}")
             sb.append(s"\nExpected exit: ${expectedExit}")
-            sb.append(s"\nOutput mismatch?: ${expectedOut == actualOut}")
+            //sb.append(s"\nOutput mismatch?: ${expectedOut == actualOut}")
             // sb.append(s"\nSupplied Input: ${in}")
             // sb.append(s"\nAssembler Output:\n${asmRaw}\n")
         }
@@ -167,55 +166,6 @@ class BackendIntegrationTest extends AnyFlatSpec {
         } else {
             info(message=s"${assembledFiles.size - failed.size}/${assembledFiles.size} tests passed")
         }
-    }
-
-    var counter = 0;
-
-    // def displayProgress(fileName: String, totalCount: Int): Unit = {
-    //     counter += 1
-    //     val bar = "====================="
-    //     var progressBar = ""
-    //     var countUp = 0
-    //     while (countUp < counter) {
-    //         progressBar += "-"
-    //         countUp += totalCount / 20
-    //     }
-    
-    //     for (i <- 0 to 4) {
-    //         print("\u001b[2K") // Clear the line
-    //         print("\u001b[1A") // Move cursor up one line
-    //         print("\r") // move left
-    //     }
-
-    //     println(bar)
-    //     println(Console.GREEN_B + Console.INVISIBLE + progressBar + Console.RESET)
-    //     println(bar)
-    //     println(s"($counter/$totalCount) $fileName")
-    //     println()
-    // }
-
-    def displayProgress(fileName: String, totalCount: Int): Unit = {
-        val progressBarWidth = 50
-        counter += 1
-
-        // Calculate progress percentage
-        val progressPercentage = (counter.toDouble / totalCount.toDouble) * 100
-
-        // Calculate number of characters to represent progress in the progress bar
-        val progressChars = (progressPercentage / 100 * progressBarWidth).toInt
-
-        // Build progress bar string
-        val progressBar = "[" + "#" * progressChars + " " * (progressBarWidth - progressChars) + "]"
-
-        // Print progress information
-        //println(s"\rProgress: $progressBar ($counter/$totalCount)")
-        //println(s"Executing: $fileName ($counter/$totalCount)\r")
-        
-        if (counter == totalCount) {
-            println() // Print newline when progress is completed
-        }
-
-        Console.out.flush()
     }
 
     def runCustomCommand(command: Seq[String],

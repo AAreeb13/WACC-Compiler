@@ -148,8 +148,8 @@ case object X86Config extends TargetConfig {
                     val prefix = "."
                     val name = tag match {
                         case TextTag => "text"
-                        case GlobalTag => "globl"
-                        case ReadonlyTag => "section .readonly"
+                        case GlobalTag => "globl main"
+                        case ReadonlyTag => "section .rodata"
                     }
                     s"$prefix$name"
                 case other =>
