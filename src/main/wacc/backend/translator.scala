@@ -349,8 +349,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                         currentLabel.buf += DivASM(ScratchRegs.head, ScratchRegs.head, ScratchRegs(1)) // note that first 2 args are ignored for x86
 
                         (divMod: @unchecked) match {
-                            case _: Div =>// currentLabel.buf += MovASM(ScratchRegs.head, ScratchRegs.head, DWord)
-                            case _: Mod => currentLabel.buf += MovASM(R3, ScratchRegs.head, DWord) // todo: specify divMod register in config
+                            case _: Div => currentLabel.buf += MovASM(DivRegister, ScratchRegs.head, DWord)
+                            case _: Mod => currentLabel.buf += MovASM(ModRegister, ScratchRegs.head, DWord) // todo: specify divMod register in config
                         }
                         currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
                     case other =>
