@@ -160,24 +160,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def assignParam(node: Param)(implicit buf: ListBuffer[Line], st: SymbolTable): Unit = {
         val size = semanticToSize(syntaxToSemanticType(node.declType))
 
-        val localMemLocation = Memory(StackPointer,  stackOffsets.head) // todo //st.getScopeSize() - size -
-        // val funcMemLocation = Memory(BasePointer, 16 + st.getScopeSize() - stackOffsets.head - sizeToInt(size))
-
-        // st.updateLocation(node.name, funcMemLocation)
+        val localMemLocation = Memory(StackPointer,  stackOffsets.head)
         
         incrementStackOffset(sizeToInt(size))
         buf += MovASM(ScratchRegs.head, localMemLocation, size)
     }
-
-    /*
-    TODO:
-        - Make it so that order of function/main prog translation is non-deterministic
-        - In assignLocation -> move the placement of assigning parameters on stack from assignLoc to translateFunction
-        - For function calls -> Only need to mov parameter to where it is relative to stack pointer
-
-        - (Optionally?) for nested function calls -> if the function doesn't exist then translate that? but due to above decomposition it should not pose a problem anymore
-    */
-
 
     def incrementStackOffset(size: Int) = {
         //System.err.println(s"Stack offset is: ${stackOffsets.head}")
@@ -781,6 +768,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translatePrintLabel(label: WrapperFuncLabel, fstring: String, _type: SemType): ListBuffer[Line] = {
         val stringLabel = StringLabel(s".L.${label.name}_string", fstring)
         val size = semanticToSize(_type)
+        val stringOffset = -4
 
         stringSet.addOne(stringLabel)
 
@@ -808,11 +796,11 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                     falseLabel,
                     LeaASM(Memory(InstructionPointer, trueStringLabel), ParamRegs(2)),
                     trueLabel,
-                    MovASM(Memory(ParamRegs(2), -4), ParamRegs(1), DWord)
+                    MovASM(Memory(ParamRegs(2), stringOffset), ParamRegs(1), DWord)
                 )
             case SemString | SemArray(SemChar) =>
                 buf += MovASM(ParamRegs(0), ParamRegs(2))
-                buf += MovASM(Memory(ParamRegs(0), -4), ParamRegs(1), DWord)
+                buf += MovASM(Memory(ParamRegs(0), stringOffset), ParamRegs(1), DWord)
             case other =>
                 buf += MovASM(ParamRegs(0), ParamRegs(1), size)
         }
@@ -852,92 +840,48 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     ////////////////// ERRORS ////////////////////
 
     def translateNullLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n")
-        stringSet.addOne(errorLabel)
-
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
-    }
-
-    def translateBoundsLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n")
-        stringSet.addOne(errorLabel)
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
-            MovASM(Imm(0), R0, Byte),
-            CallASM(PrintFormatted),
-            MovASM(Imm(0), ParamRegs.head),
-            CallASM(FileFlush),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
-    }
-    
-    def translateOOMLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n")
-        stringSet.addOne(errorLabel)
-
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
-    }
-
-    def translateOverflowLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n")
-        stringSet.addOne(errorLabel)
-
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
-    }
-
-
-    def translateDivZeroLabel: ListBuffer[Line] = { // identical to translateOverflow - maybe simplify
-        val errorLabel = StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n")
-        stringSet.addOne(errorLabel)
-
-        if (!funcMap.contains(PrintStrLabel)) {
-            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
-        }
-
-        ListBuffer(
-            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
-            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
-            CallASM(PrintStrLabel),
-            MovASM(ExitFailureImm, ParamRegs.head, Byte),
-            CallASM(ExitLabel)
-        )
+        translateErrorString(StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n"))
     }
 
     def translateBadCharLabel: ListBuffer[Line] = {
-        val errorLabel = StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n")
+        translateErrorInt(StringLabel(s".L._errBadChar_string", "fatal error: int %d is not ascii character 0-127\\n"))
+    }
+
+    def translateBoundsLabel: ListBuffer[Line] = {
+        translateErrorInt(StringLabel(s".L._errOutOfBounds_string", "fatal error: array index %d out of bounds\\n"))
+    }
+    
+    def translateOOMLabel: ListBuffer[Line] = {
+        translateErrorString(StringLabel(s".L._errOutOfMemory_string", "fatal error: out of memory\\n"))
+    }
+
+    def translateOverflowLabel: ListBuffer[Line] = {
+        translateErrorString(StringLabel(s".L._errOverflow_string", "fatal error: integer overflow or underflow occurred\\n"))
+    }
+
+    def translateDivZeroLabel: ListBuffer[Line] = {
+        translateErrorString(StringLabel(s".L._errDivZero_string", "fatal error: division or modulo by zero\\n"))
+    }
+
+    ////////// ERROR HELPERS ///////////
+
+    def translateErrorString(errorLabel: StringLabel): ListBuffer[Line] = {
+        if (!funcMap.contains(PrintStrLabel)) {
+            funcMap.addOne((PrintStrLabel, translatePrintLabel(PrintStrLabel, "%.*s", SemString)))
+        }
+
+        stringSet.addOne(errorLabel)
+
+        ListBuffer(
+            AndASM(AlignmentMaskImm, StackPointer, StackPointer),
+            LeaASM(Memory(InstructionPointer, errorLabel), ParamRegs.head),
+            CallASM(PrintStrLabel),
+            MovASM(ExitFailureImm, ParamRegs.head, Byte),
+            CallASM(ExitLabel)
+        )
+    }
+
+    def translateErrorInt(errorLabel: StringLabel): ListBuffer[Line] = {
         stringSet.addOne(errorLabel)
 
         ListBuffer(
