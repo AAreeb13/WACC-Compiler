@@ -542,6 +542,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: ArrayLiteral => translateArrayLiteral(node)
             case node: PairElem => translatePairElem(node)
             case node: PairCons => translatePairCons(node)
+            case node: ArrayCons => translateArrayCons(node)
             case node: FuncCall => translateFuncCall(node)
             case node: Expr => translateExpression(node)
         }
@@ -566,6 +567,41 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             currentLabel.buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, index * singleSize))
         }
         currentLabel.buf += MovASM(ArrayPointer, ScratchRegs(0))
+    }
+
+    def translateArrayCons(node: ArrayCons)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+        // Implement translation for Array Constructor here
+        if (!funcMap.contains(MallocWrapperLabel)) {
+            funcMap.addOne((MallocWrapperLabel, translateMallocLabel))
+        }
+
+        if (!funcMap.contains(CheckAllocLabel)) {
+            funcMap.addOne((CheckAllocLabel, translateBadAllocLabel))
+        }
+
+        val singleSize = semanticToSize(node.declType)
+        val offsetSize = sizeToInt(DWord)
+        translateExpression(node.lengthExpr)
+
+        // Check that malloc value is not less than 0
+        currentLabel.buf += CmpASM(Imm(0), ScratchRegs.head, DWord)
+        currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs(1), IR.Less)
+        currentLabel.buf += JmpASM(CheckAllocLabel, IR.Less)
+
+
+        currentLabel.buf += PushASM(ScratchRegs.head)
+        currentLabel.buf += MulASM(Imm(sizeToInt(singleSize)), ScratchRegs.head, ScratchRegs.head)
+        currentLabel.buf += AddASM(Imm(offsetSize), ScratchRegs.head, ScratchRegs.head)
+
+        currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs.head, DWord)
+        currentLabel.buf += CallASM(MallocWrapperLabel)
+        currentLabel.buf += MovASM(ScratchRegs(0), ArrayPointer)
+        currentLabel.buf += AddASM(Imm(sizeToInt(DWord)), ArrayPointer, ArrayPointer)
+        
+        currentLabel.buf += PopASM(ScratchRegs(0))
+        currentLabel.buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, -sizeToInt(DWord)))
+        currentLabel.buf += MovASM(ArrayPointer, ScratchRegs(0))
+        
     }
 
     def translatePairCons(node: PairCons)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
@@ -982,6 +1018,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
 
     def translateNullLabel: LabelInfo = {
         translateErrorString(StringLabel(s".L._errNull_string", "fatal error: null pair dereferenced or freed\\n"))
+    }
+
+    def translateBadAllocLabel: LabelInfo = {
+        translateErrorInt(StringLabel(s".L._errBadAlloc_string", "fatal error: negative value %d passed in as array length\\n"))
     }
 
     def translateBadCharLabel: LabelInfo = {

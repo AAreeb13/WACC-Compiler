@@ -112,6 +112,7 @@ object IR {
     case object CheckBoundsLabel    extends ErrorFuncLabel("_boundsCheck")
     case object CheckBadCharLabel  extends ErrorFuncLabel("_errBadChar")
     case object CheckOOMLabel     extends ErrorFuncLabel("_errOutOfMemory")
+    case object CheckAllocLabel     extends ErrorFuncLabel("_errBadAlloc")
 
     case class ArrayStoreLabel(size: Size)  extends WrapperFuncLabel("_arrStore") {
         override val name = s"_arrStore${sizeToInt(size)}"

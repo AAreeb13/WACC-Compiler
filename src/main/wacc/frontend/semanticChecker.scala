@@ -242,6 +242,10 @@ object semanticChecker {
                     
                 case pairElem: PairElem => checkPair(pairElem)
 
+                case ArrayCons(declType, lengthExpr) => 
+                    matchesType(checkExpression(lengthExpr), SemInt)
+                    SemArray(declType)
+
                 case PairCons(fst, snd) =>
                     // If a nested pair type is made, pair erasure is performed (may not be best idea)
                     val fstType = checkExpression(fst) match {

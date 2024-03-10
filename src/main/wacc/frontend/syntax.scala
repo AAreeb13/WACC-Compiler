@@ -128,6 +128,7 @@ object ast {
     case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 
     case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue with TypeCapture
+    case class ArrayCons(declType: Type, lengthExpr: Expr)(val pos: (Int, Int))            extends RValue
     case class PairCons(fstExpr: Expr, sndExpr: Expr)(val pos: (Int, Int))            extends RValue
     case class FuncCall(name: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
         var func: Func = null
@@ -302,6 +303,7 @@ object ast {
     object ArrayLiteral extends ParserBridge1[List[Expr], RValue] {
         override def labels = List{"array literal"}
     }
+    object ArrayCons     extends ParserBridge2[Type, Expr, RValue]
     object PairCons     extends ParserBridge2[Expr, Expr, RValue] 
     object FuncCall     extends ParserBridge2[String, List[Expr], RValue] {
         override def labels = List{"function call"}

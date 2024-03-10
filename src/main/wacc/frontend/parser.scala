@@ -89,7 +89,8 @@ object parser {
 
     lazy val rvalue: Parsley[RValue] = expr |
         arrayLiteral |
-        PairCons("newpair" ~> "(" ~> expr, "," ~> expr <~ ")") |
+        PairCons(atomic("newpair") ~> "(" ~> expr, "," ~> expr <~ ")") |
+        ArrayCons("newarray" ~> declType, "[" ~> expr <~ "]") |
         pairElem |
         FuncCall("call" ~> ident, "(" ~> argList <~ ")")
 
