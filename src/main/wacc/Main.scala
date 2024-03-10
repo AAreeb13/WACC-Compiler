@@ -88,7 +88,7 @@ object Main {
         }
 
         // Code Generation
-        val assemblyResult = codeGenerator.generateAssembly(semanticResult, IntelConfig)
+        val assemblyResult = codeGenerator.generateAssembly(semanticResult, X86Config)
 
         if (path.equals("in.txt")) {
             println(assemblyResult)

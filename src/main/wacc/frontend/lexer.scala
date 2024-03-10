@@ -80,8 +80,9 @@ object lexer {
             )
         ),
         numericDesc = numeric.NumericDesc.plain.copy(
-            integerNumbersCanBeHexadecimal = false,
-            integerNumbersCanBeOctal = false,
+            integerNumbersCanBeHexadecimal = true,
+            integerNumbersCanBeOctal = true,
+            integerNumbersCanBeBinary = true,
             decimalExponentDesc = numeric.ExponentDesc.NoExponents
         ),
         textDesc = text.TextDesc.plain.copy(
@@ -119,7 +120,7 @@ object lexer {
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
 
     val ident: Parsley[String]      = lexer.lexeme.names.identifier
-    val intLiteral: Parsley[BigInt] = lexer.lexeme.integer.decimal32[BigInt] // could also make Long
+    val intLiteral: Parsley[BigInt] = lexer.lexeme.integer.number32[BigInt] // could also make Long
     val charLiteral                 = lexer.lexeme.character.ascii
     val stringLiteral               = lexer.lexeme.string.ascii
     val pairLiteral                 = lexer.lexeme.symbol("null")
