@@ -168,6 +168,7 @@ object semanticChecker {
                     s.enclosingScopes += childScope
                     stats.foreach(checkStatement(_, expectedType)(childScope))
 
+                case call: CallStat => checkCall(call)
                 
 
                 case i@If(cond, ifStats, elseStats) =>
@@ -185,7 +186,10 @@ object semanticChecker {
                     case SemNone => 
                         // If no expected type is provided we know that it cannot have been in a function
                         errorCollector.addError(stat, SpecialError("Return placement error", "Return outside function is not allowed" ))
-                    case retType => matchesType(checkExpression(expr), retType)
+                    case retType => expr match {
+                        case None => matchesType(SemVoid, retType)
+                        case Some(declType) => matchesType(checkExpression(declType), retType)
+                    }
                 }
                     
                 case r@Read(lvalue) => checkLValue(lvalue) match {
@@ -259,30 +263,69 @@ object semanticChecker {
                     }
                     SemPair(fstType, sndType)
 
-                case funcCall@FuncCall(ident, args) => funcTable.get(ident) match {
-                    case None =>
-                        // If function doesn't exist then create error and perform scope check on arguments
-                        errorCollector.addError(rvalue, UndefinedFuncError(ident))
-                        args.foreach(checkExpression(_))
-                        SemNone
-                    case Some(funcInfo@FuncInfo(retType, paramTypes, func)) =>
-                        // Check that argument size is the same
-                        if (paramTypes.size != args.size) {
-                            errorCollector.addError(rvalue, FuncArgumentSizeError(ident, args.size, paramTypes.size))
-                            args.foreach(checkExpression(_))
-                            SemNone
-                        } else { 
-                            // Check that types match for the arguments and parameters
-                            args.zip(paramTypes).foreach{ case (arg, paramType) => 
-                                matchesType(checkExpression(arg), paramType)
-                            }
-                            funcCall.func = func
-                            retType
-                        }
-                    }
+                case funcCall@FuncCall(ident, args) => checkCall(funcCall)
+                    // funcTable.get(ident) match {
+                    // case None =>
+                    //     // If function doesn't exist then create error and perform scope check on arguments
+                    //     errorCollector.addError(rvalue, UndefinedFuncError(ident))
+                    //     args.foreach(checkExpression(_))
+                    //     SemNone
+                    // case Some(funcInfo@FuncInfo(retType, paramTypes, func)) =>
+                    //     // Check that argument size is the same
+                    //     if (paramTypes.size != args.size) {
+                    //         errorCollector.addError(rvalue, FuncArgumentSizeError(ident, args.size, paramTypes.size))
+                    //         args.foreach(checkExpression(_))
+                    //         SemNone
+                    //     } else { 
+                    //         // Check that types match for the arguments and parameters
+                    //         args.zip(paramTypes).foreach{ case (arg, paramType) => 
+                    //             matchesType(checkExpression(arg), paramType)
+                    //         }
+                    //         funcCall.func = func
+                    //         retType match {
+                    //             case SemVoid =>
+                    //                 errorCollector.addError(funcCall, SpecialError("Function call error", "Void functions do not return a value"))
+                    //                 SemNone
+                    //             case other => retType
+                    //         }
+                    //     }
+                    // }
 
                 case expr: Expr => checkExpression(expr)
             }
+        }
+        
+        def checkCall(call: Call)(implicit currentScope: SymbolTable): SemType = {
+            implicit val node: Node = call
+            funcTable.get(call.name) match {
+                case None =>
+                    // If function doesn't exist then create error and perform scope check on arguments
+                    errorCollector.addError(call, UndefinedFuncError(call.name))
+                    call.args.foreach(checkExpression(_))
+                    SemNone
+                case Some(funcInfo@FuncInfo(retType, paramTypes, func)) =>
+                    // Check that argument size is the same
+                    if (paramTypes.size != call.args.size) {
+                        errorCollector.addError(call, FuncArgumentSizeError(call.name, call.args.size, paramTypes.size))
+                        call.args.foreach(checkExpression(_))
+                        SemNone
+                    } else { 
+                        // Check that types match for the arguments and parameters
+                        call.args.zip(paramTypes).foreach{ case (arg, paramType) => 
+                            matchesType(checkExpression(arg), paramType)
+                        }
+                        call.func = func
+                        call match {
+                            case _: CallStat => retType
+                            case _: FuncCall => retType match {
+                                case SemVoid =>
+                                    errorCollector.addError(call, SpecialError("Function call error", "Void functions do not return a value"))
+                                    SemNone
+                                case other => retType
+                            }
+                        }
+                    }
+                }
         }
         /**
          * Semantic checks for variables

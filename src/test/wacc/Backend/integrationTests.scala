@@ -33,7 +33,7 @@ class BackendIntegrationTest extends AnyFlatSpec {
     val examplesDir = "wacc_examples/valid/"
     val asmDir = "backend_output"
     val executionTimeout: Long = 2
-    val config: TargetConfig = IntelConfig
+    val config: TargetConfig = X86Config
 
     /**
       * Compiles all the files in a given path

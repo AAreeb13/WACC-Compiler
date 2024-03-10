@@ -23,6 +23,9 @@ object semAst {
             case (SemNone, _) | (_, SemNone) => false // errors will always be errors
             case (SemAny, _) | (_, SemAny) => true // anything can be anyting
 
+            case (SemVoid, SemVoid) => true
+            case (SemVoid, _) | (_, SemVoid)  => false
+
             case (SemInt, SemInt) | // base types always match
                  (SemChar, SemChar) | 
                  (SemBool, SemBool) | 
@@ -84,6 +87,10 @@ object semAst {
 
     case object SemNull extends SemBaseType {
         override def toString = "null"
+    }
+
+    case object SemVoid extends SemType {
+        override def toString = "void"
     }
 
     // null keyword for pairval

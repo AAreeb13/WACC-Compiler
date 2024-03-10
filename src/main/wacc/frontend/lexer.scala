@@ -49,6 +49,7 @@ object lexer {
                 "fst",
                 "snd",
                 "int",
+                "void",
                 "bool",
                 "char",
                 "string",

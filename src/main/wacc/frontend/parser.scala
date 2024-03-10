@@ -46,6 +46,9 @@ object parser {
         pairType |
         baseType
 
+    lazy val voidType = (VoidType.from("void"))
+    lazy val retType: Parsley[TypeRef] = ((VoidType.from("void"))) | declType
+
     lazy val baseType: Parsley[BaseType] = ((IntType.from("int")) |
         (StringType.from("string")) |
         (CharType.from("char")) |
@@ -65,8 +68,11 @@ object parser {
     lazy val prog = "begin".explain("A valid wacc program must start with begin") ~> Prog(funcList, stmtList) <~ "end".explain(
         "A valid wacc program must finish with end")
     lazy val funcList = many(func)
-    lazy val func = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(containsReturn(_)) <~ "end")
-    
+
+    lazy val voidFunc = Func(atomic(voidType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList <~ "end")
+    lazy val nonVoidFunc = Func(atomic(declType <~> ident <~ "("), paramList <~ ")", "is" ~> stmtList.filter(containsReturn(_)) <~ "end")
+    lazy val func = ifS(lookAhead(voidType).as(true) | lookAhead(declType).as(false), voidFunc, nonVoidFunc)
+
     lazy val paramList = sepBy(param, ",")
     lazy val param     = Param(declType, ident)
     lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt | _semicheck, ";")
@@ -76,13 +82,14 @@ object parser {
         (Assign(lvalue <~  _equalscheck, rvalue)) |
         Read("read" ~> lvalue) |
         Free("free" ~> expr).hide |
-        Return("return" ~> expr) |
+        Return("return" ~> option(expr)) |
         Exit("exit" ~> expr).hide |
         Print("print" ~> expr).hide |
         Println("println" ~> expr).hide |
         (If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")) |
         (While("while" ~> expr, "do" ~> stmtList <~ "done")) |
-        Scope("begin" ~> stmtList <~ "end")
+        Scope("begin" ~> stmtList <~ "end") |
+        CallStat("call" ~> ident, "(" ~> argList <~ ")")
 
     lazy val lvalue: Parsley[LValue] = VarOrArrayVal(ident, many(_opensqbrcheck ~> expr <~ "]")) |
         pairElem

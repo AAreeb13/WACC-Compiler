@@ -23,7 +23,13 @@ object ast {
 
     /*--------------------------------------- Types ---------------------------------------*/
 
-    sealed trait Type extends Node
+    sealed trait TypeRef extends Node
+
+    case class VoidType()(val pos: (Int, Int)) extends TypeRef {
+        override def toString = "VoidType"
+    }
+
+    sealed trait Type extends TypeRef
 
     sealed trait BaseType  extends Type
     case class IntType()(val pos: (Int, Int))    extends BaseType {
@@ -50,13 +56,24 @@ object ast {
     case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node
 
 
-    case class Func(retType: Type, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node {
+    case class Func(retType: TypeRef, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node {
         override def toString = s"Func($retType,\"$name\",$params,$stats)"
     }
 
     case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node with Declarable {
         override def toString = s"Param($declType,\"$name\")"
     }
+
+    def voidContainsReturn(statList: List[Stat]): Boolean = statList.lastOption match {
+        case None => true
+        case Some(Return(None)) | Some(Exit(_)) => true
+        case Some(If(_, ifStats, elseStats)) => voidContainsReturn(ifStats) && voidContainsReturn(elseStats)
+        case Some(While(_, stats)) => voidContainsReturn(stats)
+        case Some(Scope(stats)) => voidContainsReturn(stats)
+        case Some(Return(Some(_))) => false
+        case _ => true
+    }
+
 
     /**
      * Used to filter out statements that don't end in a return, used for functions 
@@ -105,13 +122,16 @@ object ast {
     case class Free(expr: Expr)(val pos: (Int, Int))                                         extends Stat {
         var isArray = false
     }
-    case class Return(expr: Expr)(val pos: (Int, Int))                                       extends Stat
+    case class Return(exprOption: Option[Expr])(val pos: (Int, Int))                                       extends Stat
     case class Exit(expr: Expr)(val pos: (Int, Int))                                         extends Stat
     case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with Printable
     case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with Printable
     case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat with Scopable
     case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat with Scopable
     case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat with Scopable
+    case class CallStat(name: String, args: List[Expr])(val pos: (Int, Int)) extends Call with Stat {
+        override def toString = s"CallStat(\"$name\",$args)"
+    }
 
     sealed trait LValue extends Node
     sealed trait RValue extends Node
@@ -124,14 +144,19 @@ object ast {
         def unapply(p: PairElem): Option[LValue] = Some(p.lvalue)
     }
 
+    sealed trait Call extends Node {
+        val name: String
+        val args: List[Expr] 
+        var func: Func = null
+    }
+
     case class FstPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
     case class SndPair(lvalue: LValue)(val pos: (Int, Int)) extends PairElem
 
     case class ArrayLiteral(exprs: List[Expr])(val pos: (Int, Int))           extends RValue with TypeCapture
     case class ArrayCons(declType: Type, lengthExpr: Expr)(val pos: (Int, Int))            extends RValue
     case class PairCons(fstExpr: Expr, sndExpr: Expr)(val pos: (Int, Int))            extends RValue
-    case class FuncCall(name: String, args: List[Expr])(val pos: (Int, Int)) extends RValue {
-        var func: Func = null
+    case class FuncCall(name: String, args: List[Expr])(val pos: (Int, Int)) extends Call with RValue {
         override def toString = s"FuncCall(\"$name\",$args)"
     }
 
@@ -237,6 +262,8 @@ object ast {
      * information to be hooked in and also override the labels for errors
      */
 
+    object VoidType extends ParserBridge0[TypeRef]
+
     object IntType extends ParserBridge0[BaseType] {
         override def labels = List{"type"}
     }
@@ -261,8 +288,8 @@ object ast {
     }
 
     object Prog extends ParserBridge2[List[Func], List[Stat], Prog]
-    object Func extends ParserBridge3[(Type, String), List[Param], List[Stat], Func] {
-        def apply(tuple: (Type, String), params: List[Param], stats: List[Stat])(pos: (Int, Int) = (0, 0)) = tuple match {
+    object Func extends ParserBridge3[(TypeRef, String), List[Param], List[Stat], Func] {
+        def apply(tuple: (TypeRef, String), params: List[Param], stats: List[Stat])(pos: (Int, Int) = (0, 0)) = tuple match {
             case (retType, name) => Func(retType, name, params, stats)(pos)
         }
     }
@@ -277,7 +304,7 @@ object ast {
         override def labels = List{"read"}
     }
     object Free      extends ParserBridge1[Expr, Stat]
-    object Return    extends ParserBridge1[Expr, Stat] {
+    object Return    extends ParserBridge1[Option[Expr], Stat] {
         override def labels = List{"return"}
     }
     object Exit      extends ParserBridge1[Expr, Stat]
@@ -293,6 +320,7 @@ object ast {
         override def labels = List{"new scope"}
         override def reason = Some("all program body and function declarations must be within `begin` and `end`")
     }
+    object CallStat     extends ParserBridge2[String, List[Expr], Stat]
 
     object FstPair      extends ParserBridge1[LValue, PairElem] {
         override def labels = List("fst")

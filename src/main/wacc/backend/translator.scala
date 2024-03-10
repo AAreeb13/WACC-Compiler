@@ -149,6 +149,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: While      => translateWhile(node)
             case node: Print      => translatePrint(node)
             case node: Println    => translatePrintln(node)
+            case node: CallStat   => translateCall(node)
             case Skip()           => 
             case node: Exit       => translateExit(node)
             case node: Scope      => translateBlock(node.stats)(currentLabel, node.enclosingScopes(0))
@@ -362,7 +363,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
       */
     def translateReturn(node: Return)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for Return statement here
-        translateExpression(node.expr)
+        node.exprOption match {
+            case None => // void returns
+            case Some(expr) => translateExpression(expr)
+        }
         currentLabel.buf += MovASM(BasePointer, StackPointer)
         currentLabel.buf += PopASM(BasePointer)
         currentLabel.buf += RetASM
@@ -543,7 +547,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: PairElem => translatePairElem(node)
             case node: PairCons => translatePairCons(node)
             case node: ArrayCons => translateArrayCons(node)
-            case node: FuncCall => translateFuncCall(node)
+            case node: FuncCall => translateCall(node)
             case node: Expr => translateExpression(node)
         }
     }
@@ -630,7 +634,7 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
       * Generate code for 'call'
       * All parameters are put on the stack during function call function is called
       */
-    def translateFuncCall(node: FuncCall)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+    def translateCall(node: Call)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         // Implement translation for FuncCall statement here
         val paramScope = node.func.scope
         allocateStackVariables()(currentLabel, paramScope)
@@ -784,6 +788,10 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         stackOffsets.pop()
 
         translateBlock(func.stats)(currentLabel, bodyScope)
+
+        currentLabel.buf += MovASM(BasePointer, StackPointer)
+        currentLabel.buf += PopASM(BasePointer)
+        currentLabel.buf += RetASM
 
         currentLabel
     }
