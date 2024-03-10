@@ -403,6 +403,10 @@ object semanticChecker {
                     matchesType(checkExpression(y), SemBool)
                     SemBool
                 
+                case BNeg(x) =>
+                    matchesType(checkExpression(x), SemInt)
+                    SemInt
+                
                 case Neg(x) =>
                     matchesType(checkExpression(x), SemInt)
                     SemInt
@@ -430,7 +434,9 @@ object semanticChecker {
                 case PairVal() => SemNull
                 case IntVal(x) => SemInt
 
-                case _ => SemNone // should not happen, metals is bugging
+                case other =>
+                    errorCollector.addError(expr, SpecialError("Unknown operand error", s"Matched unknown expression $other and cannot infer type"))
+                    SemNone
             }
         }
 

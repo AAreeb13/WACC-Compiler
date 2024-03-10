@@ -119,12 +119,15 @@ object parser {
                 Neg.from(atomic("-" <~ notFollowedBy(digit))), // so that negative integer literals can be parsed properly
                 Len.from("len"),
                 Ord.from("ord"),
-                Chr.from("chr")
+                Chr.from("chr"),
+                BNeg.from("~")
             ),
             Ops(InfixL)(Mul.from("*"), Mod.from("%"), Div.from("/")),
             Ops(InfixL)(Add.from("+"), Sub.from("-")),
             Ops(InfixN)(Grt.from(">"), GrtEql.from(">="), Less.from("<"), LessEql.from("<=")),
             Ops(InfixN)(Eql.from("=="), NotEql.from("!=")),
+            Ops(InfixL)(BAnd.from(atomic("&"))),
+            Ops(InfixL)(BOr.from(atomic("|"))),
             Ops(InfixR)(And.from("&&")),
             Ops(InfixR)(Or.from("||"))
         )

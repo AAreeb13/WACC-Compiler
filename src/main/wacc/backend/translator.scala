@@ -424,6 +424,8 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
                             case _: Add => currentLabel.buf += AddASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                             case _: Sub => currentLabel.buf += SubASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                             case _: Mul => currentLabel.buf += MulASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
+                            case _: BAnd => currentLabel.buf += AndASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
+                            case _: BOr => currentLabel.buf += OrASM(ScratchRegs(1), ScratchRegs.head, ScratchRegs.head, DWord)
                         }
                         currentLabel.buf += JmpASM(CheckOverflowLabel, Overflow)
                         currentLabel.buf += MovsASM(ScratchRegs.head, ScratchRegs.head, DWord)
@@ -475,6 +477,9 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
       */
     def translateUnOp(unop: UnOp)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         unop match {
+            case BNeg(expr) => 
+                translateExpression(expr)
+                currentLabel.buf += NotASM(ScratchRegs.head, ScratchRegs.head)
             case Len(expr) => 
                 translateExpression(expr)
                 currentLabel.buf += MovASM(ScratchRegs.head, ScratchRegs(1)) // can this be optimised out?

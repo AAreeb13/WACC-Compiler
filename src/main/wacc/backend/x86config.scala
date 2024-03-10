@@ -166,6 +166,7 @@ case object X86Config extends TargetConfig {
                         case AddASM(op, _, dst, size) => s"add${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
                         case PopASM(op, size) => s"pop${sizeStr(size)} ${opStr(op)(size)}"
                         case AndASM(op, _, dst, size) => s"and${sizeStr(size)} ${opStr(op)(size)}, ${opStr(dst)(size)}"
+                        case NotASM(src, _, size) => s"not${sizeStr(size)} ${opStr(src)(size)}"
                         case MulASM(op1, op2, dst, size) => 
                             if (op2 == dst) s"imul${sizeStr(size)} ${opStr(op1)(size)}, ${opStr(dst)(size)}"
                             else s"imul${sizeStr(size)} ${opStr(op1)(size)}, ${opStr(op2)(size)}, ${opStr(dst)(size)}"

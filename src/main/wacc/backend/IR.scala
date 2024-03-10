@@ -167,6 +167,7 @@ object IR {
 
     case class CmpASM(src: Operand, dst: Location, size: Size = QWord) extends NonDoubleImm(src, dst)
     case class SetASM(dst: Operand, flag: Condition, private val size: Size = Byte) extends Instruction
+    case class NotASM(src: Operand, dst: Location, size: Size = QWord) extends NonDoubleImm(src, dst)
 
     case class JmpASM(label: Label, flag: Condition = Unconditional) extends Instruction
     case class LeaASM(src: Memory, dst: Register, size: Size = QWord) extends Instruction

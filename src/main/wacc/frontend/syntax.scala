@@ -199,6 +199,8 @@ object ast {
     case class Mod(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
     case class Add(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
     case class Sub(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
+    case class BAnd(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
+    case class BOr(x: Expr, y: Expr)(val pos: (Int, Int))     extends ArithmeticOp
 
     case class Grt(x: Expr, y: Expr)(val pos: (Int, Int))     extends ComparisonOp 
     case class GrtEql(x: Expr, y: Expr)(val pos: (Int, Int))  extends ComparisonOp 
@@ -222,6 +224,7 @@ object ast {
 
     case class Not(x: Expr)(val pos: (Int, Int)) extends UnOp
     case class Neg(x: Expr)(val pos: (Int, Int)) extends UnOp
+    case class BNeg(x: Expr)(val pos: (Int, Int)) extends UnOp
     case class Len(x: Expr)(val pos: (Int, Int)) extends UnOp
     case class Ord(x: Expr)(val pos: (Int, Int)) extends UnOp
     case class Chr(x: Expr)(val pos: (Int, Int)) extends UnOp
@@ -330,6 +333,8 @@ object ast {
     object Var     extends ParserBridge1[String, Expr with LValue]
     object ArrayVal extends ParserBridge2[String, List[Expr], Expr with LValue]
 
+    object BAnd    extends ParserBridge2[Expr, Expr, Expr]
+    object BOr     extends ParserBridge2[Expr, Expr, Expr]
     object Mul     extends ParserBridge2[Expr, Expr, Expr]
     object Div     extends ParserBridge2[Expr, Expr, Expr]
     object Mod     extends ParserBridge2[Expr, Expr, Expr]
@@ -344,6 +349,7 @@ object ast {
     object And     extends ParserBridge2[Expr, Expr, Expr]
     object Or      extends ParserBridge2[Expr, Expr, Expr]  
 
+    object BNeg extends ParserBridge1[Expr, Expr] 
     object Not extends ParserBridge1[Expr, Expr] 
     object Neg extends ParserBridge1[Expr, Expr] 
     object Len extends ParserBridge1[Expr, Expr]
