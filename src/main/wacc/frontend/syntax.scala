@@ -255,6 +255,20 @@ object ast {
     case class Ord(x: Expr)(val pos: (Int, Int)) extends UnOp
     case class Chr(x: Expr)(val pos: (Int, Int)) extends UnOp
 
+        /*-------------------------------- Ternary Operators --------------------------------*/
+
+    sealed trait TernaryOp extends Expr {
+        val x: Expr
+        val y: Expr
+        val z: Expr
+    }
+
+    object TernaryOp {
+        def unapply(op: TernaryOp): Option[(Expr, Expr, Expr)] = Some((op.x, op.y, op.z))
+    }
+
+    case class IfExpr(x: Expr, y: Expr, z: Expr)(val pos: (Int, Int)) extends TernaryOp
+
     /*--------------------------------------- Companion Objects for above case classes ---------------------------------------*/
 
     /**
@@ -385,6 +399,8 @@ object ast {
     object Len extends ParserBridge1[Expr, Expr]
     object Ord extends ParserBridge1[Expr, Expr]
     object Chr extends ParserBridge1[Expr, Expr]
+
+    object IfExpr      extends ParserBridge3[Expr, Expr, Expr, Expr]  
 
     /* Disambiguation bridge for variables and array literals */
 

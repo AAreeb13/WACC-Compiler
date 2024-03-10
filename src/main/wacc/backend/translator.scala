@@ -378,17 +378,37 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
     def translateExpression(expr: Expr)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
         expr match {
             case v: Var => translateVar(v)
+            case v: ArrayVal => translateArrayElem(v)
+
+            case node: BinOp => translateBinOp(node)
+            case node: UnOp => translateUnOp(node)
+            case node: TernaryOp => translateTernaryOp(node)
+            
             case CharVal(c) => currentLabel.buf += MovASM(Imm(c.toInt), ScratchRegs.head)
+            case BoolVal(b) => currentLabel.buf += MovASM(Imm(if (b) 1 else 0), ScratchRegs.head)
+            case PairVal() => currentLabel.buf += MovASM(NullImm, ScratchRegs.head)
+            case IntVal(x) => currentLabel.buf += MovASM(Imm(x), ScratchRegs.head)
             case StrVal(s) =>
                 val stringLabel = addStringConstant(s)
                 currentLabel.buf += LeaASM(Memory(InstructionPointer, stringLabel), ScratchRegs.head)
-            case BoolVal(b) => currentLabel.buf += MovASM(Imm(if (b) 1 else 0), ScratchRegs.head)
-            case PairVal() => currentLabel.buf += MovASM(NullImm, ScratchRegs.head)
-            case v: ArrayVal => translateArrayElem(v)
-            case IntVal(x) => currentLabel.buf += MovASM(Imm(x), ScratchRegs.head)
-            case node: BinOp => translateBinOp(node)
-            case node: UnOp => translateUnOp(node)
-            
+        }
+    }
+
+    def translateTernaryOp(ternop: TernaryOp)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+        ternop match {
+            case IfExpr(cond, ifExpr, elseExpr) => 
+                val trueLabel = JumpLabel(s".L_if_expr_true_$branchCounter")
+                val endLabel = JumpLabel(s".L_if_expr_end_$branchCounter")
+                branchCounter += 1
+
+                translateExpression(cond)
+                currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head)
+                currentLabel.buf += JmpASM(trueLabel, Equal)
+                translateExpression(elseExpr)
+                currentLabel.buf += JmpASM(endLabel)
+                currentLabel.buf += trueLabel
+                translateExpression(ifExpr)
+                currentLabel.buf += endLabel
         }
     }
 
@@ -592,19 +612,27 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs(1), IR.Less)
         currentLabel.buf += JmpASM(CheckAllocLabel, IR.Less)
 
-
+        // Save the size of the expression for later
         currentLabel.buf += PushASM(ScratchRegs.head)
+
+        // Calculate the size of what is to be malloced
         currentLabel.buf += MulASM(Imm(sizeToInt(singleSize)), ScratchRegs.head, ScratchRegs.head)
         currentLabel.buf += AddASM(Imm(offsetSize), ScratchRegs.head, ScratchRegs.head)
 
+        // Call malloc 
         currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs.head, DWord)
         currentLabel.buf += CallASM(MallocWrapperLabel)
+
+        // Array pointer points to start of array (not including size offset)
         currentLabel.buf += MovASM(ScratchRegs(0), ArrayPointer)
         currentLabel.buf += AddASM(Imm(sizeToInt(DWord)), ArrayPointer, ArrayPointer)
         
+        // Pop the size from stack and store into array - 4
         currentLabel.buf += PopASM(ScratchRegs(0))
         currentLabel.buf += MovASM(ScratchRegs(0), Memory(ArrayPointer, -sizeToInt(DWord)))
-        currentLabel.buf += MovASM(ArrayPointer, ScratchRegs(0))
+
+        // Return into Return reg
+        currentLabel.buf += MovASM(ArrayPointer, ReturnReg)
         
     }
 

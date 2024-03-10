@@ -474,6 +474,14 @@ object semanticChecker {
                 case Chr(x) =>
                     matchesType(checkExpression(x), SemInt)
                     SemChar
+                
+                case IfExpr(cond, ifExpr, elseExpr) =>
+                    matchesType(checkExpression(cond), SemBool)
+                    (checkExpression(ifExpr), checkExpression(elseExpr)) match {
+                        case (a, b) if (a reducesTo b) => b
+                        case (a, b) if (b reducesTo a) => a
+                        case (a, b) => matchesType(a, b) // technically redundant but does error stuff for us
+                    }
 
                 case BoolVal(x) => SemBool
                 case CharVal(x) => SemChar

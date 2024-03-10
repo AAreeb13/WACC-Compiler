@@ -115,6 +115,7 @@ object parser {
         StrVal(stringLiteral) |
         (PairVal.from(pairLiteral)) |
         VarOrArrayVal(ident, many("[" ~> expr <~ "]")) |
+        IfExpr("if" ~> expr, "then" ~> expr, "else" ~> expr <~ "fi") |
         ("(".hide ~> expr <~ ")")
 
     lazy val arrayElem = VarOrArrayVal(ident, many("[" ~> expr <~ "]"))
