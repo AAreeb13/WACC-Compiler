@@ -127,8 +127,8 @@ object parser {
             Ops(InfixL)(Add.from("+"), Sub.from("-")),
             Ops(InfixN)(Grt.from(">"), GrtEql.from(">="), Less.from("<"), LessEql.from("<=")),
             Ops(InfixN)(Eql.from("=="), NotEql.from("!=")),
-            Ops(InfixL)(BAnd.from(atomic("&"))),
-            Ops(InfixL)(BOr.from(atomic("|"))),
+            Ops(InfixL)(BAnd.from(atomic("&" <~ notFollowedBy("&")))),
+            Ops(InfixL)(BOr.from(atomic("|" <~ notFollowedBy("|")))),
             Ops(InfixR)(And.from("&&")),
             Ops(InfixR)(Or.from("||"))
         )
