@@ -53,27 +53,16 @@ object ast {
 
     /*--------------------------------------- Statements ---------------------------------------*/
 
-    case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node
+    case class Prog(funcs: List[Func], stats: List[Stat])(val pos: (Int, Int)) extends Node with Scopable
 
 
-    case class Func(retType: TypeRef, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node {
+    case class Func(retType: TypeRef, name: String, params: List[Param], stats: List[Stat])(val pos: (Int, Int)) extends Node with Scopable {
         override def toString = s"Func($retType,\"$name\",$params,$stats)"
     }
 
     case class Param(declType: Type, name: String)(val pos: (Int, Int)) extends Node with Declarable {
         override def toString = s"Param($declType,\"$name\")"
     }
-
-    def voidContainsReturn(statList: List[Stat]): Boolean = statList.lastOption match {
-        case None => true
-        case Some(Return(None)) | Some(Exit(_)) => true
-        case Some(If(_, ifStats, elseStats)) => voidContainsReturn(ifStats) && voidContainsReturn(elseStats)
-        case Some(While(_, stats)) => voidContainsReturn(stats)
-        case Some(Scope(stats)) => voidContainsReturn(stats)
-        case Some(Return(Some(_))) => false
-        case _ => true
-    }
-
 
     /**
      * Used to filter out statements that don't end in a return, used for functions 
@@ -113,8 +102,33 @@ object ast {
         override def toString = "Skip"
     }
 
+    sealed trait LoopControl extends Stat {
+        var enclosingLoop: Loop = null
+    }
+
+    case class Break()(val pos: (Int, Int))                                                   extends LoopControl {
+        override def toString = "Break"
+    }
+
+    case class Continue()(val pos: (Int, Int))                                                   extends LoopControl {
+        override def toString = "Continue"
+    }
+
     case class AssignNew(declType: Type, name: String, rvalue: RValue)(val pos: (Int, Int))        extends Stat with Declarable {
         override def toString = s"AssignNew($declType,\"$name\",$rvalue)"
+    }
+
+    sealed trait Loop extends Stat with Scopable {
+        val cond: Expr
+        val stats: List[Stat]
+        var condLabel: IR.JumpLabel = null
+        var repeatLabel: IR.JumpLabel = null
+        var doneLabel: IR.JumpLabel = null
+        var updateLabel: IR.JumpLabel = null
+    }
+
+    object Loop {
+        def unapply(l: Loop): Option[(Expr, List[Stat])] = Some(l.cond, l.stats)
     }
     
     case class Assign(lvalue: LValue, rvalue: RValue)(val pos: (Int, Int))                   extends Stat
@@ -127,8 +141,11 @@ object ast {
     case class Print(expr: Expr)(val pos: (Int, Int))                                        extends Stat with Printable
     case class Println(expr: Expr)(val pos: (Int, Int))                                      extends Stat with Printable
     case class If(cond: Expr, ifStat: List[Stat], elseStat: List[Stat])(val pos: (Int, Int)) extends Stat with Scopable
-    case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Stat with Scopable
+    case class While(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Loop
+    case class Do(cond: Expr, stats: List[Stat])(val pos: (Int, Int))                     extends Loop
+    case class For(start: Stat, cond: Expr, update: Stat, stats: List[Stat])(val pos: (Int, Int)) extends Loop
     case class Scope(stats: List[Stat])(val pos: (Int, Int))                                 extends Stat with Scopable
+
     case class CallStat(name: String, args: List[Expr])(val pos: (Int, Int)) extends Call with Stat {
         override def toString = s"CallStat(\"$name\",$args)"
     }
@@ -310,6 +327,9 @@ object ast {
     object Param extends ParserBridge2[Type, String, Param]
 
     object Skip      extends ParserBridge0[Stat]
+    object Break      extends ParserBridge0[Stat]
+    object Continue      extends ParserBridge0[Stat]
+
     object AssignNew extends ParserBridge3[Type, String, RValue, Stat]
     object Assign    extends ParserBridge2[LValue, RValue, Stat] {
         override def labels = List{"assignment"}
@@ -327,6 +347,13 @@ object ast {
     object If        extends ParserBridge3[Expr, List[Stat], List[Stat], Stat] {
         override def labels = List{"if"}
     }
+
+    object Do     extends ParserBridge2[List[Stat], Expr, Stat] {
+        def apply(stats: List[Stat], cond: Expr)(pos: (Int, Int)): Do = Do(cond, stats)(pos)
+    }
+
+    object For     extends ParserBridge4[Stat, Expr, Stat, List[Stat], Stat]
+
     object While     extends ParserBridge2[Expr, List[Stat], Stat] {
         override def labels = List{"while"}
     }
