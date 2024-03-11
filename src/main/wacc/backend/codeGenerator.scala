@@ -13,8 +13,11 @@ object codeGenerator {
  * @return The asm code generate
  */
     def generateAssembly(semanticResult: Either[String, SemanticInfo], assemblyTarget: TargetConfig): String = {
-        val ir = new Translator(semanticResult.toOption.get, assemblyTarget).translate()
-
-        assemblyTarget.assemble(ir)
+        semanticResult match {
+            case Left(err) => err
+            case Right(semInfo) =>
+                val ir = new Translator(semInfo, assemblyTarget).translate()
+                assemblyTarget.assemble(ir)
+        }
     }
 }

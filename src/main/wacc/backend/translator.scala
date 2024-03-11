@@ -146,16 +146,82 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
             case node: Assign     => translateAssign(node)
             case node: AssignNew  => translateDeclaration(node)
             case node: Read       => translateRead(node)
-            case node: While      => translateWhile(node)
             case node: Print      => translatePrint(node)
             case node: Println    => translatePrintln(node)
             case node: CallStat   => translateCall(node)
-            case Skip()           => 
+            case node: Skip       => 
+            case node: LoopControl => translateLoopControl(node)
+            case node: Loop       => translateLoop(node)
             case node: Exit       => translateExit(node)
             case node: Scope      => translateBlock(node.stats)(currentLabel, node.enclosingScopes(0))
             case node: Free       => translateFree(node)
             case node: Return     => translateReturn(node)
         }
+    }
+
+    def translateLoopControl(node: LoopControl)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+        node match {
+            case _: Break => currentLabel.buf += JmpASM(node.enclosingLoop.doneLabel)
+            case _: Continue => currentLabel.buf += JmpASM(node.enclosingLoop.updateLabel)
+        }
+    }
+    
+    def generateBranchLabels(node: Node): Unit = {
+        node match {
+            case loop: Loop =>
+                val loopType = loop match {
+                    case _: Do => "do"
+                    case _: For => "for"
+                    case _: While => "while"
+                }
+
+                loop.doneLabel = JumpLabel(s".L_${loopType}_done_$branchCounter")
+                loop.repeatLabel = JumpLabel(s".L_${loopType}_repeat_$branchCounter")
+                loop.condLabel = JumpLabel(s".L_${loopType}_cond_$branchCounter")
+
+                loop.updateLabel = loop match {
+                    case _: For => JumpLabel(s".L_${loopType}_update_$branchCounter")
+                    case _ => loop.condLabel
+                }
+
+                branchCounter += 1
+            case other => System.err.println(s"Warning: No labels were generated for $other")
+        }
+    }
+
+    def translateLoop(node: Loop)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
+        generateBranchLabels(node)
+
+        currentLabel.buf += Comment("Begin LOOP")
+
+        node match {
+            case _: While =>
+                currentLabel.buf += JmpASM(node.condLabel)
+            case forStat: For =>
+                translateStatement(forStat.start)
+                currentLabel.buf += JmpASM(node.condLabel)
+            case _ =>
+        }
+        
+        currentLabel.buf += node.repeatLabel
+        translateBlock(node.stats)(currentLabel, node.enclosingScopes(0))
+
+        node match {
+            case forStat: For =>
+                currentLabel.buf += node.updateLabel
+                translateStatement(forStat.update)
+            case _ =>
+        }
+
+        currentLabel.buf += node.condLabel
+
+        translateExpression(node.cond)
+        currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head, Byte)
+        currentLabel.buf += JmpASM(node.repeatLabel, Equal)
+
+        currentLabel.buf += node.doneLabel
+
+        currentLabel.buf += Comment("End LOOP")
     }
 
     /**
@@ -251,28 +317,6 @@ class Translator(val semanticInfo: SemanticInfo, val targetConfig: TargetConfig)
         currentLabel.buf += MovASM(ScratchRegs.head, ParamRegs.head)
         currentLabel.buf += CallASM(wrapperLabel)
         translateLValue(node.lvalue, true)
-    }
-
-    /**
-      * Generates code for 'while' statements
-      */
-    def translateWhile(node: While)(implicit currentLabel: LabelInfo, st: SymbolTable): Unit = {
-        // Implement translation for While statement here
-        val doneLabel = JumpLabel(s".L_while_done_$branchCounter")
-        val repeatLabel = JumpLabel(s".L_while_repeat_$branchCounter")
-        branchCounter += 1
-
-        currentLabel.buf += Comment("Begin WHILE")
-
-        currentLabel.buf += JmpASM(doneLabel)
-        currentLabel.buf += repeatLabel
-        translateBlock(node.stats)(currentLabel, node.enclosingScopes(0))
-        currentLabel.buf += doneLabel
-        translateExpression(node.cond)
-        currentLabel.buf += CmpASM(TrueImm, ScratchRegs.head, Byte)
-        currentLabel.buf += JmpASM(repeatLabel, Equal)
-
-        currentLabel.buf += Comment("End WHILE")
     }
 
     /**
