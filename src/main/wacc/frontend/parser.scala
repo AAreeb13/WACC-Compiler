@@ -77,7 +77,9 @@ object parser {
     lazy val param     = Param(declType, ident)
     lazy val stmtList: Parsley[List[Stat]] = sepBy1(stmt | _semicheck, ";")
 
-    lazy val stmt = (Skip from "skip") |
+    lazy val stmt: Parsley[Stat] = (Skip from "skip") |
+        (Continue from "continue") |
+        (Break from "break") |
         AssignNew(declType, ident <~ "=", rvalue) |
         (Assign(lvalue <~  _equalscheck, rvalue)) |
         Read("read" ~> lvalue) |
@@ -88,6 +90,8 @@ object parser {
         Println("println" ~> expr).hide |
         (If("if" ~> expr, "then" ~> stmtList, "else" ~> stmtList <~ "fi")) |
         (While("while" ~> expr, "do" ~> stmtList <~ "done")) |
+        (Do("do" ~> stmtList, "while" ~> expr <~ "done")) |
+        (For("for" ~> "(" ~> stmt, ";" ~> expr, ";" ~> stmt <~ ")", "do" ~> stmtList <~ "done")) |
         Scope("begin" ~> stmtList <~ "end") |
         CallStat("call" ~> ident, "(" ~> argList <~ ")")
 

@@ -3,9 +3,14 @@ package wacc
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 
-import ast.Node
+import ast.{Node, Scopable, Func}
 import semAst.SemType
 import implicits._
+import wacc.ast.Scope
+import wacc.ast.If
+import wacc.ast.Do
+import wacc.ast.For
+import wacc.ast.While
 
 /**
   * Doubly linked symbol table class that keeps track of parent and child nodes 
@@ -13,7 +18,7 @@ import implicits._
   * @param parent Optional ST for parent scopes
   */
 
-class SymbolTable(val parent: Option[SymbolTable] = None, val isArgTable: Boolean = false) {
+class SymbolTable(val parent: Option[SymbolTable] = None, val enclosingNode: Scopable, val isArgTable: Boolean = false) {
     //  (ident, (semantic type, reference to original node))
     private var table: HashMap[String, (SemType, Node)] = HashMap.empty
     private var locationTable: HashMap[String, IR.Location] = HashMap.empty
@@ -21,7 +26,15 @@ class SymbolTable(val parent: Option[SymbolTable] = None, val isArgTable: Boolea
     
     // freeze variables?
     private var scopeSize = 0
+    // This is used for base pointer offsets in a function
     private var basePointerOffset = 0
+
+    def getEnclosingNode(): Scopable = enclosingNode
+
+    // def getEnclosingNodeOfType[T <: Scopable](): Option[Scopable] = enclosingNode match {
+    //     case T => Some(enclosingNode)
+    //     case _ => parent.flatMap(_.getEnclosingNodeOfType[T]())
+    // }
 
     // add child to parent so we don't need to explictly do this
     if (parent.isDefined) parent.get.addChild(this)

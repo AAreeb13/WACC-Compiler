@@ -41,7 +41,7 @@ object semanticChecker {
         val errorCollector = errorCollectorOption.getOrElse(new SemanticErrorCollector)
 
         // Global symbol table
-        var mainScope = new SymbolTable()
+        var mainScope = new SymbolTable(None, prog)
         var topLevelScopes: ListBuffer[SymbolTable] = ListBuffer(mainScope)
         var funcTable: FuncTable = HashMap.empty
 
@@ -96,7 +96,7 @@ object semanticChecker {
          */
         def checkFunction(func: Func): Unit = {
             // A new symbol table for the function is created and added to the list
-            val funcArgSymbolTable = new SymbolTable(None, true)
+            val funcArgSymbolTable = new SymbolTable(None, func, true)
             func.scope = funcArgSymbolTable
             topLevelScopes.addOne(funcArgSymbolTable)
 
@@ -112,7 +112,7 @@ object semanticChecker {
             
             // Function body can declare new variables with same name as args
             // so a new scope is needed
-            val funcBodySymbolTable = new SymbolTable(Some(funcArgSymbolTable))
+            val funcBodySymbolTable = new SymbolTable(Some(funcArgSymbolTable), func)
 
             // Each statement in the function is semantically checked
             // The return type is passed in so that the "Return" statment can match against its expected type
@@ -131,11 +131,19 @@ object semanticChecker {
             //println(s"$currentScope, $stat")
             implicit val node: Node = stat
             stat match {
-                case w@While(cond, stats) => 
-                    // Checks that condition is a boolean type
-                    matchesType(checkExpression(cond), SemBool)(cond)
-                    val childScope = new SymbolTable(Some(currentScope))
-                    w.enclosingScopes += childScope
+                case loop@Loop(cond, stats) =>
+                    loop match {
+                        case _: Do | _: While  =>
+                            matchesType(checkExpression(cond), SemBool)(cond)
+
+                        case For(start, _, update, _) =>
+                            checkStatement(start, expectedType)
+                            matchesType(checkExpression(cond), SemBool)(cond)
+                            checkStatement(update, expectedType)
+                    }
+
+                    val childScope = new SymbolTable(Some(currentScope), loop)
+                    loop.enclosingScopes += childScope
                     stats.foreach(checkStatement(_, expectedType)(childScope))
 
                 case Assign(lvalue, rvalue) => 
@@ -148,38 +156,50 @@ object semanticChecker {
                         case (lvalType, rvalType) => matchesType(lvalType, rvalType)
                     }
 
-                case f@Free(expr) => checkExpression(expr) match {
+                case free@Free(expr) => checkExpression(expr) match {
                         // Expression must be any of "null", array or pair
-                        case SemArray(_) => f.isArray = true
+                        case SemArray(_) => free.isArray = true
                         case SemNull | SemPair(_, _) =>
                         case other =>
                             errorCollector.addError(expr, TypeError(s"$other", "1-dimensional array or pair type"))
                     }
 
-                case p@Print(expr) => p.enclosingType = checkExpression(expr)
-                case p@Println(expr) => p.enclosingType = checkExpression(expr)
-                case Skip() => // do nothing
+                case print@Print(expr) => print.enclosingType = checkExpression(expr)
+                case println@Println(expr) => println.enclosingType = checkExpression(expr)
+
+                case _: Skip => // do nothing
+
+                case loopControl: LoopControl =>
+                    def getEnclosingLoop(st: SymbolTable): Option[Loop] = st.getEnclosingNode() match {
+                        case loop: Loop => Some(loop)
+                        case _ => st.parent.flatMap(getEnclosingLoop)
+                    }
+
+                    getEnclosingLoop(currentScope) match {
+                        case None => errorCollector.addError(node, SpecialError(s"$loopControl statement error", "Statement is not inside a loop"))
+                        case Some(loop) => loopControl.enclosingLoop = loop
+                    }
+
 
                 // Exit must be an integer
                 case Exit(expr) => matchesType(checkExpression(expr), SemInt)(expr)
 
-                case s@Scope(stats) =>
-                    val childScope = new SymbolTable(Some(currentScope))
-                    s.enclosingScopes += childScope
+                case scope@Scope(stats) =>
+                    val childScope = new SymbolTable(Some(currentScope), scope)
+                    scope.enclosingScopes += childScope
                     stats.foreach(checkStatement(_, expectedType)(childScope))
 
                 case call: CallStat => checkCall(call)
-                
 
-                case i@If(cond, ifStats, elseStats) =>
+                case ifElse@If(cond, ifStats, elseStats) =>
                     matchesType(checkExpression(cond), SemBool)
                 
-                    val ifChild = new SymbolTable(Some(currentScope))
-                    i.enclosingScopes += ifChild
+                    val ifChild = new SymbolTable(Some(currentScope), ifElse)
+                    ifElse.enclosingScopes += ifChild
                     ifStats.foreach(checkStatement(_, expectedType)(ifChild))
 
-                    val elseChild = new SymbolTable(Some(currentScope))
-                    i.enclosingScopes += elseChild
+                    val elseChild = new SymbolTable(Some(currentScope), ifElse)
+                    ifElse.enclosingScopes += elseChild
                     elseStats.foreach(checkStatement(_, expectedType)(elseChild))
 
                 case Return(expr) => expectedType match {
@@ -192,10 +212,10 @@ object semanticChecker {
                     }
                 }
                     
-                case r@Read(lvalue) => checkLValue(lvalue) match {
+                case read@Read(lvalue) => checkLValue(lvalue) match {
                     case SemUnknown => 
                         errorCollector.addError(lvalue, SpecialError("Type Error", "Attempting to read from unknown type. Reading from a nested pair extraction is not legal due to pair erasure"))
-                    case other => r.enclosingType = matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
+                    case other => read.enclosingType = matchesType(checkLValue(lvalue), List[SemType](SemInt, SemChar))
                 }
 
                 case assignNew@AssignNew(declType, ident, rvalue) =>
@@ -207,6 +227,8 @@ object semanticChecker {
                     else {
                         errorCollector.addError(stat, RedeclaredVarError(assignNew, currentScope.nodeof(ident)))
                     }
+
+                case other => errorCollector.addError(stat, SpecialError("Unknown Statement Error", s"Cannot semantic check ${other}. Check the pattern match"))
             }
         }
 

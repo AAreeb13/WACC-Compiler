@@ -27,6 +27,8 @@ object lexer {
         symbolDesc = SymbolDesc.plain.copy(
             hardKeywords = Set(
                 "skip",
+                "break",
+                "continue",
                 "begin",
                 "end",
                 "read",
@@ -59,7 +61,8 @@ object lexer {
                 "chr",
                 "true",
                 "false",
-                "null"
+                "null",
+                "for"
             ),
             hardOperators = Set(
                 // binary operators
@@ -78,7 +81,8 @@ object lexer {
                 "||",
                 // unary operators
                 "!",
-                "-"
+                "-",
+                ";"
             )
         ),
         numericDesc = numeric.NumericDesc.plain.copy(
