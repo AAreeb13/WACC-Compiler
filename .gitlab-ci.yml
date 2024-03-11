@@ -4,9 +4,6 @@ stages:
   - build
   - test
 
-variables:
-  GIT_SUBMODULE_STRATEGY: recursive
-
 build-job:       
   stage: build
   script:
